@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const BACKEND_URL = process.env.INTERNAL_API_URL || 'http://shifra-backend:8000'
+const BACKEND_URL = process.env.INTERNAL_API_URL || 'http://enclava-backend:8000'
 
 export async function GET(
   request: NextRequest,

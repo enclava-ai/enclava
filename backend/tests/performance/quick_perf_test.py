@@ -8,8 +8,8 @@ import requests
 import json
 
 # Configuration
-API_KEY = "ce_mMJNyEznKHJRvvNyyuwuQotuWJ2BvdD8"
-LITELLM_KEY = "shifra-master-key"
+API_KEY = "en_mMJNyEznKHJRvvNyyuwuQotuWJ2BvdD8"
+LITELLM_KEY = "enclava-master-key"
 TEST_PROMPT = "What is 2+2? Answer briefly."
 MODEL = "ollama-deepseek-r1"
 

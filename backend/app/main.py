@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     """
     Application lifespan handler
     """
-    logger.info("Starting Confidential Empire platform...")
+    logger.info("Starting Enclava platform...")
     
     # Initialize database
     await init_db()
@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Modular AI Gateway Platform with confidential AI processing",
+    description="Enclava - Modular AI Platform with confidential processing",
     version="1.0.0",
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",
@@ -201,7 +201,7 @@ async def health_check():
 async def root():
     """Root endpoint"""
     return {
-        "message": "Confidential Empire - Modular AI Gateway Platform",
+        "message": "Enclava - Modular AI Platform",
         "version": "1.0.0",
         "docs": "/api/v1/docs",
     }

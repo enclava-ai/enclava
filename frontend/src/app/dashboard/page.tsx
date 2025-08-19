@@ -205,7 +205,7 @@ function DashboardContent() {
             Welcome back, {user.name}
           </h1>
           <p className="text-empire-gold/60 mt-1">
-            Manage your AI gateway and modules
+            Manage your Enclava platform and modules
           </p>
         </div>
         <Button className="bg-empire-gold hover:bg-empire-gold/90 text-empire-dark">

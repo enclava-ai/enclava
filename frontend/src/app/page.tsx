@@ -43,7 +43,7 @@ export default function HomePage() {
               <div className="w-8 h-8 bg-empire-gold rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-empire-dark" />
               </div>
-              <span className="text-xl font-bold text-empire-gold">AI Gateway</span>
+              <span className="text-xl font-bold text-empire-gold">Enclava</span>
             </div>
             <nav className="hidden md:flex items-center space-x-6">
               <a href="#features" className="text-empire-gold/60 hover:text-empire-gold">
@@ -78,9 +78,9 @@ export default function HomePage() {
               AI Processing Platform
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold mb-6 text-empire-gold">
-              Secure AI Gateway with{' '}
+              Secure AI Platform with{' '}
               <span className="bg-gradient-to-r from-empire-gold to-empire-gold/80 bg-clip-text text-transparent">
-                Secure Computing
+                Confidential Computing
               </span>
             </h1>
             <p className="text-xl text-empire-gold/60 mb-8">
@@ -206,7 +206,7 @@ export default function HomePage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4 text-empire-gold">Available Modules</h2>
             <p className="text-empire-gold/60 max-w-2xl mx-auto">
-              Extend your AI gateway with powerful modules for enhanced functionality
+              Extend your Enclava platform with powerful modules for enhanced functionality
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -278,7 +278,7 @@ export default function HomePage() {
               <div className="w-6 h-6 bg-empire-gold rounded flex items-center justify-center">
                 <Shield className="w-4 h-4 text-empire-dark" />
               </div>
-              <span className="font-semibold text-empire-gold">AI Gateway</span>
+              <span className="font-semibold text-empire-gold">Enclava</span>
             </div>
             <div className="flex items-center space-x-6 text-sm text-empire-gold/60">
               <a href="/docs" className="hover:text-empire-gold">Documentation</a>
@@ -288,7 +288,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-empire-gold/20 text-center text-sm text-empire-gold/60">
-            <p>&copy; 2024 AI Gateway. All rights reserved.</p>
+            <p>&copy; 2024 Enclava. All rights reserved.</p>
           </div>
         </div>
       </footer>

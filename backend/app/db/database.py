@@ -26,7 +26,7 @@ engine = create_async_engine(
     connect_args={
         "command_timeout": 5,
         "server_settings": {
-            "application_name": "shifra_backend",
+            "application_name": "enclava_backend",
         },
     },
 )
@@ -49,7 +49,7 @@ sync_engine = create_engine(
     pool_recycle=3600,     # Recycle connections every hour
     pool_timeout=30,       # Max time to get connection from pool
     connect_args={
-        "application_name": "shifra_backend_sync",
+        "application_name": "enclava_backend_sync",
     },
 )
 

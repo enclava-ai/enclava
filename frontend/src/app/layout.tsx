@@ -17,22 +17,22 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL('http://localhost:3000'),
-  title: 'AI Gateway Platform',
+  title: 'Enclava Platform',
   description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
-  keywords: ['AI', 'Gateway', 'Confidential Computing', 'LLM', 'TEE'],
-  authors: [{ name: 'AI Gateway Team' }],
+  keywords: ['AI', 'Enclava', 'Confidential Computing', 'LLM', 'TEE'],
+  authors: [{ name: 'Enclava Team' }],
   robots: 'index, follow',
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'http://localhost:3000',
-    title: 'AI Gateway Platform',
+    title: 'Enclava Platform',
     description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
-    siteName: 'AI Gateway',
+    siteName: 'Enclava',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'AI Gateway Platform',
+    title: 'Enclava Platform',
     description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
   },
 }

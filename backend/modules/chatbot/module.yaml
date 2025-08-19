@@ -1,7 +1,7 @@
 name: chatbot
 version: 1.0.0
 description: "AI Chatbot with RAG integration and customizable prompts"
-author: "AI Gateway Team"
+author: "Enclava Team"
 category: "conversation"
 
 # Module lifecycle

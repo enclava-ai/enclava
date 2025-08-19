@@ -69,7 +69,7 @@ const Navigation = () => {
           <Link href={user ? "/dashboard" : "/"} className="mr-6 flex items-center space-x-2">
             <div className="h-6 w-6 rounded bg-gradient-to-br from-empire-600 to-empire-800" />
             <span className="hidden font-bold sm:inline-block">
-              AI Gateway
+              Enclava
             </span>
           </Link>
           {user && (

@@ -675,7 +675,7 @@ function LLMPageContent() {
             <CardHeader>
               <CardTitle>Available Models</CardTitle>
               <CardDescription>
-                Models available through your LLM gateway.
+                Models available through your LLM platform.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -691,7 +691,7 @@ function LLMPageContent() {
                 ))}
                 {models.length === 0 && (
                   <div className="col-span-full text-center py-8 text-muted-foreground">
-                    No models available. Check your LLM gateway configuration.
+                    No models available. Check your LLM platform configuration.
                   </div>
                 )}
               </div>

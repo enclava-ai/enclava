@@ -13,8 +13,8 @@ from typing import Dict, List, Tuple
 # Test configuration
 PLATFORM_URL = "http://localhost:58000/api/v1/llm/chat/completions"
 LITELLM_URL = "http://localhost:54000/chat/completions"
-API_KEY = "ce_mMJNyEznKHJRvvNyyuwuQotuWJ2BvdD8"
-LITELLM_KEY = "shifra-master-key"  # From docker-compose.yml
+API_KEY = "en_mMJNyEznKHJRvvNyyuwuQotuWJ2BvdD8"
+LITELLM_KEY = "enclava-master-key"  # From docker-compose.yml
 
 TEST_PROMPT = "What is the capital of France? Give a brief answer."
 MODEL = "ollama-deepseek-r1"

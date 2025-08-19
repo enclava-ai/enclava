@@ -30,7 +30,7 @@ export default function LoginPage() {
       await login(email, password)
       toast({
         title: "Login successful",
-        description: "Welcome to Confidential Empire",
+        description: "Welcome to Enclava",
       })
       router.push("/dashboard")
     } catch (error) {
@@ -54,10 +54,10 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-empire-gold">
-            Confidential Empire
+            Enclava
           </CardTitle>
           <CardDescription>
-            Sign in to your secure AI gateway
+            Sign in to your secure AI platform
           </CardDescription>
         </CardHeader>
         <CardContent>

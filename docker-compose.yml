@@ -1,26 +1,26 @@
-name: shifra
+name: enclava
 
 services:
   # Main application backend
-  shifra-backend:
+  enclava-backend:
     build: 
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgresql://shifra_user:shifra_pass@shifra-postgres:5432/shifra_db
-      - REDIS_URL=redis://shifra-redis:6379
-      - QDRANT_HOST=shifra-qdrant
+      - DATABASE_URL=postgresql://enclava_user:enclava_pass@enclava-postgres:5432/enclava_db
+      - REDIS_URL=redis://enclava-redis:6379
+      - QDRANT_HOST=enclava-qdrant
       - LITELLM_BASE_URL=http://litellm-proxy:4000
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-shifra-master-key}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-enclava-master-key}
       - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-here}
       - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}
       - ADMIN_USER=${ADMIN_USER:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - LOG_LLM_PROMPTS=${LOG_LLM_PROMPTS:-false}
     depends_on:
-      - shifra-postgres
-      - shifra-redis
-      - shifra-qdrant
+      - enclava-postgres
+      - enclava-redis
+      - enclava-qdrant
       - litellm-proxy
     ports:
       - "58000:8000"
@@ -28,51 +28,51 @@ services:
       - ./backend:/app
       - ./logs:/app/logs
     networks:
-      - conf-ai-net
+      - enclava-net
     restart: unless-stopped
 
   # Next.js frontend
-  shifra-frontend:
+  enclava-frontend:
     image: node:18-alpine
     working_dir: /app
     command: sh -c "npm install && npm run dev"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:58000
       - NEXT_PUBLIC_WS_URL=ws://localhost:58000
-      - INTERNAL_API_URL=http://shifra-backend:8000
+      - INTERNAL_API_URL=http://enclava-backend:8000
     depends_on:
-      - shifra-backend
+      - enclava-backend
     ports:
       - "53000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     networks:
-      - conf-ai-net
+      - enclava-net
     restart: unless-stopped
 
   # PostgreSQL database
-  shifra-postgres:
+  enclava-postgres:
     image: postgres:16
     environment:
-      - POSTGRES_DB=shifra_db
-      - POSTGRES_USER=shifra_user
-      - POSTGRES_PASSWORD=shifra_pass
+      - POSTGRES_DB=enclava_db
+      - POSTGRES_USER=enclava_user
+      - POSTGRES_PASSWORD=enclava_pass
     volumes:
-      - shifra-postgres-data:/var/lib/postgresql/data
+      - enclava-postgres-data:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d
     networks:
-      - conf-ai-net
+      - enclava-net
     restart: unless-stopped
 
   # Redis for caching and message queue
-  shifra-redis:
+  enclava-redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes:
-      - shifra-redis-data:/data
+      - enclava-redis-data:/data
     networks:
-      - conf-ai-net
+      - enclava-net
     restart: unless-stopped
 
   # LiteLLM proxy for unified LLM API
@@ -81,9 +81,9 @@ services:
     environment:
       - UI_USERNAME=admin
       - UI_PASSWORD=${LITELLM_UI_PASSWORD:-admin123}
-      - DATABASE_URL=postgresql://shifra_user:shifra_pass@shifra-postgres:5432/shifra_db
+      - DATABASE_URL=postgresql://enclava_user:enclava_pass@enclava-postgres:5432/enclava_db
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      #- OLLAMA_BASE_URL=http://shifra-ollama-proxy:11434/v1
+      #- OLLAMA_BASE_URL=http://enclava-ollama-proxy:11434/v1
       #- OLLAMA_API_KEY=ollama
       - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
@@ -92,15 +92,15 @@ services:
       - ./litellm_config.yaml:/app/config.yaml
     command: --config /app/config.yaml --port 4000 --num_workers 1
     depends_on:
-      - shifra-postgres
+      - enclava-postgres
     ports:
       - "54000:4000"
     networks:
-      - conf-ai-net
+      - enclava-net
     restart: unless-stopped
 
   # Ollama Free Model Proxy
-  #shifra-ollama-proxy:
+  #enclava-ollama-proxy:
   #  build: 
   #    context: /home/lio/cloud/code/ollama-free-model-proxy
   #    dockerfile: Dockerfile
@@ -109,10 +109,10 @@ services:
   #    - FREE_MODE=true
   #    - TOOL_USE_ONLY=false
   #  volumes:
-  #    - shifra-ollama-data:/data
+  #    - enclava-ollama-data:/data
   #  working_dir: /data
   #  networks:
-  #    - conf-ai-net
+  #    - enclava-net
   #  restart: unless-stopped
     #healthcheck:
     #  test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:11434/"]
@@ -122,7 +122,7 @@ services:
     #  start_period: 40s
 
   # Qdrant vector database
-  shifra-qdrant:
+  enclava-qdrant:
     image: qdrant/qdrant:latest
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
@@ -131,9 +131,9 @@ services:
       - "56333:6333"  # HTTP API and Web Interface
       - "56334:6334"  # GRPC API (optional)
     volumes:
-      - shifra-qdrant-data:/qdrant/storage
+      - enclava-qdrant-data:/qdrant/storage
     networks:
-      - conf-ai-net
+      - enclava-net
     restart: unless-stopped
 
   # Privatemode.ai service (optional - for confidential models)
@@ -151,15 +151,15 @@ services:
     ports:
       - "58080:8080"
     networks:
-      - conf-ai-net
+      - enclava-net
     restart: unless-stopped
 
 volumes:
-  shifra-postgres-data:
-  shifra-redis-data:
-  shifra-qdrant-data:
-#  shifra-ollama-data:
+  enclava-postgres-data:
+  enclava-redis-data:
+  enclava-qdrant-data:
+#  enclava-ollama-data:
 
 networks:
-  conf-ai-net:
+  enclava-net:
     driver: bridge

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings"""
     
     # Application
-    APP_NAME: str = "Shifra"
+    APP_NAME: str = "Enclava"
     APP_DEBUG: bool = False
     APP_LOG_LEVEL: str = "INFO"
     APP_HOST: str = "0.0.0.0"
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     SESSION_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
-    API_KEY_PREFIX: str = "ce_"
+    API_KEY_PREFIX: str = "en_"
     
     # Admin user provisioning
     ADMIN_USER: str = "admin"
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     
     # LiteLLM
     LITELLM_BASE_URL: str = "http://localhost:4000"
-    LITELLM_MASTER_KEY: str = "empire-master-key"
+    LITELLM_MASTER_KEY: str = "enclava-master-key"
     
     # API Keys for LLM providers
     OPENAI_API_KEY: Optional[str] = None

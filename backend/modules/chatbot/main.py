@@ -803,7 +803,7 @@ class ChatbotModule(BaseModule):
                     try:
                         # Try to verify the collection exists in Qdrant
                         from qdrant_client import QdrantClient
-                        qdrant_client = QdrantClient(host="shifra-qdrant", port=6333)
+                        qdrant_client = QdrantClient(host="enclava-qdrant", port=6333)
                         collections = qdrant_client.get_collections()
                         collection_names = [c.name for c in collections.collections]
                         

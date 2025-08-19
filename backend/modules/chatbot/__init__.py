@@ -12,7 +12,7 @@ This module provides AI chatbot capabilities with:
 from .main import ChatbotModule, create_module
 
 __version__ = "1.0.0"
-__author__ = "AI Gateway Team"
+__author__ = "Enclava Team"
 
 # Export main classes for easy importing
 __all__ = [
