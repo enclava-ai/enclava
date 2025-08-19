@@ -1,0 +1,5 @@
+{
+  "redis_url": "redis://empire-redis:6379/0",
+  "timeout": 30,
+  "max_connections": 10
+}

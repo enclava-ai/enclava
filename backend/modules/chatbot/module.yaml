@@ -1,0 +1,146 @@
+name: chatbot
+version: 1.0.0
+description: "AI Chatbot with RAG integration and customizable prompts"
+author: "AI Gateway Team"
+category: "conversation"
+
+# Module lifecycle
+enabled: true
+auto_start: true
+dependencies: 
+  - rag
+  - workflow
+optional_dependencies:
+  - analytics
+
+# Configuration
+config_schema: "./config_schema.json"
+ui_components: "./ui_components/"
+
+# Module capabilities
+provides:
+  - "chat_completion"
+  - "conversation_management"
+  - "chatbot_configuration"
+  - "workflow_chat_step"
+
+consumes:
+  - "rag_search"
+  - "llm_completion"
+  - "workflow_execution"
+
+# API endpoints
+endpoints:
+  - path: "/chatbot/chat"
+    method: "POST"
+    description: "Generate chat completion"
+    
+  - path: "/chatbot/create"
+    method: "POST" 
+    description: "Create new chatbot instance"
+    
+  - path: "/chatbot/list"
+    method: "GET"
+    description: "List user chatbots"
+
+# Workflow integration
+workflow_steps:
+  - name: "chatbot_response"
+    description: "Generate chatbot response with optional RAG context"
+    inputs:
+      - name: "message"
+        type: "string"
+        required: true
+        description: "User message to respond to"
+      - name: "chatbot_id" 
+        type: "string"
+        required: true
+        description: "ID of configured chatbot instance"
+      - name: "use_rag"
+        type: "boolean"
+        required: false
+        default: false
+        description: "Whether to use RAG for context"
+      - name: "context"
+        type: "object"
+        required: false
+        description: "Additional context data"
+    outputs:
+      - name: "response"
+        type: "string"
+        description: "Generated chatbot response"
+      - name: "conversation_id"
+        type: "string"
+        description: "Conversation ID for follow-up"
+      - name: "sources"
+        type: "array"
+        description: "RAG sources used (if any)"
+
+# UI Configuration
+ui_config:
+  icon: "message-circle"
+  color: "#10B981"
+  category: "AI & ML"
+  
+  # Configuration forms
+  forms:
+    - name: "basic_config"
+      title: "Basic Settings"
+      fields: ["name", "chatbot_type", "model"]
+      
+    - name: "personality"
+      title: "Personality & Prompts"
+      fields: ["system_prompt", "temperature", "fallback_responses"]
+      
+    - name: "knowledge_base"
+      title: "Knowledge Base"
+      fields: ["use_rag", "rag_collection", "rag_top_k"]
+      
+    - name: "advanced"
+      title: "Advanced Settings"
+      fields: ["max_tokens", "memory_length"]
+
+# Permissions
+permissions:
+  - name: "chatbot.create"
+    description: "Create new chatbot instances"
+    
+  - name: "chatbot.configure" 
+    description: "Configure chatbot settings"
+    
+  - name: "chatbot.chat"
+    description: "Use chatbot for conversations"
+    
+  - name: "chatbot.manage"
+    description: "Manage all chatbots (admin)"
+
+# Analytics events
+analytics_events:
+  - name: "chatbot_created"
+    description: "New chatbot instance created"
+    
+  - name: "chat_message_sent"
+    description: "User sent message to chatbot"
+    
+  - name: "chat_response_generated" 
+    description: "Chatbot generated response"
+    
+  - name: "rag_context_used"
+    description: "RAG context was used in response"
+
+# Health checks
+health_checks:
+  - name: "llm_connectivity"
+    description: "Check LLM client connection"
+    
+  - name: "rag_availability"
+    description: "Check RAG module availability"
+    
+  - name: "conversation_memory"
+    description: "Check conversation storage health"
+
+# Documentation
+documentation:
+  readme: "./README.md"
+  examples: "./examples/"
+  api_docs: "./docs/api.md"

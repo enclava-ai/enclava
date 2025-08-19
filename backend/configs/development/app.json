@@ -1,0 +1,7 @@
+{
+  "name": "Confidential Empire",
+  "version": "1.0.0",
+  "debug": true,
+  "log_level": "INFO",
+  "timezone": "UTC"
+}

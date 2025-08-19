@@ -1,0 +1,279 @@
+"""
+Authentication API endpoints
+"""
+
+from datetime import datetime, timedelta
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+from pydantic import BaseModel, EmailStr, validator
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.core.config import settings
+from app.core.security import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+    get_current_user,
+    get_current_active_user,
+)
+from app.db.database import get_db
+from app.models.user import User
+from app.utils.exceptions import AuthenticationError, ValidationError
+
+router = APIRouter()
+security = HTTPBearer()
+
+
+# Request/Response Models
+class UserRegisterRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+    
+    @validator('username')
+    def validate_username(cls, v):
+        if len(v) < 3:
+            raise ValueError('Username must be at least 3 characters long')
+        if not v.isalnum():
+            raise ValueError('Username must contain only alphanumeric characters')
+        return v
+
+
+class UserLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    username: str
+    full_name: Optional[str]
+    is_active: bool
+    is_verified: bool
+    role: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(
+    user_data: UserRegisterRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Register a new user"""
+    
+    # Check if user already exists
+    stmt = select(User).where(User.email == user_data.email)
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Check if username already exists
+    stmt = select(User).where(User.username == user_data.username)
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
+    
+    # Create new user
+    full_name = None
+    if user_data.first_name or user_data.last_name:
+        full_name = f"{user_data.first_name or ''} {user_data.last_name or ''}".strip()
+    
+    user = User(
+        email=user_data.email,
+        username=user_data.username,
+        hashed_password=get_password_hash(user_data.password),
+        full_name=full_name,
+        is_active=True,
+        is_verified=False,
+        role="user"
+    )
+    
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    
+    return UserResponse.from_orm(user)
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    user_data: UserLoginRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Login user and return access tokens"""
+    
+    # Get user by email
+    stmt = select(User).where(User.email == user_data.email)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user or not verify_password(user_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is disabled"
+        )
+    
+    # Update last login
+    user.update_last_login()
+    await db.commit()
+    
+    # Create tokens
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "is_superuser": user.is_superuser,
+            "role": user.role
+        },
+        expires_delta=access_token_expires
+    )
+    
+    refresh_token = create_refresh_token(
+        data={"sub": str(user.id), "type": "refresh"}
+    )
+    
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(
+    token_data: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Refresh access token using refresh token"""
+    
+    try:
+        payload = verify_token(token_data.refresh_token)
+        user_id = payload.get("sub")
+        token_type = payload.get("type")
+        
+        if not user_id or token_type != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token"
+            )
+        
+        # Get user from database
+        stmt = select(User).where(User.id == int(user_id))
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found or inactive"
+            )
+        
+        # Create new access token
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={
+                "sub": str(user.id),
+                "email": user.email,
+                "is_superuser": user.is_superuser,
+                "role": user.role
+            },
+            expires_delta=access_token_expires
+        )
+        
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=token_data.refresh_token,  # Keep same refresh token
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(
+    current_user: dict = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get current user information"""
+    
+    # Get full user details from database
+    stmt = select(User).where(User.id == int(current_user["id"]))
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return UserResponse.from_orm(user)
+
+
+@router.post("/logout")
+async def logout():
+    """Logout user (client should discard tokens)"""
+    return {"message": "Successfully logged out"}
+
+
+@router.post("/verify-token")
+async def verify_user_token(
+    current_user: dict = Depends(get_current_user)
+):
+    """Verify if the current token is valid"""
+    return {
+        "valid": True,
+        "user_id": current_user["id"],
+        "email": current_user["email"]
+    }

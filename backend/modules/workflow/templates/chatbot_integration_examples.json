@@ -1,0 +1,389 @@
+{
+  "templates": [
+    {
+      "id": "simple_chatbot_interaction",
+      "name": "Simple Chatbot Interaction",
+      "description": "Basic workflow that processes user input through a configured chatbot",
+      "version": "1.0",
+      "variables": {
+        "user_message": "Hello, I need help with my account",
+        "chatbot_id": "customer_support_bot"
+      },
+      "steps": [
+        {
+          "id": "chatbot_response",
+          "name": "Get Chatbot Response",
+          "type": "chatbot",
+          "chatbot_id": "{chatbot_id}",
+          "message_template": "{user_message}",
+          "output_variable": "bot_response",
+          "create_new_conversation": true,
+          "save_conversation_id": "conversation_id"
+        }
+      ],
+      "outputs": {
+        "response": "{bot_response}",
+        "conversation_id": "{conversation_id}"
+      },
+      "metadata": {
+        "created_by": "system",
+        "use_case": "customer_support",
+        "tags": ["chatbot", "simple", "customer_support"]
+      }
+    },
+    {
+      "id": "multi_turn_customer_support",
+      "name": "Multi-Turn Customer Support Flow",
+      "description": "Advanced customer support workflow with intent classification, knowledge base lookup, and escalation",
+      "version": "1.0",
+      "variables": {
+        "user_message": "My order hasn't arrived yet",
+        "customer_support_chatbot": "support_assistant",
+        "escalation_chatbot": "human_handoff_bot",
+        "rag_collection": "support_knowledge_base"
+      },
+      "steps": [
+        {
+          "id": "classify_intent",
+          "name": "Classify User Intent",
+          "type": "llm_call",
+          "model": "gpt-3.5-turbo",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are an intent classifier. Classify the user's message into one of: order_inquiry, technical_support, billing, general_question, escalation_needed. Respond with only the classification."
+            },
+            {
+              "role": "user",
+              "content": "{user_message}"
+            }
+          ],
+          "output_variable": "intent"
+        },
+        {
+          "id": "handle_order_inquiry",
+          "name": "Handle Order Inquiry",
+          "type": "chatbot",
+          "conditions": ["{intent} == 'order_inquiry'"],
+          "chatbot_id": "{customer_support_chatbot}",
+          "message_template": "Customer inquiry about order: {user_message}",
+          "output_variable": "support_response",
+          "context_variables": {
+            "intent": "intent",
+            "inquiry_type": "order_inquiry"
+          }
+        },
+        {
+          "id": "handle_technical_support",
+          "name": "Handle Technical Support",
+          "type": "chatbot", 
+          "conditions": ["{intent} == 'technical_support'"],
+          "chatbot_id": "{customer_support_chatbot}",
+          "message_template": "Technical support request: {user_message}",
+          "output_variable": "support_response",
+          "context_variables": {
+            "intent": "intent",
+            "inquiry_type": "technical_support"
+          }
+        },
+        {
+          "id": "escalate_to_human",
+          "name": "Escalate to Human Agent",
+          "type": "chatbot",
+          "conditions": ["{intent} == 'escalation_needed'"],
+          "chatbot_id": "{escalation_chatbot}",
+          "message_template": "Customer needs human assistance: {user_message}",
+          "output_variable": "escalation_response"
+        },
+        {
+          "id": "general_response",
+          "name": "General Support Response",
+          "type": "chatbot",
+          "conditions": ["{intent} == 'general_question' or {intent} == 'billing'"],
+          "chatbot_id": "{customer_support_chatbot}",
+          "message_template": "{user_message}",
+          "output_variable": "support_response"
+        },
+        {
+          "id": "format_final_response",
+          "name": "Format Final Response",
+          "type": "transform",
+          "input_variable": "support_response",
+          "output_variable": "final_response",
+          "transformation": "extract:response"
+        }
+      ],
+      "outputs": {
+        "intent": "{intent}",
+        "response": "{final_response}",
+        "escalation_response": "{escalation_response}"
+      },
+      "error_handling": {
+        "retry_failed_steps": true,
+        "max_retries": 2,
+        "fallback_response": "I apologize, but I'm experiencing technical difficulties. Please try again later or contact support directly."
+      },
+      "metadata": {
+        "created_by": "system",
+        "use_case": "customer_support",
+        "tags": ["chatbot", "multi_turn", "intent_classification", "escalation"]
+      }
+    },
+    {
+      "id": "research_assistant_workflow",
+      "name": "AI Research Assistant",
+      "description": "Research workflow that uses specialized chatbots for different research tasks",
+      "version": "1.0",
+      "variables": {
+        "research_topic": "artificial intelligence trends 2024",
+        "researcher_chatbot": "ai_researcher",
+        "analyst_chatbot": "data_analyst",
+        "writer_chatbot": "content_writer"
+      },
+      "steps": [
+        {
+          "id": "initial_research",
+          "name": "Conduct Initial Research",
+          "type": "chatbot",
+          "chatbot_id": "{researcher_chatbot}",
+          "message_template": "Please research the following topic and provide key findings: {research_topic}",
+          "output_variable": "research_findings",
+          "create_new_conversation": true,
+          "save_conversation_id": "research_conversation"
+        },
+        {
+          "id": "analyze_findings",
+          "name": "Analyze Research Findings",
+          "type": "chatbot",
+          "chatbot_id": "{analyst_chatbot}",
+          "message_template": "Please analyze these research findings and identify key trends and insights: {research_findings}",
+          "output_variable": "analysis_results",
+          "create_new_conversation": true
+        },
+        {
+          "id": "create_summary",
+          "name": "Create Executive Summary",
+          "type": "chatbot",
+          "chatbot_id": "{writer_chatbot}",
+          "message_template": "Create an executive summary based on this research and analysis:\n\nTopic: {research_topic}\nResearch: {research_findings}\nAnalysis: {analysis_results}",
+          "output_variable": "executive_summary"
+        },
+        {
+          "id": "follow_up_questions",
+          "name": "Generate Follow-up Questions",
+          "type": "chatbot",
+          "chatbot_id": "{researcher_chatbot}",
+          "message_template": "Based on this research on {research_topic}, what are 5 important follow-up questions that should be investigated further?",
+          "output_variable": "follow_up_questions",
+          "conversation_id": "research_conversation"
+        }
+      ],
+      "outputs": {
+        "research_findings": "{research_findings}",
+        "analysis": "{analysis_results}",
+        "summary": "{executive_summary}",
+        "next_steps": "{follow_up_questions}",
+        "conversation_id": "{research_conversation}"
+      },
+      "metadata": {
+        "created_by": "system",
+        "use_case": "research_automation",
+        "tags": ["chatbot", "research", "analysis", "multi_agent"]
+      }
+    },
+    {
+      "id": "content_creation_pipeline",
+      "name": "AI Content Creation Pipeline",
+      "description": "Multi-stage content creation using different specialized chatbots",
+      "version": "1.0",
+      "variables": {
+        "content_brief": "Write a blog post about sustainable technology innovations",
+        "target_audience": "tech-savvy professionals",
+        "content_length": "1500 words",
+        "research_bot": "researcher_assistant",
+        "writer_bot": "creative_writer",
+        "editor_bot": "content_editor"
+      },
+      "steps": [
+        {
+          "id": "research_phase",
+          "name": "Research Content Topic",
+          "type": "chatbot",
+          "chatbot_id": "{research_bot}",
+          "message_template": "Research this content brief: {content_brief}. Target audience: {target_audience}. Provide key points, statistics, and current trends.",
+          "output_variable": "research_data",
+          "create_new_conversation": true,
+          "save_conversation_id": "content_conversation"
+        },
+        {
+          "id": "create_outline",
+          "name": "Create Content Outline",
+          "type": "chatbot",
+          "chatbot_id": "{writer_bot}",
+          "message_template": "Create a detailed outline for: {content_brief}\nTarget audience: {target_audience}\nLength: {content_length}\nResearch data: {research_data}",
+          "output_variable": "content_outline"
+        },
+        {
+          "id": "write_content",
+          "name": "Write First Draft",
+          "type": "chatbot",
+          "chatbot_id": "{writer_bot}",
+          "message_template": "Write the full content based on this outline: {content_outline}\nBrief: {content_brief}\nResearch: {research_data}\nTarget length: {content_length}",
+          "output_variable": "first_draft"
+        },
+        {
+          "id": "edit_content",
+          "name": "Edit and Polish Content",
+          "type": "chatbot",
+          "chatbot_id": "{editor_bot}",
+          "message_template": "Please edit and improve this content for clarity, engagement, and professional tone:\n\n{first_draft}",
+          "output_variable": "final_content"
+        },
+        {
+          "id": "generate_metadata",
+          "name": "Generate SEO Metadata",
+          "type": "parallel",
+          "steps": [
+            {
+              "id": "create_title_options",
+              "name": "Generate Title Options",
+              "type": "chatbot",
+              "chatbot_id": "{writer_bot}",
+              "message_template": "Generate 5 compelling SEO-optimized titles for this content: {final_content}",
+              "output_variable": "title_options"
+            },
+            {
+              "id": "create_meta_description",
+              "name": "Create Meta Description",
+              "type": "chatbot",
+              "chatbot_id": "{editor_bot}",
+              "message_template": "Create an SEO-optimized meta description (150-160 characters) for this content: {final_content}",
+              "output_variable": "meta_description"
+            }
+          ]
+        }
+      ],
+      "outputs": {
+        "research": "{research_data}",
+        "outline": "{content_outline}",
+        "draft": "{first_draft}",
+        "final_content": "{final_content}",
+        "titles": "{title_options}",
+        "meta_description": "{meta_description}",
+        "conversation_id": "{content_conversation}"
+      },
+      "metadata": {
+        "created_by": "system",
+        "use_case": "content_creation",
+        "tags": ["chatbot", "content", "writing", "parallel", "seo"]
+      }
+    },
+    {
+      "id": "demo_chatbot_workflow",
+      "name": "Demo Interactive Chatbot",
+      "description": "A demonstration workflow showcasing interactive chatbot capabilities with multi-turn conversation, context awareness, and intelligent response handling",
+      "version": "1.0.0",
+      "steps": [
+        {
+          "id": "welcome_interaction",
+          "name": "Welcome User",
+          "type": "chatbot",
+          "chatbot_id": "demo_assistant",
+          "message_template": "Hello! I'm a demo AI assistant. What can I help you with today? Feel free to ask me about anything - technology, general questions, or just have a conversation!",
+          "output_variable": "welcome_response",
+          "create_new_conversation": true,
+          "save_conversation_id": "demo_conversation_id",
+          "enabled": true
+        },
+        {
+          "id": "analyze_user_intent",
+          "name": "Analyze User Intent",
+          "type": "llm_call",
+          "model": "gpt-3.5-turbo",
+          "messages": [
+            {
+              "role": "system",
+              "content": "Analyze the user's response and classify their intent. Categories: question, casual_chat, technical_help, information_request, creative_task, other. Respond with only the category name."
+            },
+            {
+              "role": "user",
+              "content": "{user_input}"
+            }
+          ],
+          "output_variable": "user_intent",
+          "parameters": {
+            "temperature": 0.3,
+            "max_tokens": 50
+          },
+          "enabled": true
+        },
+        {
+          "id": "personalized_response",
+          "name": "Generate Personalized Response",
+          "type": "chatbot",
+          "chatbot_id": "demo_assistant",
+          "message_template": "User intent: {user_intent}. User message: {user_input}. Please provide a helpful, engaging response tailored to their specific need.",
+          "output_variable": "personalized_response",
+          "conversation_id": "demo_conversation_id",
+          "context_variables": {
+            "intent": "user_intent",
+            "previous_welcome": "welcome_response"
+          },
+          "enabled": true
+        },
+        {
+          "id": "follow_up_suggestions",
+          "name": "Generate Follow-up Suggestions",
+          "type": "llm_call",
+          "model": "gpt-3.5-turbo",
+          "messages": [
+            {
+              "role": "system",
+              "content": "Based on the conversation, suggest 2-3 relevant follow-up questions or topics the user might be interested in. Format as a simple list."
+            },
+            {
+              "role": "user",
+              "content": "User intent: {user_intent}, Response given: {personalized_response}"
+            }
+          ],
+          "output_variable": "follow_up_suggestions",
+          "parameters": {
+            "temperature": 0.7,
+            "max_tokens": 150
+          },
+          "enabled": true
+        },
+        {
+          "id": "conversation_summary",
+          "name": "Create Conversation Summary",
+          "type": "transform",
+          "input_variable": "personalized_response",
+          "output_variable": "conversation_summary",
+          "transformation": "extract:content",
+          "enabled": true
+        }
+      ],
+      "variables": {
+        "user_input": "I'm interested in learning about artificial intelligence and how it's changing the world",
+        "demo_assistant": "assistant"
+      },
+      "metadata": {
+        "created_by": "demo_system",
+        "use_case": "demonstration",
+        "tags": ["demo", "chatbot", "interactive", "multi_turn"],
+        "demo_instructions": {
+          "description": "This workflow demonstrates key chatbot capabilities including conversation continuity, intent analysis, personalized responses, and follow-up suggestions.",
+          "usage": "Execute this workflow with different user inputs to see how the chatbot adapts its responses based on intent analysis and conversation context.",
+          "features": [
+            "Multi-turn conversation with persistent conversation ID",
+            "Intent classification for tailored responses",
+            "Context-aware personalized interactions",
+            "Automatic follow-up suggestions",
+            "Conversation summarization"
+          ]
+        }
+      },
+      "timeout": 300
+    }
+  ]
+}
