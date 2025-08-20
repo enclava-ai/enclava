@@ -111,8 +111,16 @@ class ModuleManager:
             # Load saved configurations
             await module_config_manager.load_saved_configs()
             
+            # Filter out core infrastructure that shouldn't be pluggable modules
+            EXCLUDED_MODULES = ["cache"]  # Cache is now core infrastructure
+            
             # Convert manifests to ModuleConfig objects
             for name, manifest in discovered_manifests.items():
+                # Skip modules that are now core infrastructure
+                if name in EXCLUDED_MODULES:
+                    logger.info(f"Skipping module '{name}' - now integrated as core infrastructure")
+                    continue
+                    
                 saved_config = module_config_manager.get_module_config(name)
                 
                 module_config = ModuleConfig(

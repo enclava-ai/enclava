@@ -38,6 +38,14 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Starting Enclava platform...")
     
+    # Initialize core cache service (before database to provide caching for auth)
+    from app.core.cache import core_cache
+    try:
+        await core_cache.initialize()
+        logger.info("Core cache service initialized successfully")
+    except Exception as e:
+        logger.warning(f"Core cache service initialization failed: {e}")
+    
     # Initialize database
     await init_db()
     
@@ -69,6 +77,10 @@ async def lifespan(app: FastAPI):
     
     # Cleanup
     logger.info("Shutting down platform...")
+    
+    # Close core cache service
+    from app.core.cache import core_cache
+    await core_cache.cleanup()
     
     # Close Redis connection for cached API key service
     from app.services.cached_api_key import cached_api_key_service

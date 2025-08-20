@@ -317,6 +317,16 @@ function ModulesPageContent() {
                       Configure
                     </Button>
                   )}
+                  {module.name === 'zammad' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.location.href = '/zammad'}
+                    >
+                      <Settings className="mr-2 h-3 w-3" />
+                      Configure
+                    </Button>
+                  )}
                 </div>
 
                 {module.health && (

@@ -103,8 +103,8 @@ async def init_db():
             except ImportError:
                 logger.warning("Module model not available yet")
             
-            # Create all tables
-            await conn.run_sync(Base.metadata.create_all)
+            # Tables are now created via migration container - no need to create here
+            # await conn.run_sync(Base.metadata.create_all)  # DISABLED - migrations handle this
             
         # Create default admin user if no admin exists
         await create_default_admin()

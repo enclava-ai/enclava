@@ -1,0 +1,72 @@
+name: zammad
+version: 1.0.0
+description: "AI-powered ticket summarization for Zammad ticketing system"
+author: "Enclava Team"
+category: "integration"
+
+# Module lifecycle
+enabled: true
+auto_start: true
+dependencies: 
+  - chatbot
+optional_dependencies: []
+
+# Module capabilities
+provides:
+  - "ticket_summarization"
+  - "zammad_integration"
+  - "batch_processing"
+
+consumes:
+  - "chatbot_completion"
+  - "llm_completion"
+
+# API endpoints
+endpoints:
+  - path: "/zammad/configurations"
+    method: "GET"
+    description: "List Zammad configurations"
+    
+  - path: "/zammad/configurations"
+    method: "POST"
+    description: "Create new Zammad configuration"
+    
+  - path: "/zammad/test-connection"
+    method: "POST"
+    description: "Test Zammad connection"
+    
+  - path: "/zammad/process"
+    method: "POST"
+    description: "Process tickets for summarization"
+    
+  - path: "/zammad/status"
+    method: "GET"
+    description: "Get processing status and statistics"
+
+# UI Configuration
+ui_config:
+  icon: "ticket"
+  color: "#3B82F6"
+  category: "Integration"
+
+# Permissions
+permissions:
+  - name: "zammad.read"
+    description: "Read Zammad tickets and configurations"
+    
+  - name: "zammad.write"
+    description: "Create and update Zammad ticket summaries"
+    
+  - name: "zammad.configure"
+    description: "Configure Zammad integration settings"
+    
+  - name: "chatbot.use"
+    description: "Use chatbot for AI summarization"
+
+# Health checks
+health_checks:
+  - name: "zammad_connectivity"
+    description: "Check Zammad API connection"
+    
+  - name: "chatbot_availability"
+    description: "Check chatbot module availability"

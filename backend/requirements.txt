@@ -48,15 +48,18 @@ qdrant-client==1.7.0
 # Text Processing
 tiktoken==0.5.1
 
-# NLP and Content Processing (required for RAG module with integrated content processing)
-nltk==3.8.1
-spacy==3.7.2
+# Basic document processing (lightweight)
 markitdown==0.0.1a2
 python-docx==1.1.0
-sentence-transformers==2.6.1
 
-# Optional heavy ML dependencies (commented out for lighter deployments)
-# transformers==4.35.2
+# Advanced NLP processing (OPTIONAL - only for entity extraction)
+# Install requirements-nlp.txt separately if you need these features:
+# nltk==3.8.1
+# spacy==3.7.2
+
+# Heavy ML dependencies (REMOVED - unused in codebase)
+# sentence-transformers==2.6.1  # REMOVED - not used anywhere in codebase
+# transformers==4.35.2  # REMOVED - already commented out
 
 # Configuration
 pyyaml==6.0.1

@@ -1,6 +1,22 @@
 name: enclava
 
 services:
+  # Database migration service - runs once to apply migrations
+  enclava-migrate:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://enclava_user:enclava_pass@enclava-postgres:5432/enclava_db
+    depends_on:
+      - enclava-postgres
+    command: ["/usr/local/bin/migrate.sh"]
+    volumes:
+      - ./backend:/app
+    networks:
+      - enclava-net
+    restart: "no"  # Run once and exit
+
   # Main application backend
   enclava-backend:
     build: 
@@ -18,6 +34,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - LOG_LLM_PROMPTS=${LOG_LLM_PROMPTS:-false}
     depends_on:
+      - enclava-migrate
       - enclava-postgres
       - enclava-redis
       - enclava-qdrant

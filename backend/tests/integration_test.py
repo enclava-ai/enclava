@@ -17,7 +17,7 @@ class LiveModuleIntegrationTest:
         self.client = httpx.AsyncClient(timeout=30.0)
     
     async def test_all_modules_loaded(self):
-        """Test that all 7 modules are loaded and operational"""
+        """Test that all 5 modules are loaded and operational"""
         print("🧪 Testing module loading...")
         
         response = await self.client.get(f"{self.base_url}/api/v1/modules/")
@@ -27,12 +27,12 @@ class LiveModuleIntegrationTest:
         print(f"✓ API Response: {response.status_code}")
         print(f"✓ Total modules: {data['total']}")
         
-        # Verify we have all 7 modules
-        assert data["total"] >= 7, f"Expected at least 7 modules, got {data['total']}"
-        assert data["module_count"] >= 7
+        # Verify we have all 5 modules (updated after 2025-08-10 cleanup)
+        assert data["total"] >= 5, f"Expected at least 5 modules, got {data['total']}"
+        assert data["module_count"] >= 5
         assert data["initialized"] is True
         
-        expected_modules = ['cache', 'analytics', 'rag', 'content', 'security', 'monitoring', 'config']
+        expected_modules = ['cache', 'chatbot', 'rag', 'signal', 'workflow']
         loaded_modules = [mod["name"] for mod in data["modules"]]
         
         for expected in expected_modules:

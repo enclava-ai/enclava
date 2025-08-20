@@ -20,13 +20,26 @@ async def list_modules():
     
     modules = []
     for module_info in all_modules:
-        # Convert module_info to API format
+        # Convert module_info to API format with status field
+        name = module_info["name"]
+        is_loaded = module_info["loaded"]  # Module is actually loaded in memory
+        is_enabled = module_info["enabled"]  # Module is enabled in config
+        
+        # Determine status based on enabled + loaded state
+        if is_enabled and is_loaded:
+            status = "running"
+        elif is_enabled and not is_loaded:
+            status = "error"  # Enabled but failed to load
+        else:  # not is_enabled (regardless of loaded state)
+            status = "standby"  # Disabled
+        
         api_module = {
-            "name": module_info["name"],
+            "name": name,
             "version": module_info["version"],
             "description": module_info["description"],
-            "initialized": module_info["loaded"], 
-            "enabled": module_info["enabled"]
+            "initialized": is_loaded, 
+            "enabled": is_enabled,
+            "status": status  # Add status field for frontend compatibility
         }
         
         # Get module statistics if available and module is loaded
@@ -58,31 +71,64 @@ async def list_modules():
 
 @router.get("/status")
 async def get_modules_status():
-    """Get summary status of all modules"""
+    """Get comprehensive module status - CONSOLIDATED endpoint"""
     log_api_request("get_modules_status", {})
     
-    total_modules = len(module_manager.modules)
-    running_modules = 0
-    standby_modules = 0
-    failed_modules = 0
+    # Get all discovered modules including disabled ones
+    all_modules = module_manager.list_all_modules()
     
-    for name, module in module_manager.modules.items():
-        config = module_manager.module_configs.get(name)
-        is_initialized = getattr(module, "initialized", False)
-        is_enabled = config.enabled if config else True
+    modules_with_status = []
+    running_count = 0
+    standby_count = 0
+    failed_count = 0
+    
+    for module_info in all_modules:
+        name = module_info["name"]
+        is_loaded = module_info["loaded"]  # Module is actually loaded in memory
+        is_enabled = module_info["enabled"]  # Module is enabled in config
         
-        if is_initialized and is_enabled:
-            running_modules += 1
-        elif not is_initialized:
-            failed_modules += 1
-        else:
-            standby_modules += 1
+        # Determine status based on enabled + loaded state
+        if is_enabled and is_loaded:
+            status = "running"
+            running_count += 1
+        elif is_enabled and not is_loaded:
+            status = "failed"  # Enabled but failed to load
+            failed_count += 1
+        else:  # not is_enabled (regardless of loaded state)
+            status = "standby"  # Disabled
+            standby_count += 1
+        
+        # Get module statistics if available and loaded
+        stats = {}
+        if is_loaded and name in module_manager.modules:
+            module_instance = module_manager.modules[name]
+            if hasattr(module_instance, "get_stats"):
+                try:
+                    import asyncio
+                    if asyncio.iscoroutinefunction(module_instance.get_stats):
+                        stats_result = await module_instance.get_stats()
+                    else:
+                        stats_result = module_instance.get_stats()
+                    stats = stats_result.__dict__ if hasattr(stats_result, "__dict__") else stats_result
+                except:
+                    stats = {}
+        
+        modules_with_status.append({
+            "name": name,
+            "version": module_info["version"],
+            "description": module_info["description"],
+            "status": status,
+            "enabled": is_enabled,
+            "loaded": is_loaded,
+            "stats": stats
+        })
     
     return {
-        "total": total_modules,
-        "running": running_modules,
-        "standby": standby_modules,
-        "failed": failed_modules,
+        "modules": modules_with_status,
+        "total": len(modules_with_status),
+        "running": running_count,
+        "standby": standby_count, 
+        "failed": failed_count,
         "system_initialized": module_manager.initialized
     }
 

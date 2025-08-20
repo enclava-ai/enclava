@@ -1,0 +1,109 @@
+name: rag
+version: 1.0.0
+description: "Document search, retrieval, and vector storage"
+author: "Enclava Team"
+category: "ai"
+
+# Module lifecycle
+enabled: true
+auto_start: true
+dependencies: []
+optional_dependencies:
+  - cache
+
+# Module capabilities
+provides:
+  - "document_storage"
+  - "semantic_search"
+  - "vector_embeddings"
+  - "document_processing"
+  - "workflow_rag_step"
+
+consumes:
+  - "qdrant_connection"
+  - "llm_embeddings"
+  - "document_parsing"
+
+# API endpoints
+endpoints:
+  - path: "/rag/collections"
+    method: "GET"
+    description: "List document collections"
+    
+  - path: "/rag/upload"
+    method: "POST"
+    description: "Upload and process documents"
+    
+  - path: "/rag/search"
+    method: "POST"
+    description: "Semantic search in documents"
+    
+  - path: "/rag/collections/{collection_id}/documents"
+    method: "GET"
+    description: "List documents in collection"
+
+# Workflow integration
+workflow_steps:
+  - name: "rag_search"
+    description: "Search documents for relevant context"
+    inputs:
+      - name: "query"
+        type: "string"
+        required: true
+        description: "Search query"
+      - name: "collection_id"
+        type: "string"
+        required: true
+        description: "Document collection to search"
+      - name: "top_k"
+        type: "integer"
+        required: false
+        default: 5
+        description: "Number of top results to return"
+    outputs:
+      - name: "results"
+        type: "array"
+        description: "Search results with content and metadata"
+      - name: "context"
+        type: "string"
+        description: "Combined context from top results"
+
+# UI Configuration
+ui_config:
+  icon: "search"
+  color: "#8B5CF6"
+  category: "AI & ML"
+  
+  forms:
+    - name: "collection_config"
+      title: "Collection Settings"
+      fields: ["name", "description", "embedding_model"]
+      
+    - name: "search_config"
+      title: "Search Configuration"
+      fields: ["top_k", "similarity_threshold", "rerank_enabled"]
+
+# Permissions
+permissions:
+  - name: "rag.create"
+    description: "Create document collections"
+    
+  - name: "rag.upload"
+    description: "Upload documents to collections"
+    
+  - name: "rag.search"
+    description: "Search document collections"
+    
+  - name: "rag.manage"
+    description: "Manage all collections (admin)"
+
+# Health checks
+health_checks:
+  - name: "qdrant_connectivity"
+    description: "Check Qdrant vector database connection"
+    
+  - name: "embeddings_service"
+    description: "Check LLM embeddings service"
+    
+  - name: "document_processing"
+    description: "Check document parsing capabilities"

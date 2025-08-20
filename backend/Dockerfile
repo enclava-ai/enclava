@@ -12,6 +12,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
+    postgresql-client \
     curl \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
@@ -20,11 +21,16 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download spaCy English model for NLP processing
-RUN python -m spacy download en_core_web_sm
+# Optional: Download spaCy English model for NLP processing (commented out for faster builds)
+# Uncomment if you install requirements-nlp.txt and need entity extraction
+# RUN python -m spacy download en_core_web_sm
 
 # Copy application code
 COPY . .
+
+# Copy and make migration script executable
+COPY scripts/migrate.sh /usr/local/bin/migrate.sh
+RUN chmod +x /usr/local/bin/migrate.sh
 
 # Create logs directory
 RUN mkdir -p logs
