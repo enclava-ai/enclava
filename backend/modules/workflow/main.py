@@ -22,13 +22,16 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.core.logging import get_logger
-from app.services.litellm_client import LiteLLMClient
+from app.services.llm.service import llm_service
+from app.services.llm.models import ChatRequest as LLMChatRequest, ChatMessage as LLMChatMessage
+from app.services.llm.exceptions import LLMError, ProviderError, SecurityError
 from app.services.base_module import Permission
 from app.db.database import SessionLocal
 from app.models.workflow import WorkflowDefinition as DBWorkflowDefinition, WorkflowExecution as DBWorkflowExecution
 
 # Import protocols for type hints and dependency injection
-from ..protocols import ChatbotServiceProtocol, LiteLLMClientProtocol
+from ..protocols import ChatbotServiceProtocol
+# Note: LiteLLMClientProtocol replaced with direct LLM service usage
 
 logger = get_logger(__name__)
 
@@ -234,8 +237,7 @@ class WorkflowExecution(BaseModel):
 class WorkflowEngine:
     """Core workflow execution engine"""
     
-    def __init__(self, litellm_client: LiteLLMClient, chatbot_service: Optional[ChatbotServiceProtocol] = None):
-        self.litellm_client = litellm_client
+    def __init__(self, chatbot_service: Optional[ChatbotServiceProtocol] = None):
         self.chatbot_service = chatbot_service
         self.executions: Dict[str, WorkflowExecution] = {}
         self.workflows: Dict[str, WorkflowDefinition] = {}
@@ -343,15 +345,23 @@ class WorkflowEngine:
         # Template message content with context variables
         messages = self._template_messages(llm_step.messages, context.variables)
         
-        # Make LLM call
-        response = await self.litellm_client.chat_completion(
+        # Convert messages to LLM service format
+        llm_messages = [LLMChatMessage(role=msg["role"], content=msg["content"]) for msg in messages]
+        
+        # Create LLM service request
+        llm_request = LLMChatRequest(
             model=llm_step.model,
-            messages=messages,
-            **llm_step.parameters
+            messages=llm_messages,
+            user_id="workflow_user",
+            api_key_id=0,  # Workflow module uses internal service
+            **{k: v for k, v in llm_step.parameters.items() if k in ['temperature', 'max_tokens', 'top_p', 'frequency_penalty', 'presence_penalty', 'stop']}
         )
         
+        # Make LLM call
+        response = await llm_service.create_chat_completion(llm_request)
+        
         # Store result
-        result = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+        result = response.choices[0].message.content if response.choices else ""
         context.variables[llm_step.output_variable] = result
         context.results[step.id] = result
         
@@ -631,16 +641,21 @@ class WorkflowEngine:
         
         messages = [{"role": "user", "content": self._template_string(prompt, variables)}]
         
-        response = await self.litellm_client.create_chat_completion(
+        # Convert to LLM service format
+        llm_messages = [LLMChatMessage(role=msg["role"], content=msg["content"]) for msg in messages]
+        
+        llm_request = LLMChatRequest(
             model=step.model,
-            messages=messages,
+            messages=llm_messages,
             user_id="workflow_system",
-            api_key_id="workflow",
+            api_key_id=0,
             temperature=step.temperature,
             max_tokens=step.max_tokens
         )
         
-        return response.get("choices", [{}])[0].get("message", {}).get("content", "")
+        response = await llm_service.create_chat_completion(llm_request)
+        
+        return response.choices[0].message.content if response.choices else ""
     
     async def _generate_brand_names(self, variables: Dict[str, Any], step: AIGenerationStep) -> List[Dict[str, str]]:
         """Generate brand names for a specific category"""
@@ -687,16 +702,21 @@ class WorkflowEngine:
         
         messages = [{"role": "user", "content": self._template_string(prompt, variables)}]
         
-        response = await self.litellm_client.create_chat_completion(
+        # Convert to LLM service format
+        llm_messages = [LLMChatMessage(role=msg["role"], content=msg["content"]) for msg in messages]
+        
+        llm_request = LLMChatRequest(
             model=step.model,
-            messages=messages,
+            messages=llm_messages,
             user_id="workflow_system",
-            api_key_id="workflow",
+            api_key_id=0,
             temperature=step.temperature,
             max_tokens=step.max_tokens
         )
         
-        return response.get("choices", [{}])[0].get("message", {}).get("content", "")
+        response = await llm_service.create_chat_completion(llm_request)
+        
+        return response.choices[0].message.content if response.choices else ""
     
     async def _generate_custom_prompt(self, variables: Dict[str, Any], step: AIGenerationStep) -> str:
         """Generate content using custom prompt template"""
@@ -705,16 +725,21 @@ class WorkflowEngine:
         
         messages = [{"role": "user", "content": self._template_string(step.prompt_template, variables)}]
         
-        response = await self.litellm_client.create_chat_completion(
+        # Convert to LLM service format
+        llm_messages = [LLMChatMessage(role=msg["role"], content=msg["content"]) for msg in messages]
+        
+        llm_request = LLMChatRequest(
             model=step.model,
-            messages=messages,
+            messages=llm_messages,
             user_id="workflow_system",
-            api_key_id="workflow",
+            api_key_id=0,
             temperature=step.temperature,
             max_tokens=step.max_tokens
         )
         
-        return response.get("choices", [{}])[0].get("message", {}).get("content", "")
+        response = await llm_service.create_chat_completion(llm_request)
+        
+        return response.choices[0].message.content if response.choices else ""
     
     async def _execute_aggregate_step(self, step: WorkflowStep, context: WorkflowContext):
         """Execute aggregate step to combine multiple inputs"""

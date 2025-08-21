@@ -23,7 +23,8 @@ from app.core.config import settings
 from app.db.database import async_session_factory
 from app.models.user import User
 from app.models.chatbot import ChatbotInstance
-from app.services.litellm_client import LiteLLMClient
+from app.services.llm.service import llm_service
+from app.services.llm.models import ChatRequest as LLMChatRequest, ChatMessage as LLMChatMessage
 from cryptography.fernet import Fernet
 import base64
 import os
@@ -65,8 +66,8 @@ class ZammadModule(BaseModule):
         try:
             logger.info("Initializing Zammad module...")
             
-            # Initialize LLM client for chatbot integration
-            self.llm_client = LiteLLMClient()
+            # Initialize LLM service for chatbot integration
+            # Note: llm_service is already a global singleton, no need to create instance
             
             # Create HTTP session pool for Zammad API calls
             timeout = aiohttp.ClientTimeout(total=60, connect=10)
@@ -597,19 +598,21 @@ class ZammadModule(BaseModule):
             }
         ]
         
-        # Generate summary using LLM client
-        response = await self.llm_client.create_chat_completion(
-            messages=messages,
+        # Generate summary using new LLM service
+        chat_request = LLMChatRequest(
             model=await self._get_chatbot_model(config.chatbot_id),
-            user_id=str(config.user_id),
-            api_key_id=0,  # Using 0 for module requests
+            messages=[LLMChatMessage(role=msg["role"], content=msg["content"]) for msg in messages],
             temperature=0.3,
-            max_tokens=500
+            max_tokens=500,
+            user_id=str(config.user_id),
+            api_key_id=0  # Using 0 for module requests
         )
         
-        # Extract content from LiteLLM response
-        if "choices" in response and len(response["choices"]) > 0:
-            return response["choices"][0]["message"]["content"].strip()
+        response = await llm_service.create_chat_completion(chat_request)
+        
+        # Extract content from new LLM service response
+        if response.choices and len(response.choices) > 0:
+            return response.choices[0].message.content.strip()
         
         return "Unable to generate summary."
     

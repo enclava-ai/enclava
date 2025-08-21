@@ -15,7 +15,8 @@ from app.models.prompt_template import PromptTemplate, ChatbotPromptVariable
 from app.core.security import get_current_user
 from app.models.user import User
 from app.core.logging import log_api_request
-from app.services.litellm_client import litellm_client
+from app.services.llm.service import llm_service
+from app.services.llm.models import ChatRequest as LLMChatRequest, ChatMessage as LLMChatMessage
 
 router = APIRouter()
 
@@ -394,25 +395,28 @@ Please improve this prompt to make it more effective for a {request.chatbot_type
         ]
 
         # Get available models to use a default model
-        models = await litellm_client.get_models()
+        models = await llm_service.get_models()
         if not models:
             raise HTTPException(status_code=503, detail="No LLM models available")
         
         # Use the first available model (you might want to make this configurable)
-        default_model = models[0]["id"]
+        default_model = models[0].id
         
-        # Make the AI call
-        response = await litellm_client.create_chat_completion(
+        # Prepare the chat request for the new LLM service
+        chat_request = LLMChatRequest(
             model=default_model,
-            messages=messages,
-            user_id=str(user_id),
-            api_key_id=1,  # Using default API key, you might want to make this dynamic
+            messages=[LLMChatMessage(role=msg["role"], content=msg["content"]) for msg in messages],
             temperature=0.3,
-            max_tokens=1000
+            max_tokens=1000,
+            user_id=str(user_id),
+            api_key_id=1  # Using default API key, you might want to make this dynamic
         )
         
+        # Make the AI call
+        response = await llm_service.create_chat_completion(chat_request)
+        
         # Extract the improved prompt from the response
-        improved_prompt = response["choices"][0]["message"]["content"].strip()
+        improved_prompt = response.choices[0].message.content.strip()
         
         return {
             "improved_prompt": improved_prompt,

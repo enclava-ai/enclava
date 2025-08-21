@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { RefreshCw, Zap, Info, AlertCircle } from 'lucide-react'
+import { RefreshCw, Zap, Info, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react'
 
 interface Model {
   id: string
@@ -16,6 +16,22 @@ interface Model {
   permission?: any[]
   root?: string
   parent?: string
+  provider?: string
+  capabilities?: string[]
+  context_window?: number
+  max_output_tokens?: number
+  supports_streaming?: boolean
+  supports_function_calling?: boolean
+}
+
+interface ProviderStatus {
+  provider: string
+  status: 'healthy' | 'degraded' | 'unavailable'
+  latency_ms?: number
+  success_rate?: number
+  last_check: string
+  error_message?: string
+  models_available: string[]
 }
 
 interface ModelSelectorProps {
@@ -27,6 +43,7 @@ interface ModelSelectorProps {
 
 export default function ModelSelector({ value, onValueChange, filter = 'all', className }: ModelSelectorProps) {
   const [models, setModels] = useState<Model[]>([])
+  const [providerStatus, setProviderStatus] = useState<Record<string, ProviderStatus>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
@@ -37,20 +54,31 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
       
       // Get the auth token from localStorage
       const token = localStorage.getItem('token')
+      const headers = {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
       
-      const response = await fetch('/api/llm/models', {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
+      // Fetch models and provider status in parallel
+      const [modelsResponse, statusResponse] = await Promise.allSettled([
+        fetch('/api/llm/models', { headers }),
+        fetch('/api/llm/providers/status', { headers })
+      ])
+      
+      // Handle models response
+      if (modelsResponse.status === 'fulfilled' && modelsResponse.value.ok) {
+        const modelsData = await modelsResponse.value.json()
+        setModels(modelsData.data || [])
+      } else {
         throw new Error('Failed to fetch models')
       }
-
-      const data = await response.json()
-      setModels(data.data || [])
+      
+      // Handle provider status response (optional)
+      if (statusResponse.status === 'fulfilled' && statusResponse.value.ok) {
+        const statusData = await statusResponse.value.json()
+        setProviderStatus(statusData.data || {})
+      }
+      
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load models')
@@ -64,30 +92,39 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
   }, [])
 
   const getProviderFromModel = (modelId: string): string => {
+    // PrivateMode models have specific prefixes
+    if (modelId.startsWith('privatemode-')) return 'PrivateMode.ai'
+    
+    // Legacy detection for other providers
     if (modelId.startsWith('gpt-') || modelId.includes('openai')) return 'OpenAI'
     if (modelId.startsWith('claude-') || modelId.includes('anthropic')) return 'Anthropic'
     if (modelId.startsWith('gemini-') || modelId.includes('google')) return 'Google'
-    if (modelId.includes('privatemode')) return 'Privatemode.ai'
     if (modelId.includes('cohere')) return 'Cohere'
     if (modelId.includes('mistral')) return 'Mistral'
-    if (modelId.includes('llama')) return 'Meta'
+    if (modelId.includes('llama') && !modelId.startsWith('privatemode-')) return 'Meta'
     return 'Unknown'
   }
 
   const getModelType = (modelId: string): 'chat' | 'embedding' | 'other' => {
-    if (modelId.includes('embedding')) return 'embedding'
-    if (modelId.includes('whisper')) return 'other'  // Audio transcription models
+    if (modelId.includes('embedding') || modelId.includes('embed')) return 'embedding'
+    if (modelId.includes('whisper') || modelId.includes('speech')) return 'other'  // Audio models
+    
+    // PrivateMode and other chat models
     if (
+      modelId.startsWith('privatemode-llama') ||
+      modelId.startsWith('privatemode-claude') ||
+      modelId.startsWith('privatemode-gpt') ||
+      modelId.startsWith('privatemode-gemini') ||
       modelId.includes('text-') || 
       modelId.includes('gpt-') || 
       modelId.includes('claude-') || 
       modelId.includes('gemini-') ||
-      modelId.includes('privatemode-') ||
       modelId.includes('llama') ||
       modelId.includes('gemma') ||
       modelId.includes('qwen') ||
       modelId.includes('latest')
     ) return 'chat'
+    
     return 'other'
   }
 
@@ -112,6 +149,28 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
     acc[provider].push(model)
     return acc
   }, {} as Record<string, Model[]>)
+  
+  const getProviderStatusIcon = (provider: string) => {
+    const status = providerStatus[provider.toLowerCase()]?.status || 'unknown'
+    switch (status) {
+      case 'healthy':
+        return <CheckCircle className="h-3 w-3 text-green-500" />
+      case 'degraded':
+        return <Clock className="h-3 w-3 text-yellow-500" />
+      case 'unavailable':
+        return <XCircle className="h-3 w-3 text-red-500" />
+      default:
+        return <AlertCircle className="h-3 w-3 text-gray-400" />
+    }
+  }
+  
+  const getProviderStatusText = (provider: string) => {
+    const status = providerStatus[provider.toLowerCase()]
+    if (!status) return 'Status unknown'
+    
+    const latencyText = status.latency_ms ? ` (${Math.round(status.latency_ms)}ms)` : ''
+    return `${status.status.charAt(0).toUpperCase() + status.status.slice(1)}${latencyText}`
+  }
 
   const selectedModel = models.find(m => m.id === value)
 
@@ -191,16 +250,32 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
         <SelectContent>
           {Object.entries(groupedModels).map(([provider, providerModels]) => (
             <div key={provider}>
-              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                {provider}
+              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                {getProviderStatusIcon(provider)}
+                <span>{provider}</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {getProviderStatusText(provider)}
+                </span>
               </div>
               {providerModels.map((model) => (
                 <SelectItem key={model.id} value={model.id}>
                   <div className="flex items-center gap-2">
                     <span>{model.id}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {getModelCategory(model.id)}
-                    </Badge>
+                    <div className="flex gap-1">
+                      <Badge variant="outline" className="text-xs">
+                        {getModelCategory(model.id)}
+                      </Badge>
+                      {model.supports_streaming && (
+                        <Badge variant="secondary" className="text-xs">
+                          Streaming
+                        </Badge>
+                      )}
+                      {model.supports_function_calling && (
+                        <Badge variant="secondary" className="text-xs">
+                          Functions
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </SelectItem>
               ))}
@@ -217,7 +292,7 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
               Model Details
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <span className="font-medium">ID:</span>
@@ -225,7 +300,10 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
               </div>
               <div>
                 <span className="font-medium">Provider:</span>
-                <div className="text-muted-foreground">{getProviderFromModel(selectedModel.id)}</div>
+                <div className="text-muted-foreground flex items-center gap-1">
+                  {getProviderStatusIcon(getProviderFromModel(selectedModel.id))}
+                  {getProviderFromModel(selectedModel.id)}
+                </div>
               </div>
               <div>
                 <span className="font-medium">Type:</span>
@@ -236,6 +314,40 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
                 <div className="text-muted-foreground">{selectedModel.object}</div>
               </div>
             </div>
+            
+            {(selectedModel.context_window || selectedModel.max_output_tokens) && (
+              <div className="grid grid-cols-2 gap-4">
+                {selectedModel.context_window && (
+                  <div>
+                    <span className="font-medium">Context Window:</span>
+                    <div className="text-muted-foreground">{selectedModel.context_window.toLocaleString()} tokens</div>
+                  </div>
+                )}
+                {selectedModel.max_output_tokens && (
+                  <div>
+                    <span className="font-medium">Max Output:</span>
+                    <div className="text-muted-foreground">{selectedModel.max_output_tokens.toLocaleString()} tokens</div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {(selectedModel.supports_streaming || selectedModel.supports_function_calling) && (
+              <div>
+                <span className="font-medium">Capabilities:</span>
+                <div className="flex gap-1 mt-1">
+                  {selectedModel.supports_streaming && (
+                    <Badge variant="secondary" className="text-xs">Streaming</Badge>
+                  )}
+                  {selectedModel.supports_function_calling && (
+                    <Badge variant="secondary" className="text-xs">Function Calling</Badge>
+                  )}
+                  {selectedModel.capabilities?.includes('tee') && (
+                    <Badge variant="outline" className="text-xs border-green-500 text-green-700">TEE Protected</Badge>
+                  )}
+                </div>
+              </div>
+            )}
             
             {selectedModel.created && (
               <div>
@@ -250,6 +362,46 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
               <div>
                 <span className="font-medium">Owned by:</span>
                 <div className="text-muted-foreground">{selectedModel.owned_by}</div>
+              </div>
+            )}
+            
+            {/* Provider Status Details */}
+            {providerStatus[getProviderFromModel(selectedModel.id).toLowerCase()] && (
+              <div className="border-t pt-3">
+                <span className="font-medium">Provider Status:</span>
+                <div className="mt-1 text-xs space-y-1">
+                  {(() => {
+                    const status = providerStatus[getProviderFromModel(selectedModel.id).toLowerCase()]
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Status:</span>
+                          <span className={`font-medium ${
+                            status.status === 'healthy' ? 'text-green-600' :
+                            status.status === 'degraded' ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>{status.status}</span>
+                        </div>
+                        {status.latency_ms && (
+                          <div className="flex justify-between">
+                            <span>Latency:</span>
+                            <span>{Math.round(status.latency_ms)}ms</span>
+                          </div>
+                        )}
+                        {status.success_rate && (
+                          <div className="flex justify-between">
+                            <span>Success Rate:</span>
+                            <span>{Math.round(status.success_rate * 100)}%</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span>Last Check:</span>
+                          <span>{new Date(status.last_check).toLocaleTimeString()}</span>
+                        </div>
+                      </>
+                    )
+                  })()} 
+                </div>
               </div>
             )}
           </CardContent>

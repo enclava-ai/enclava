@@ -51,7 +51,7 @@ class SystemInfoResponse(BaseModel):
     environment: str
     database_status: str
     redis_status: str
-    litellm_status: str
+    llm_service_status: str
     modules_loaded: int
     active_users: int
     total_api_keys: int
@@ -227,8 +227,13 @@ async def get_system_info(
     # Get Redis status (simplified check)
     redis_status = "healthy"  # Would implement actual Redis check
     
-    # Get LiteLLM status (simplified check)
-    litellm_status = "healthy"  # Would implement actual LiteLLM check
+    # Get LLM service status
+    try:
+        from app.services.llm.service import llm_service
+        health_summary = llm_service.get_health_summary()
+        llm_service_status = health_summary.get("service_status", "unknown")
+    except Exception:
+        llm_service_status = "unavailable"
     
     # Get modules loaded (from module manager)
     modules_loaded = 8  # Would get from actual module manager
@@ -261,7 +266,7 @@ async def get_system_info(
         environment="production",
         database_status=database_status,
         redis_status=redis_status,
-        litellm_status=litellm_status,
+        llm_service_status=llm_service_status,
         modules_loaded=modules_loaded,
         active_users=active_users,
         total_api_keys=total_api_keys,

@@ -43,15 +43,18 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
     
-    # LiteLLM
-    LITELLM_BASE_URL: str = "http://localhost:4000"
-    LITELLM_MASTER_KEY: str = "enclava-master-key"
+    # LLM Service Configuration (replaced LiteLLM)
+    # LLM service configuration is now handled in app/services/llm/config.py
+    
+    # LLM Service Security
+    LLM_ENCRYPTION_KEY: Optional[str] = None  # Key for encrypting LLM provider API keys
     
     # API Keys for LLM providers
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     PRIVATEMODE_API_KEY: Optional[str] = None
+    PRIVATEMODE_PROXY_URL: str = "http://privatemode-proxy:8080/v1"
     
     # Qdrant
     QDRANT_HOST: str = "localhost"

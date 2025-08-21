@@ -23,7 +23,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger
-from app.services.litellm_client import LiteLLMClient
+from app.services.llm.service import llm_service
+from app.services.llm.models import ChatRequest as LLMChatRequest, ChatMessage as LLMChatMessage
+from app.services.llm.exceptions import LLMError, ProviderError, SecurityError
 from app.services.base_module import BaseModule, Permission
 from app.models.user import User
 from app.models.chatbot import ChatbotInstance as DBChatbotInstance, ChatbotConversation as DBConversation, ChatbotMessage as DBMessage, ChatbotAnalytics
@@ -32,7 +34,8 @@ from app.db.database import get_db
 from app.core.config import settings
 
 # Import protocols for type hints and dependency injection
-from ..protocols import RAGServiceProtocol, LiteLLMClientProtocol
+from ..protocols import RAGServiceProtocol
+# Note: LiteLLMClientProtocol replaced with direct LLM service usage
 
 logger = get_logger(__name__)
 
@@ -131,10 +134,8 @@ class ChatbotInstance(BaseModel):
 class ChatbotModule(BaseModule):
     """Main chatbot module implementation"""
     
-    def __init__(self, litellm_client: Optional[LiteLLMClientProtocol] = None, 
-                 rag_service: Optional[RAGServiceProtocol] = None):
+    def __init__(self, rag_service: Optional[RAGServiceProtocol] = None):
         super().__init__("chatbot")
-        self.litellm_client = litellm_client
         self.rag_module = rag_service  # Keep same name for compatibility
         self.db_session = None
         
@@ -145,15 +146,10 @@ class ChatbotModule(BaseModule):
         """Initialize the chatbot module"""
         await super().initialize(**kwargs)
         
-        # Get dependencies from global services if not already injected
-        if not self.litellm_client:
-            try:
-                from app.services.litellm_client import litellm_client
-                self.litellm_client = litellm_client
-                logger.info("LiteLLM client injected from global service")
-            except Exception as e:
-                logger.warning(f"Could not inject LiteLLM client: {e}")
+        # Initialize the LLM service
+        await llm_service.initialize()
         
+        # Get RAG module dependency if not already injected
         if not self.rag_module:
             try:
                 # Try to get RAG module from module manager
@@ -168,19 +164,16 @@ class ChatbotModule(BaseModule):
         await self._load_prompt_templates()
         
         logger.info("Chatbot module initialized")
-        logger.info(f"LiteLLM client available after init: {self.litellm_client is not None}")
+        logger.info(f"LLM service available: {llm_service._initialized}")
         logger.info(f"RAG module available after init: {self.rag_module is not None}")
         logger.info(f"Loaded {len(self.system_prompts)} prompt templates")
     
     async def _ensure_dependencies(self):
         """Lazy load dependencies if not available"""
-        if not self.litellm_client:
-            try:
-                from app.services.litellm_client import litellm_client
-                self.litellm_client = litellm_client
-                logger.info("LiteLLM client lazy loaded")
-            except Exception as e:
-                logger.warning(f"Could not lazy load LiteLLM client: {e}")
+        # Ensure LLM service is initialized
+        if not llm_service._initialized:
+            await llm_service.initialize()
+            logger.info("LLM service lazy loaded")
         
         if not self.rag_module:
             try:
@@ -468,45 +461,58 @@ class ChatbotModule(BaseModule):
                 logger.info(msg['content'])
         logger.info("=== END COMPREHENSIVE LLM REQUEST ===")
         
-        if self.litellm_client:
-            try:
-                logger.info("Calling LiteLLM client create_chat_completion...")
-                response = await self.litellm_client.create_chat_completion(
-                    model=config.model,
-                    messages=messages,
-                    user_id="chatbot_user",
-                    api_key_id="chatbot_api_key",
-                    temperature=config.temperature,
-                    max_tokens=config.max_tokens
-                )
-                logger.info(f"LiteLLM response received, response keys: {list(response.keys())}")
+        try:
+            logger.info("Calling LLM service create_chat_completion...")
+            
+            # Convert messages to LLM service format
+            llm_messages = [LLMChatMessage(role=msg["role"], content=msg["content"]) for msg in messages]
+            
+            # Create LLM service request
+            llm_request = LLMChatRequest(
+                model=config.model,
+                messages=llm_messages,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+                user_id="chatbot_user",
+                api_key_id=0  # Chatbot module uses internal service
+            )
+            
+            # Make request to LLM service
+            llm_response = await llm_service.create_chat_completion(llm_request)
+            
+            # Extract response content
+            if llm_response.choices:
+                content = llm_response.choices[0].message.content
+                logger.info(f"Response content length: {len(content)}")
                 
-                # Extract response content from the LiteLLM response format
-                if 'choices' in response and response['choices']:
-                    content = response['choices'][0]['message']['content']
-                    logger.info(f"Response content length: {len(content)}")
-                    
-                    # Always log response for debugging
-                    logger.info("=== COMPREHENSIVE LLM RESPONSE ===")
-                    logger.info(f"Response content ({len(content)} chars):")
-                    logger.info(content)
-                    if 'usage' in response:
-                        usage = response['usage']
-                        logger.info(f"Token usage - Prompt: {usage.get('prompt_tokens', 'N/A')}, Completion: {usage.get('completion_tokens', 'N/A')}, Total: {usage.get('total_tokens', 'N/A')}")
-                    if sources:
-                        logger.info(f"RAG sources included: {len(sources)} documents")
-                    logger.info("=== END COMPREHENSIVE LLM RESPONSE ===")
-                    
-                    return content, sources
-                else:
-                    logger.warning("No choices in LiteLLM response")
-                    return "I received an empty response from the AI model.", sources
-            except Exception as e:
-                logger.error(f"LiteLLM completion failed: {e}")
-                raise e
-        else:
-            logger.warning("No LiteLLM client available, using fallback")
-            # Fallback if no LLM client
+                # Always log response for debugging
+                logger.info("=== COMPREHENSIVE LLM RESPONSE ===")
+                logger.info(f"Response content ({len(content)} chars):")
+                logger.info(content)
+                if llm_response.usage:
+                    usage = llm_response.usage
+                    logger.info(f"Token usage - Prompt: {usage.prompt_tokens}, Completion: {usage.completion_tokens}, Total: {usage.total_tokens}")
+                if sources:
+                    logger.info(f"RAG sources included: {len(sources)} documents")
+                logger.info("=== END COMPREHENSIVE LLM RESPONSE ===")
+                
+                return content, sources
+            else:
+                logger.warning("No choices in LLM response")
+                return "I received an empty response from the AI model.", sources
+                
+        except SecurityError as e:
+            logger.error(f"Security error in LLM completion: {e}")
+            raise HTTPException(status_code=400, detail=f"Security validation failed: {e.message}")
+        except ProviderError as e:
+            logger.error(f"Provider error in LLM completion: {e}")
+            raise HTTPException(status_code=503, detail="LLM service temporarily unavailable")
+        except LLMError as e:
+            logger.error(f"LLM service error: {e}")
+            raise HTTPException(status_code=500, detail="LLM service error")
+        except Exception as e:
+            logger.error(f"LLM completion failed: {e}")
+            # Return fallback if available
             return "I'm currently unable to process your request. Please try again later.", None
     
     def _build_conversation_messages(self, db_messages: List[DBMessage], config: ChatbotConfig, 
@@ -685,7 +691,7 @@ class ChatbotModule(BaseModule):
         # Lazy load dependencies
         await self._ensure_dependencies()
         
-        logger.info(f"LiteLLM client available: {self.litellm_client is not None}")
+        logger.info(f"LLM service available: {llm_service._initialized}")
         logger.info(f"RAG module available: {self.rag_module is not None}")
         
         try:
@@ -884,10 +890,9 @@ class ChatbotModule(BaseModule):
 
 
 # Module factory function
-def create_module(litellm_client: Optional[LiteLLMClientProtocol] = None, 
-                 rag_service: Optional[RAGServiceProtocol] = None) -> ChatbotModule:
+def create_module(rag_service: Optional[RAGServiceProtocol] = None) -> ChatbotModule:
     """Factory function to create chatbot module instance"""
-    return ChatbotModule(litellm_client=litellm_client, rag_service=rag_service)
+    return ChatbotModule(rag_service=rag_service)
 
 # Create module instance (dependencies will be injected via factory)
 chatbot_module = ChatbotModule()

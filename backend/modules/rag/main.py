@@ -401,7 +401,7 @@ class RAGModule(BaseModule):
         """Initialize embedding model"""
         from app.services.embedding_service import embedding_service
         
-        # Use privatemode-embeddings for LiteLLM integration
+        # Use privatemode-embeddings for LLM service integration
         model_name = self.config.get("embedding_model", "privatemode-embeddings")
         embedding_service.model_name = model_name
         

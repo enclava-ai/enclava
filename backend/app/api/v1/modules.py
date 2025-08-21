@@ -447,7 +447,7 @@ async def get_module_config(module_name: str):
     log_api_request("get_module_config", {"module_name": module_name})
     
     from app.services.module_config_manager import module_config_manager
-    from app.services.litellm_client import litellm_client
+    from app.services.llm.service import llm_service
     import copy
     
     # Get module manifest and schema
@@ -461,9 +461,9 @@ async def get_module_config(module_name: str):
     # For Signal module, populate model options dynamically
     if module_name == "signal" and schema:
         try:
-            # Get available models from LiteLLM
-            models_data = await litellm_client.get_models()
-            model_ids = [model.get("id", model.get("model", "")) for model in models_data if model.get("id") or model.get("model")]
+            # Get available models from LLM service
+            models_data = await llm_service.get_models()
+            model_ids = [model.id for model in models_data]
             
             if model_ids:
                 # Create a copy of the schema to avoid modifying the original
