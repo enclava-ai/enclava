@@ -213,9 +213,15 @@ async def update_configuration(
         if not zammad_module:
             raise HTTPException(status_code=503, detail="Zammad module not available")
         
+        # For updates, pass the existing api_token if not provided in the request
+        config_data = config_request.dict()
+        if not config_data.get("api_token"):
+            # Use existing encrypted token for the new config
+            config_data["existing_encrypted_token"] = existing_config.api_token_encrypted
+        
         request_data = {
-            "action": "save_configuration",
-            "configuration": config_request.dict()
+            "action": "save_configuration", 
+            "configuration": config_data
         }
         
         context = {

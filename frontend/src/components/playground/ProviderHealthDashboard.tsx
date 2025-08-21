@@ -55,8 +55,8 @@ export default function ProviderHealthDashboard() {
       }
 
       const [statusResponse, metricsResponse] = await Promise.allSettled([
-        fetch('/api/llm/providers/status', { headers }),
-        fetch('/api/llm/metrics', { headers })
+        fetch('/api/v1/llm/providers/status', { headers }),
+        fetch('/api/v1/llm/metrics', { headers })
       ])
 
       // Handle provider status

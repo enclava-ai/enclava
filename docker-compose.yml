@@ -38,7 +38,7 @@ services:
       - enclava-postgres
       - enclava-redis
       - enclava-qdrant
-      - litellm-proxy
+      - privatemode-proxy
     ports:
       - "58000:8000"
     volumes:
@@ -88,30 +88,6 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - enclava-redis-data:/data
-    networks:
-      - enclava-net
-    restart: unless-stopped
-
-  # LiteLLM proxy for unified LLM API
-  litellm-proxy:
-    image: ghcr.io/berriai/litellm:main-latest
-    environment:
-      - UI_USERNAME=admin
-      - UI_PASSWORD=${LITELLM_UI_PASSWORD:-admin123}
-      - DATABASE_URL=postgresql://enclava_user:enclava_pass@enclava-postgres:5432/enclava_db
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      #- OLLAMA_BASE_URL=http://enclava-ollama-proxy:11434/v1
-      #- OLLAMA_API_KEY=ollama
-      - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
-      - LITELLM_UI_PASSWORD=${LITELLM_UI_PASSWORD:-admin123}
-    volumes:
-      - ./litellm_config.yaml:/app/config.yaml
-    command: --config /app/config.yaml --port 4000 --num_workers 1
-    depends_on:
-      - enclava-postgres
-    ports:
-      - "54000:4000"
     networks:
       - enclava-net
     restart: unless-stopped

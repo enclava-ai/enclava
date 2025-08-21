@@ -61,8 +61,8 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
       
       // Fetch models and provider status in parallel
       const [modelsResponse, statusResponse] = await Promise.allSettled([
-        fetch('/api/llm/models', { headers }),
-        fetch('/api/llm/providers/status', { headers })
+        fetch('/api/v1/llm/models', { headers }),
+        fetch('/api/v1/llm/providers/status', { headers })
       ])
       
       // Handle models response
@@ -234,7 +234,7 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
         </div>
       </div>
 
-      <Select value={value ?? ''} onValueChange={onValueChange}>
+      <Select value={value || ''} onValueChange={onValueChange}>
         <SelectTrigger>
           <SelectValue placeholder="Select a model">
             {selectedModel && (

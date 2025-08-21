@@ -115,7 +115,7 @@ export default function ApiKeysPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      const response = await fetch("/api/llm/api-keys", {
+      const response = await fetch("/api/v1/api-keys", {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -145,7 +145,7 @@ export default function ApiKeysPage() {
       setActionLoading("create");
 
       const token = localStorage.getItem("token");
-      const response = await fetch("/api/llm/api-keys", {
+      const response = await fetch("/api/v1/api-keys", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -199,7 +199,7 @@ export default function ApiKeysPage() {
       setActionLoading(`toggle-${keyId}`);
 
       const token = localStorage.getItem("token");
-      const response = await fetch(`/api/llm/api-keys/${keyId}`, {
+      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
         method: "PUT",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -236,7 +236,7 @@ export default function ApiKeysPage() {
       setActionLoading(`regenerate-${keyId}`);
 
       const token = localStorage.getItem("token");
-      const response = await fetch(`/api/llm/api-keys/${keyId}/regenerate`, {
+      const response = await fetch(`/api/v1/api-keys/${keyId}/regenerate`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -280,7 +280,7 @@ export default function ApiKeysPage() {
       setActionLoading(`delete-${keyId}`);
 
       const token = localStorage.getItem("token");
-      const response = await fetch(`/api/llm/api-keys/${keyId}`, {
+      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -316,7 +316,7 @@ export default function ApiKeysPage() {
       setActionLoading(`edit-${keyId}`);
 
       const token = localStorage.getItem("token");
-      const response = await fetch(`/api/llm/api-keys/${keyId}`, {
+      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
         method: "PUT",
         headers: {
           "Authorization": `Bearer ${token}`,

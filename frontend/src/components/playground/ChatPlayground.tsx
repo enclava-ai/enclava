@@ -69,7 +69,7 @@ export default function ChatPlayground({ selectedModel, onRequestComplete }: Cha
         { role: 'user', content: userMessage.content }
       ]
 
-      const response = await fetch('/api/llm/chat/completions', {
+      const response = await fetch('/api/v1/llm/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

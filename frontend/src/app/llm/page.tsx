@@ -118,9 +118,9 @@ function LLMPageContent() {
       
       // Fetch API keys, budgets, and models
       const [keysRes, budgetsRes, modelsRes] = await Promise.all([
-        fetch('/api/llm/api-keys', { headers }),
-        fetch('/api/llm/budgets', { headers }),
-        fetch('/api/llm/models', { headers })
+        fetch('/api/v1/api-keys', { headers }),
+        fetch('/api/v1/llm/budget/status', { headers }),
+        fetch('/api/v1/llm/models', { headers })
       ])
 
       console.log('API keys response status:', keysRes.status)
@@ -163,7 +163,7 @@ function LLMPageContent() {
   const createAPIKey = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/llm/api-keys', {
+      const response = await fetch('/api/v1/api-keys', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -209,7 +209,7 @@ function LLMPageContent() {
         throw new Error('No authentication token found')
       }
 
-      const response = await fetch(`/api/llm/api-keys/${keyId}`, {
+      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -15,7 +15,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
 from app.services.base_module import BaseModule, Permission, ModuleHealth
@@ -183,56 +183,105 @@ class ZammadModule(BaseModule):
                 "result": result
             }
     
-    async def _handle_get_ticket_summary(self, request: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle get ticket summary request"""
-        ticket_id = request.get("ticket_id")
-        if not ticket_id:
-            raise ValueError("ticket_id is required")
-        
-        async with async_session_factory() as db:
-            # Get ticket from database
-            stmt = select(ZammadTicket).where(ZammadTicket.zammad_ticket_id == ticket_id)
-            result = await db.execute(stmt)
-            ticket = result.scalar_one_or_none()
-            
-            if not ticket:
-                return {"error": "Ticket not found", "ticket_id": ticket_id}
-            
-            return {"ticket": ticket.to_dict()}
-    
-    async def _handle_process_single_ticket(self, request: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle single ticket processing request"""
+    async def _handle_save_configuration(self, request: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle save configuration request"""
         user_id = context.get("user_id")
-        ticket_id = request.get("ticket_id")
-        config_id = request.get("config_id")
-        
-        if not ticket_id:
-            raise ValueError("ticket_id is required")
-        
-        # Get user configuration
-        config = await self._get_user_configuration(user_id, config_id)
-        if not config:
-            raise ValueError("Configuration not found")
-        
-        # Process single ticket
-        result = await self._process_single_ticket(config, ticket_id, user_id)
-        
-        return {"ticket_id": ticket_id, "result": result}
-    
-    async def _handle_get_status(self, request: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle get module status request"""
-        user_id = context.get("user_id")
-        
+        config_data = request.get("configuration", {})
+        # Validate required fields for new config
+        required_fields = ["name", "zammad_url", "chatbot_id"]
+        for field in required_fields:
+            if not config_data.get(field):
+                raise ValueError(f"Required field missing: {field}")
         async with async_session_factory() as db:
-            # Import func for count queries
-            from sqlalchemy import func
+            # If updating existing config, fetch it
+            config_id = config_data.get("id")
+            config = None
+            if config_id:
+                config = await db.get(ZammadConfiguration, config_id)
+            # Verify chatbot exists and user has access
+            chatbot_stmt = select(ChatbotInstance).where(
+                and_(
+                    ChatbotInstance.id == config_data["chatbot_id"],
+                    ChatbotInstance.created_by == str(user_id),
+                    ChatbotInstance.is_active == True
+                )
+            )
+            chatbot = await db.scalar(chatbot_stmt)
+            if not chatbot:
+                raise ValueError("Chatbot not found or access denied")
+            # Handle api_token: only update if provided, else keep existing
+            if config:
+                # Update existing config
+                config.name = config_data["name"]
+                config.description = config_data.get("description")
+                config.is_default = config_data.get("is_default", False)
+                config.zammad_url = config_data["zammad_url"].rstrip("/")
+                config.chatbot_id = config_data["chatbot_id"]
+                config.process_state = config_data.get("process_state", "open")
+                config.max_tickets = config_data.get("max_tickets", 10)
+                config.skip_existing = config_data.get("skip_existing", True)
+                config.auto_process = config_data.get("auto_process", False)
+                config.process_interval = config_data.get("process_interval", 30)
+                config.summary_template = config_data.get("summary_template")
+                config.custom_settings = config_data.get("custom_settings", {})
+                if "api_token" in config_data and config_data["api_token"]:
+                    config.api_token_encrypted = self._encrypt_data(config_data["api_token"])
+                # If this is set as default, unset other defaults
+                if config.is_default:
+                    await db.execute(
+                        ZammadConfiguration.__table__.update()
+                        .where(ZammadConfiguration.user_id == user_id)
+                        .values(is_default=False)
+                    )
+                await db.commit()
+                await db.refresh(config)
+                result = {"configuration": config.to_dict()}
+            else:
+                # Creating new config, require api_token OR existing_encrypted_token
+                if not config_data.get("api_token") and not config_data.get("existing_encrypted_token"):
+                    raise ValueError("Required field missing: api_token")
+                
+                # Use provided token or existing encrypted token
+                if config_data.get("api_token"):
+                    encrypted_token = self._encrypt_data(config_data["api_token"])
+                else:
+                    encrypted_token = config_data["existing_encrypted_token"]
+                config = ZammadConfiguration(
+                    user_id=user_id,
+                    name=config_data["name"],
+                    description=config_data.get("description"),
+                    is_default=config_data.get("is_default", False),
+                    zammad_url=config_data["zammad_url"].rstrip("/"),
+                    api_token_encrypted=encrypted_token,
+                    chatbot_id=config_data["chatbot_id"],
+                    process_state=config_data.get("process_state", "open"),
+                    max_tickets=config_data.get("max_tickets", 10),
+                    skip_existing=config_data.get("skip_existing", True),
+                    auto_process=config_data.get("auto_process", False),
+                    process_interval=config_data.get("process_interval", 30),
+                    summary_template=config_data.get("summary_template"),
+                    custom_settings=config_data.get("custom_settings", {})
+                )
+                # If this is set as default, unset other defaults
+                if config.is_default:
+                    await db.execute(
+                        ZammadConfiguration.__table__.update()
+                        .where(ZammadConfiguration.user_id == user_id)
+                        .values(is_default=False)
+                    )
+                db.add(config)
+                await db.commit()
+                await db.refresh(config)
+                result = {"configuration": config.to_dict()}
             
-            # Get processing statistics - use func.count() to get actual counts
+            # Calculate total tickets and processed tickets
             total_tickets_result = await db.scalar(
-                select(func.count(ZammadTicket.id)).where(ZammadTicket.processed_by_user_id == user_id)
+                select(func.count(ZammadTicket.id)).where(
+                    ZammadTicket.processed_by_user_id == user_id
+                )
             )
             total_tickets = total_tickets_result or 0
-            
+
             processed_tickets_result = await db.scalar(
                 select(func.count(ZammadTicket.id)).where(
                     and_(
@@ -242,7 +291,7 @@ class ZammadModule(BaseModule):
                 )
             )
             processed_tickets = processed_tickets_result or 0
-            
+
             failed_tickets_result = await db.scalar(
                 select(func.count(ZammadTicket.id)).where(
                     and_(
@@ -290,64 +339,6 @@ class ZammadModule(BaseModule):
             
             return {"configurations": configs}
     
-    async def _handle_save_configuration(self, request: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle save configuration request"""
-        user_id = context.get("user_id")
-        config_data = request.get("configuration", {})
-        
-        # Validate required fields
-        required_fields = ["name", "zammad_url", "api_token", "chatbot_id"]
-        for field in required_fields:
-            if not config_data.get(field):
-                raise ValueError(f"Required field missing: {field}")
-        
-        async with async_session_factory() as db:
-            # Verify chatbot exists and user has access
-            chatbot_stmt = select(ChatbotInstance).where(
-                and_(
-                    ChatbotInstance.id == config_data["chatbot_id"],
-                    ChatbotInstance.created_by == str(user_id),
-                    ChatbotInstance.is_active == True
-                )
-            )
-            chatbot = await db.scalar(chatbot_stmt)
-            if not chatbot:
-                raise ValueError("Chatbot not found or access denied")
-            
-            # Encrypt API token
-            encrypted_token = self._encrypt_data(config_data["api_token"])
-            
-            # Create new configuration
-            config = ZammadConfiguration(
-                user_id=user_id,
-                name=config_data["name"],
-                description=config_data.get("description"),
-                is_default=config_data.get("is_default", False),
-                zammad_url=config_data["zammad_url"].rstrip("/"),
-                api_token_encrypted=encrypted_token,
-                chatbot_id=config_data["chatbot_id"],
-                process_state=config_data.get("process_state", "open"),
-                max_tickets=config_data.get("max_tickets", 10),
-                skip_existing=config_data.get("skip_existing", True),
-                auto_process=config_data.get("auto_process", False),
-                process_interval=config_data.get("process_interval", 30),
-                summary_template=config_data.get("summary_template"),
-                custom_settings=config_data.get("custom_settings", {})
-            )
-            
-            # If this is set as default, unset other defaults
-            if config.is_default:
-                await db.execute(
-                    ZammadConfiguration.__table__.update()
-                    .where(ZammadConfiguration.user_id == user_id)
-                    .values(is_default=False)
-                )
-            
-            db.add(config)
-            await db.commit()
-            await db.refresh(config)
-            
-            return {"configuration": config.to_dict()}
     
     async def _handle_test_connection(self, request: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle test Zammad connection request"""
@@ -359,6 +350,74 @@ class ZammadModule(BaseModule):
         
         result = await self._test_zammad_connection(zammad_url, api_token)
         return result
+
+    async def _handle_get_status(self, request: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle get module status request"""
+        user_id = context.get("user_id")
+        
+        try:
+            async with async_session_factory() as db:
+                # Get user's configurations count
+                config_stmt = select(ZammadConfiguration).where(
+                    and_(
+                        ZammadConfiguration.user_id == user_id,
+                        ZammadConfiguration.is_active == True
+                    )
+                )
+                config_result = await db.execute(config_stmt)
+                configurations = list(config_result.scalars())
+                
+                # Get processing statistics
+                processed_stmt = select(ZammadTicket).where(
+                    ZammadTicket.processed_by_user_id == user_id
+                )
+                processed_result = await db.execute(processed_stmt)
+                processed_tickets = list(processed_result.scalars())
+                
+                # Get recent processing logs
+                logs_stmt = select(ZammadProcessingLog).where(
+                    ZammadProcessingLog.initiated_by_user_id == user_id
+                ).order_by(ZammadProcessingLog.started_at.desc()).limit(5)
+                logs_result = await db.execute(logs_stmt)
+                recent_logs = list(logs_result.scalars())
+                
+                # Calculate statistics for frontend
+                total_processed = len(processed_tickets)
+                successful = len([t for t in processed_tickets if t.processing_status == ProcessingStatus.COMPLETED])
+                failed = len([t for t in processed_tickets if t.processing_status == ProcessingStatus.FAILED])
+                success_rate = (successful / total_processed * 100) if total_processed > 0 else 0
+                
+                health = self.get_health()
+                
+                return {
+                    "module_health": {
+                        "status": health.status,
+                        "message": health.message,
+                        "uptime": health.uptime
+                    },
+                    "statistics": {
+                        "total_tickets": total_processed,  # Frontend expects this name
+                        "processed_tickets": successful,   # Successfully processed tickets
+                        "failed_tickets": failed,         # Failed tickets  
+                        "success_rate": success_rate       # Calculated percentage
+                    }
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting Zammad module status: {e}")
+            return {
+                "module_health": {
+                    "status": "error",
+                    "message": f"Error getting module status: {str(e)}",
+                    "uptime": 0.0
+                },
+                "statistics": {
+                    "total_tickets": 0,
+                    "processed_tickets": 0,
+                    "failed_tickets": 0,
+                    "success_rate": 0.0
+                }
+            }
     
     async def _process_tickets_batch(self, config: ZammadConfiguration, batch_id: str, user_id: int, filters: Dict[str, Any]) -> Dict[str, Any]:
         """Process a batch of tickets"""

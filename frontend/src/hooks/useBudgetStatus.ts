@@ -39,7 +39,7 @@ export function useBudgetStatus(autoRefresh = true, refreshInterval = 30000) {
     try {
       setLoading(true)
 
-      const response = await fetch('/api/llm/budget/status')
+      const response = await fetch('/api/v1/llm/budget/status')
 
       if (!response.ok) {
         if (response.status === 401) {
