@@ -1,0 +1,253 @@
+apiVersion: "v1"
+kind: "Plugin"
+metadata:
+  name: "zammad"
+  version: "1.0.0"
+  description: "Zammad helpdesk integration with AI summarization and ticket management"
+  author: "Enclava Team"
+  license: "MIT"
+  homepage: "https://github.com/enclava/plugins/zammad"
+  repository: "https://github.com/enclava/plugins/zammad"
+  tags:
+    - "helpdesk"
+    - "ticket-management"
+    - "ai-summarization"
+    - "integration"
+
+spec:
+  runtime:
+    python_version: "3.11"
+    dependencies:
+      - "aiohttp>=3.8.0"
+      - "pydantic>=2.0.0"
+      - "httpx>=0.24.0"
+      - "python-dateutil>=2.8.0"
+    environment_variables:
+      ZAMMAD_TIMEOUT: "30"
+      ZAMMAD_MAX_RETRIES: "3"
+  
+  permissions:
+    platform_apis:
+      - "chatbot:invoke"
+      - "rag:query"
+      - "llm:completion"
+      - "llm:embeddings"
+    plugin_scopes:
+      - "tickets:read"
+      - "tickets:write"
+      - "tickets:summarize"
+      - "webhooks:receive"
+      - "config:manage"
+      - "sync:execute"
+    external_domains:
+      - "*.zammad.com"
+      - "*.zammad.org"
+      - "api.zammad.org"
+  
+  database:
+    schema: "plugin_zammad"
+    migrations_path: "./migrations"
+    auto_migrate: true
+  
+  api_endpoints:
+    - path: "/tickets"
+      methods: ["GET", "POST"]
+      description: "List and create Zammad tickets"
+      auth_required: true
+    
+    - path: "/tickets/{ticket_id}"
+      methods: ["GET", "PUT", "DELETE"]
+      description: "Get, update, or delete specific ticket"
+      auth_required: true
+    
+    - path: "/tickets/{ticket_id}/summarize"
+      methods: ["POST"]
+      description: "Generate AI summary for ticket"
+      auth_required: true
+    
+    - path: "/tickets/{ticket_id}/articles"
+      methods: ["GET", "POST"]
+      description: "Get ticket articles or add new article"
+      auth_required: true
+    
+    - path: "/webhooks/ticket-created"
+      methods: ["POST"]
+      description: "Handle Zammad webhook for new tickets"
+      auth_required: false
+    
+    - path: "/webhooks/ticket-updated"
+      methods: ["POST"]
+      description: "Handle Zammad webhook for updated tickets"
+      auth_required: false
+    
+    - path: "/configurations"
+      methods: ["GET", "POST", "PUT", "DELETE"]
+      description: "Manage Zammad configurations"
+      auth_required: true
+    
+    - path: "/configurations/{config_id}/test"
+      methods: ["POST"]
+      description: "Test Zammad configuration connection"
+      auth_required: true
+    
+    - path: "/statistics"
+      methods: ["GET"]
+      description: "Get plugin usage statistics"
+      auth_required: true
+    
+    - path: "/health"
+      methods: ["GET"]
+      description: "Plugin health check"
+      auth_required: false
+  
+  cron_jobs:
+    - name: "sync_tickets"
+      schedule: "0 */2 * * *"
+      function: "sync_tickets_from_zammad"
+      description: "Sync tickets from Zammad every 2 hours"
+      enabled: true
+      timeout_seconds: 600
+      max_retries: 3
+    
+    - name: "cleanup_summaries"
+      schedule: "0 3 * * 0"
+      function: "cleanup_old_summaries"
+      description: "Clean up old AI summaries weekly"
+      enabled: true
+      timeout_seconds: 300
+      max_retries: 1
+    
+    - name: "health_check"
+      schedule: "*/15 * * * *"
+      function: "check_zammad_connection"
+      description: "Check Zammad API connectivity every 15 minutes"
+      enabled: true
+      timeout_seconds: 60
+      max_retries: 2
+    
+    - name: "generate_reports"
+      schedule: "0 9 * * 1"
+      function: "generate_weekly_reports"
+      description: "Generate weekly ticket reports"
+      enabled: false
+      timeout_seconds: 900
+      max_retries: 2
+  
+  ui_config:
+    configuration_schema: "./config_schema.json"
+    ui_components: "./ui/components"
+    pages:
+      - name: "dashboard"
+        path: "/plugins/zammad"
+        component: "ZammadDashboard"
+      
+      - name: "settings"
+        path: "/plugins/zammad/settings"
+        component: "ZammadSettings"
+      
+      - name: "tickets"
+        path: "/plugins/zammad/tickets"
+        component: "ZammadTicketList"
+      
+      - name: "analytics"
+        path: "/plugins/zammad/analytics"
+        component: "ZammadAnalytics"
+  
+  external_services:
+    allowed_domains:
+      - "*.zammad.com"
+      - "*.zammad.org"
+      - "api.zammad.org"
+      - "help.zammad.com"
+    
+    webhooks:
+      - endpoint: "/webhooks/ticket-created"
+        security: "signature_validation"
+      
+      - endpoint: "/webhooks/ticket-updated"
+        security: "signature_validation"
+    
+    rate_limits:
+      "*.zammad.com": 100
+      "*.zammad.org": 100
+      "api.zammad.org": 200
+  
+  config_schema:
+    type: "object"
+    required:
+      - "zammad_url"
+      - "api_token"
+      - "chatbot_id"
+    properties:
+      zammad_url:
+        type: "string"
+        format: "uri"
+        title: "Zammad URL"
+        description: "The base URL of your Zammad instance"
+        examples:
+          - "https://company.zammad.com"
+          - "https://support.example.com"
+      
+      api_token:
+        type: "string"
+        title: "API Token"
+        description: "Zammad API token with ticket read/write permissions"
+        minLength: 20
+        format: "password"
+      
+      chatbot_id:
+        type: "string"
+        title: "Chatbot ID"
+        description: "Platform chatbot ID for AI summarization"
+        examples:
+          - "zammad-summarizer"
+          - "ticket-assistant"
+      
+      ai_summarization:
+        type: "object"
+        title: "AI Summarization Settings"
+        properties:
+          enabled:
+            type: "boolean"
+            title: "Enable AI Summarization"
+            description: "Automatically summarize tickets using AI"
+            default: true
+          
+          model:
+            type: "string"
+            title: "AI Model"
+            description: "LLM model to use for summarization"
+            default: "gpt-3.5-turbo"
+          
+          max_tokens:
+            type: "integer"
+            title: "Max Summary Tokens"
+            description: "Maximum tokens for AI summary"
+            minimum: 50
+            maximum: 500
+            default: 150
+      
+      draft_settings:
+        type: "object"
+        title: "AI Draft Settings"
+        properties:
+          enabled:
+            type: "boolean"
+            title: "Enable AI Drafts"
+            description: "Generate AI draft responses for tickets"
+            default: false
+          
+          model:
+            type: "string"
+            title: "Draft Model"
+            description: "LLM model to use for draft generation"
+            default: "gpt-3.5-turbo"
+          
+          max_tokens:
+            type: "integer"
+            title: "Max Draft Tokens"
+            description: "Maximum tokens for AI draft responses"
+            minimum: 100
+            maximum: 1000
+            default: 300
+      
