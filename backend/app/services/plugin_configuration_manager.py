@@ -355,17 +355,7 @@ class PluginConfigurationManager:
     ) -> PluginConfiguration:
         """Save plugin configuration with automatic encryption of sensitive fields"""
         
-        # Validate configuration against schema
-        is_valid, errors = await self.schema_manager.validate_configuration(plugin_id, config_data, db)
-        if not is_valid:
-            raise PluginError(f"Configuration validation failed: {', '.join(errors)}")
-        
-        # Process fields (separate sensitive from non-sensitive)
-        non_sensitive, encrypted_sensitive = await self.schema_manager.process_configuration_fields(
-            plugin_id, config_data, db, encrypt_sensitive=True
-        )
-        
-        # Check for existing configuration
+        # Check for existing configuration to handle empty sensitive fields
         plugin_uuid = self.schema_manager._ensure_uuid(plugin_id)
         stmt = select(PluginConfiguration).where(
             PluginConfiguration.plugin_id == plugin_uuid,
@@ -374,6 +364,116 @@ class PluginConfigurationManager:
         )
         result = await db.execute(stmt)
         existing_config = result.scalar_one_or_none()
+        
+        # Handle validation for existing vs new configurations
+        validation_passed = False
+        
+        if existing_config:
+            # For existing configurations, use relaxed validation for empty sensitive fields
+            try:
+                # Try to get existing decrypted configuration
+                existing_data = await self.get_plugin_configuration(plugin_id, user_id, db, decrypt_sensitive=True)
+                
+                if existing_data:
+                    # Successfully decrypted - preserve existing sensitive fields
+                    schema = await self.schema_manager.get_plugin_schema(plugin_id, db)
+                    if schema:
+                        sensitive_fields = self.schema_manager.encryption.identify_sensitive_fields(schema)
+                        validation_config = config_data.copy()
+                        
+                        for field in sensitive_fields:
+                            if not validation_config.get(field) or str(validation_config.get(field)).strip() == '':
+                                if existing_data.get(field):
+                                    validation_config[field] = existing_data[field]
+                    
+                    # Validate with complete config
+                    is_valid, errors = await self.schema_manager.validate_configuration(plugin_id, validation_config, db)
+                    if is_valid:
+                        validation_passed = True
+                    else:
+                        raise PluginError(f"Configuration validation failed: {', '.join(errors)}")
+                
+            except Exception as e:
+                # Decryption failed - use relaxed validation for updates
+                self.logger.warning(f"Using relaxed validation due to decryption error: {e}")
+                
+                schema = await self.schema_manager.get_plugin_schema(plugin_id, db)
+                if schema:
+                    # Create relaxed schema that allows empty sensitive fields for existing configs
+                    relaxed_schema = schema.copy()
+                    sensitive_fields = self.schema_manager.encryption.identify_sensitive_fields(schema)
+                    
+                    for field in sensitive_fields:
+                        if field in relaxed_schema.get("properties", {}):
+                            field_props = relaxed_schema["properties"][field]
+                            # If field is empty, relax validation requirements
+                            if not config_data.get(field) or str(config_data.get(field)).strip() == '':
+                                # Remove minLength and other constraints
+                                field_props.pop("minLength", None)
+                                field_props.pop("pattern", None)
+                                # Make it optional
+                                if "required" in relaxed_schema and field in relaxed_schema["required"]:
+                                    relaxed_schema["required"] = [r for r in relaxed_schema["required"] if r != field]
+                    
+                    # Validate with relaxed schema
+                    try:
+                        jsonschema.validate(config_data, relaxed_schema)
+                        validation_passed = True
+                        validation_config = config_data
+                    except jsonschema.ValidationError as ve:
+                        raise PluginError(f"Configuration validation failed: {ve}")
+        else:
+            # New configuration - full validation required
+            is_valid, errors = await self.schema_manager.validate_configuration(plugin_id, config_data, db)
+            if is_valid:
+                validation_passed = True
+                validation_config = config_data
+            else:
+                raise PluginError(f"Configuration validation failed: {', '.join(errors)}")
+        
+        if not validation_passed:
+            raise PluginError("Configuration validation failed")
+        
+        # Handle encryption for new vs existing configurations
+        if existing_config and existing_config.encrypted_data:
+            # For existing configs, preserve encrypted data for fields not provided
+            try:
+                existing_encrypted = json.loads(existing_config.encrypted_data)
+            except:
+                existing_encrypted = {}
+            
+            # Identify which sensitive fields are actually being updated
+            schema = await self.schema_manager.get_plugin_schema(plugin_id, db)
+            sensitive_fields = self.schema_manager.encryption.identify_sensitive_fields(schema) if schema else []
+            
+            # Process only fields that have new values
+            fields_to_encrypt = {}
+            for field in sensitive_fields:
+                if config_data.get(field) and str(config_data.get(field)).strip():
+                    # User provided new value - encrypt it
+                    fields_to_encrypt[field] = config_data[field]
+            
+            # Encrypt new fields
+            new_encrypted = {}
+            if fields_to_encrypt:
+                for field, value in fields_to_encrypt.items():
+                    new_encrypted[field] = self.schema_manager.encryption.encrypt_value(str(value))
+            
+            # Combine existing and new encrypted data
+            final_encrypted = {**existing_encrypted, **new_encrypted}
+            
+            # Process non-sensitive fields
+            non_sensitive = {}
+            for key, value in config_data.items():
+                if key not in sensitive_fields:
+                    non_sensitive[key] = value
+            
+            encrypted_sensitive = final_encrypted
+        else:
+            # New configuration or no existing encrypted data - process normally
+            non_sensitive, encrypted_sensitive = await self.schema_manager.process_configuration_fields(
+                plugin_id, validation_config, db, encrypt_sensitive=True
+            )
         
         if existing_config:
             # Update existing configuration

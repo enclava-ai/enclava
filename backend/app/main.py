@@ -71,6 +71,15 @@ async def lifespan(app: FastAPI):
     from app.services.audit_service import start_audit_worker
     start_audit_worker()
     
+    # Initialize plugin auto-discovery service
+    from app.services.plugin_autodiscovery import initialize_plugin_autodiscovery
+    try:
+        discovery_results = await initialize_plugin_autodiscovery()
+        app.state.plugin_discovery_results = discovery_results
+        logger.info(f"Plugin auto-discovery completed: {discovery_results['summary']}")
+    except Exception as e:
+        logger.warning(f"Plugin auto-discovery failed: {e}")
+    
     logger.info("Platform started successfully")
     
     yield

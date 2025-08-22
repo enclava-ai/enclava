@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { useAuth } from "@/contexts/AuthContext"
 import { useModules } from "@/contexts/ModulesContext"
+import { usePlugin } from "@/contexts/PluginContext"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,34 @@ const Navigation = () => {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const { isModuleEnabled } = useModules()
+  const { installedPlugins, getPluginPages } = usePlugin()
+
+  // Get plugin navigation items
+  const pluginNavItems = installedPlugins
+    .filter(plugin => plugin.status === 'enabled' && plugin.loaded)
+    .map(plugin => {
+      const pages = getPluginPages(plugin.id);
+      if (pages.length === 0) return null;
+      
+      if (pages.length === 1) {
+        // Single page plugin
+        return {
+          href: `/plugins/${plugin.id}${pages[0].path}`,
+          label: plugin.name
+        };
+      } else {
+        // Multi-page plugin
+        return {
+          href: `/plugins/${plugin.id}`,
+          label: plugin.name,
+          children: pages.map(page => ({
+            href: `/plugins/${plugin.id}${page.path}`,
+            label: page.title || page.name
+          }))
+        };
+      }
+    })
+    .filter(Boolean);
 
   // Core navigation items that are always visible
   const coreNavItems = [
@@ -49,6 +78,7 @@ const Navigation = () => {
       children: [
         { href: "/settings", label: "System Settings" },
         { href: "/modules", label: "Modules" },
+        { href: "/plugins", label: "Plugins" },
         { href: "/prompt-templates", label: "Prompt Templates" },
       ]
     },
@@ -59,8 +89,8 @@ const Navigation = () => {
     .filter(([moduleName]) => isModuleEnabled(moduleName))
     .map(([, navItem]) => navItem)
 
-  // Combine core and module-based navigation items
-  const navItems = [...coreNavItems, ...moduleNavItems]
+  // Combine core, module-based, and plugin navigation items
+  const navItems = [...coreNavItems, ...moduleNavItems, ...pluginNavItems]
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

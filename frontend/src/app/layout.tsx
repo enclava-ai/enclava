@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Toaster as HotToaster } from 'react-hot-toast'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ModulesProvider } from '@/contexts/ModulesContext'
+import { PluginProvider } from '@/contexts/PluginContext'
 import { Navigation } from '@/components/ui/navigation'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -53,14 +54,16 @@ export default function RootLayout({
         >
           <AuthProvider>
             <ModulesProvider>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main className="container mx-auto px-4 py-8">
-                  {children}
-                </main>
-              </div>
-              <Toaster />
-              <HotToaster />
+              <PluginProvider>
+                <div className="min-h-screen bg-background">
+                  <Navigation />
+                  <main className="container mx-auto px-4 py-8">
+                    {children}
+                  </main>
+                </div>
+                <Toaster />
+                <HotToaster />
+              </PluginProvider>
             </ModulesProvider>
           </AuthProvider>
         </ThemeProvider>

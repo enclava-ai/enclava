@@ -18,7 +18,7 @@ from .rag import router as rag_router
 from .chatbot import router as chatbot_router
 from .prompt_templates import router as prompt_templates_router
 from .security import router as security_router
-from .zammad import router as zammad_router
+from .plugin_registry import router as plugin_registry_router
 
 # Create main API router
 api_router = APIRouter()
@@ -68,5 +68,6 @@ api_router.include_router(prompt_templates_router, prefix="/prompt-templates", t
 # Include security routes
 api_router.include_router(security_router, prefix="/security", tags=["security"])
 
-# Include Zammad integration routes
-api_router.include_router(zammad_router, prefix="/zammad", tags=["zammad"])
+
+# Include plugin registry routes
+api_router.include_router(plugin_registry_router, prefix="/plugins", tags=["plugins"])

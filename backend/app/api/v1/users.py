@@ -3,6 +3,7 @@ User management API endpoints
 """
 
 from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +44,7 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: str
+    id: int
     username: str
     email: str
     full_name: Optional[str] = None
@@ -51,9 +52,9 @@ class UserResponse(BaseModel):
     is_active: bool
     is_verified: bool
     is_superuser: bool
-    created_at: str
-    updated_at: Optional[str] = None
-    last_login: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -93,14 +93,17 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         """Determine if security analysis should be skipped for this request"""
         path = request.url.path
         
-        # Skip for health checks and static assets
+        # Skip for health checks, authentication endpoints, and static assets
         skip_paths = [
             "/health",
             "/metrics", 
             "/api/v1/docs",
             "/api/v1/openapi.json",
             "/api/v1/redoc",
-            "/favicon.ico"
+            "/favicon.ico",
+            "/api/v1/auth/register",
+            "/api/v1/auth/login",
+            "/",  # Root endpoint
         ]
         
         # Skip for static file extensions

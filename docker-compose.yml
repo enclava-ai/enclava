@@ -26,8 +26,6 @@ services:
       - DATABASE_URL=postgresql://enclava_user:enclava_pass@enclava-postgres:5432/enclava_db
       - REDIS_URL=redis://enclava-redis:6379
       - QDRANT_HOST=enclava-qdrant
-      - LITELLM_BASE_URL=http://litellm-proxy:4000
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-enclava-master-key}
       - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-here}
       - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}
       - ADMIN_USER=${ADMIN_USER:-admin}
@@ -44,6 +42,7 @@ services:
     volumes:
       - ./backend:/app
       - ./logs:/app/logs
+      - ./plugins:/plugins
     networks:
       - enclava-net
     restart: unless-stopped

@@ -42,6 +42,7 @@ class ChatRequest(BaseModel):
 
 
 @router.get("/list")
+@router.get("/instances") 
 async def list_chatbots(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)

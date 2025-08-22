@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # LLM Service Security
     LLM_ENCRYPTION_KEY: Optional[str] = None  # Key for encrypting LLM provider API keys
     
+    # Plugin System Security
+    PLUGIN_ENCRYPTION_KEY: Optional[str] = None  # Key for encrypting plugin secrets and configurations
+    
     # API Keys for LLM providers
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
@@ -109,6 +112,11 @@ class Settings(BaseSettings):
     
     # Module configuration
     MODULES_CONFIG_PATH: str = "config/modules.yaml"
+    
+    # Plugin configuration
+    PLUGINS_DIR: str = "/plugins"
+    PLUGINS_CONFIG_PATH: str = "config/plugins.yaml"
+    PLUGIN_REPOSITORY_URL: str = "https://plugins.enclava.com"
     
     # Logging
     LOG_FORMAT: str = "json"

@@ -56,6 +56,7 @@ class User(Base):
     usage_tracking = relationship("UsageTracking", back_populates="user", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
+    installed_plugins = relationship("Plugin", back_populates="installed_by_user")
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', username='{self.username}')>"

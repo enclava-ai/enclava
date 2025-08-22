@@ -144,6 +144,57 @@ class ConfigurationError(Exception):
     pass
 
 
+class PluginError(CustomHTTPException):
+    """Plugin error"""
+    
+    def __init__(self, detail: str = "Plugin error", details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            error_code="PLUGIN_ERROR",
+            detail=detail,
+            details=details,
+        )
+
+
+class SecurityError(CustomHTTPException):
+    """Security error"""
+    
+    def __init__(self, detail: str = "Security violation", details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            error_code="SECURITY_ERROR",
+            detail=detail,
+            details=details,
+        )
+
+
+class PluginLoadError(Exception):
+    """Plugin load error"""
+    pass
+
+
+class PluginInstallError(Exception):
+    """Plugin installation error"""
+    pass
+
+
+class PluginSecurityError(Exception):
+    """Plugin security error"""
+    pass
+
+
+class DatabaseError(CustomHTTPException):
+    """Database error"""
+    
+    def __init__(self, detail: str = "Database error", details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            error_code="DATABASE_ERROR",
+            detail=detail,
+            details=details,
+        )
+
+
 # Aliases for backwards compatibility
 RateLimitExceeded = RateLimitError
 APIException = CustomHTTPException  # Generic API exception alias

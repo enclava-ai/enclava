@@ -601,7 +601,7 @@ async def create_embedding(
 
 @router.get("/health")
 async def llm_health_check(
-    context: Dict[str, Any] = Depends(require_api_key)
+    context: Dict[str, Any] = Depends(get_auth_context)
 ):
     """Health check for LLM service"""
     try:

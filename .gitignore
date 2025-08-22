@@ -1,3 +1,4 @@
+*.backup
 backend/storage/rag_documents/*
 # Python
 __pycache__/

@@ -12,6 +12,7 @@ from .rag_document import RagDocument
 from .chatbot import ChatbotInstance, ChatbotConversation, ChatbotMessage, ChatbotAnalytics
 from .prompt_template import PromptTemplate, ChatbotPromptVariable
 from .workflow import WorkflowDefinition, WorkflowExecution, WorkflowStepLog
+from .plugin import Plugin, PluginConfiguration, PluginInstance, PluginAuditLog, PluginCronJob, PluginAPIGateway
 
 __all__ = [
     "User", 
@@ -29,5 +30,11 @@ __all__ = [
     "ChatbotPromptVariable",
     "WorkflowDefinition",
     "WorkflowExecution", 
-    "WorkflowStepLog"
+    "WorkflowStepLog",
+    "Plugin",
+    "PluginConfiguration",
+    "PluginInstance", 
+    "PluginAuditLog",
+    "PluginCronJob",
+    "PluginAPIGateway"
 ]

@@ -65,6 +65,7 @@ class APIKey(Base):
     # Relationships
     usage_tracking = relationship("UsageTracking", back_populates="api_key", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="api_key", cascade="all, delete-orphan")
+    plugin_audit_logs = relationship("PluginAuditLog", back_populates="api_key")
     
     def __repr__(self):
         return f"<APIKey(id={self.id}, name='{self.name}', user_id={self.user_id})>"
