@@ -13,7 +13,7 @@ export async function GET(
     const authHeader = request.headers.get('authorization')
 
     // Forward request to backend
-    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/rag/documents/${documentId}/download`, {
+    const backendResponse = await fetch(`${BACKEND_URL}/api/rag/documents/${documentId}/download`, {
       method: 'GET',
       headers: {
         ...(authHeader && { 'Authorization': authHeader }),

@@ -18,6 +18,7 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.services.api_key_auth import get_api_key_auth
 from app.models.api_key import APIKey
+from app.services.conversation_service import ConversationService
 
 router = APIRouter()
 
@@ -258,42 +259,23 @@ async def chat_with_chatbot(
         if not chatbot.is_active:
             raise HTTPException(status_code=400, detail="Chatbot is not active")
         
+        # Initialize conversation service
+        conversation_service = ConversationService(db)
+        
         # Get or create conversation
-        conversation = None
-        if request.conversation_id:
-            conv_result = await db.execute(
-                select(ChatbotConversation)
-                .where(ChatbotConversation.id == request.conversation_id)
-                .where(ChatbotConversation.chatbot_id == chatbot_id)
-                .where(ChatbotConversation.user_id == str(user_id))
-            )
-            conversation = conv_result.scalar_one_or_none()
+        conversation = await conversation_service.get_or_create_conversation(
+            chatbot_id=chatbot_id,
+            user_id=str(user_id),
+            conversation_id=request.conversation_id
+        )
         
-        if not conversation:
-            # Create new conversation
-            conversation = ChatbotConversation(
-                chatbot_id=chatbot_id,
-                user_id=str(user_id),
-                title=f"Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-                is_active=True,
-                context_data={}
-            )
-            db.add(conversation)
-            await db.commit()
-            await db.refresh(conversation)
-        
-        # Save user message
-        user_message = ChatbotMessage(
+        # Add user message to conversation
+        await conversation_service.add_message(
             conversation_id=conversation.id,
             role="user",
             content=request.message,
-            timestamp=datetime.utcnow(),
-            message_metadata={},
-            sources=None
+            metadata={}
         )
-        db.add(user_message)
         
         # Get chatbot module and generate response
         try:
@@ -301,11 +283,18 @@ async def chat_with_chatbot(
             if not chatbot_module:
                 raise HTTPException(status_code=500, detail="Chatbot module not available")
             
+            # Load conversation history for context
+            conversation_history = await conversation_service.get_conversation_history(
+                conversation_id=conversation.id,
+                limit=chatbot.config.get('memory_length', 10),
+                include_system=False
+            )
+            
             # Use the chatbot module to generate a response
             response_data = await chatbot_module.chat(
                 chatbot_config=chatbot.config,
                 message=request.message,
-                conversation_history=[],  # TODO: Load conversation history
+                conversation_history=conversation_history,
                 user_id=str(user_id)
             )
             
@@ -318,21 +307,14 @@ async def chat_with_chatbot(
             ])
             response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
         
-        # Save assistant message
-        assistant_message = ChatbotMessage(
+        # Save assistant message using conversation service
+        assistant_message = await conversation_service.add_message(
             conversation_id=conversation.id,
             role="assistant",
             content=response_content,
-            timestamp=datetime.utcnow(),
-            message_metadata={},
-            sources=None
+            metadata={},
+            sources=response_data.get("sources")
         )
-        db.add(assistant_message)
-        
-        # Update conversation timestamp
-        conversation.updated_at = datetime.utcnow()
-        
-        await db.commit()
         
         return {
             "conversation_id": conversation.id,
@@ -550,41 +532,29 @@ async def external_chat_with_chatbot(
         if not chatbot.is_active:
             raise HTTPException(status_code=400, detail="Chatbot is not active")
         
-        # Get or create conversation
-        conversation = None
-        if request.conversation_id:
-            conv_result = await db.execute(
-                select(ChatbotConversation)
-                .where(ChatbotConversation.id == request.conversation_id)
-                .where(ChatbotConversation.chatbot_id == chatbot_id)
-            )
-            conversation = conv_result.scalar_one_or_none()
+        # Initialize conversation service
+        conversation_service = ConversationService(db)
         
-        if not conversation:
-            # Create new conversation with API key as the user context
-            conversation = ChatbotConversation(
-                chatbot_id=chatbot_id,
-                user_id=f"api_key_{api_key.id}",
-                title=f"API Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-                is_active=True,
-                context_data={"api_key_id": api_key.id}
-            )
-            db.add(conversation)
+        # Get or create conversation with API key context
+        conversation = await conversation_service.get_or_create_conversation(
+            chatbot_id=chatbot_id,
+            user_id=f"api_key_{api_key.id}",
+            conversation_id=request.conversation_id,
+            title=f"API Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+        )
+        
+        # Add API key metadata to conversation context if new
+        if not conversation.context_data.get("api_key_id"):
+            conversation.context_data = {"api_key_id": api_key.id}
             await db.commit()
-            await db.refresh(conversation)
         
-        # Save user message
-        user_message = ChatbotMessage(
+        # Add user message to conversation
+        await conversation_service.add_message(
             conversation_id=conversation.id,
             role="user",
             content=request.message,
-            timestamp=datetime.utcnow(),
-            message_metadata={"api_key_id": api_key.id},
-            sources=None
+            metadata={"api_key_id": api_key.id}
         )
-        db.add(user_message)
         
         # Get chatbot module and generate response
         try:
@@ -592,11 +562,18 @@ async def external_chat_with_chatbot(
             if not chatbot_module:
                 raise HTTPException(status_code=500, detail="Chatbot module not available")
             
+            # Load conversation history for context
+            conversation_history = await conversation_service.get_conversation_history(
+                conversation_id=conversation.id,
+                limit=chatbot.config.get('memory_length', 10),
+                include_system=False
+            )
+            
             # Use the chatbot module to generate a response
             response_data = await chatbot_module.chat(
                 chatbot_config=chatbot.config,
                 message=request.message,
-                conversation_history=[],  # TODO: Load conversation history
+                conversation_history=conversation_history,
                 user_id=f"api_key_{api_key.id}"
             )
             
@@ -611,23 +588,17 @@ async def external_chat_with_chatbot(
             response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
             sources = None
         
-        # Save assistant message
-        assistant_message = ChatbotMessage(
+        # Save assistant message using conversation service
+        assistant_message = await conversation_service.add_message(
             conversation_id=conversation.id,
             role="assistant",
             content=response_content,
-            timestamp=datetime.utcnow(),
-            message_metadata={"api_key_id": api_key.id},
+            metadata={"api_key_id": api_key.id},
             sources=sources
         )
-        db.add(assistant_message)
-        
-        # Update conversation timestamp
-        conversation.updated_at = datetime.utcnow()
         
         # Update API key usage stats
         api_key.update_usage(tokens_used=len(request.message) + len(response_content), cost_cents=0)
-        
         await db.commit()
         
         return {

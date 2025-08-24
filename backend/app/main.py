@@ -18,7 +18,8 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.security import get_current_user
 from app.db.database import init_db
-from app.api.v1 import api_router
+from app.api.internal_v1 import internal_api_router
+from app.api.public_v1 import public_api_router
 from app.utils.exceptions import CustomHTTPException
 from app.services.module_manager import module_manager
 from app.services.metrics import setup_metrics
@@ -198,12 +199,13 @@ async def general_exception_handler(request, exc: Exception):
     )
 
 
-# Include API routes
-app.include_router(api_router, prefix="/api/v1")
+# Include Internal API routes (for frontend)
+app.include_router(internal_api_router, prefix="/api-internal/v1")
 
-# Include OpenAI-compatible routes
-from app.api.v1.openai_compat import router as openai_router
-app.include_router(openai_router, prefix="/v1", tags=["openai-compat"])
+# Include Public API routes (for external clients)  
+app.include_router(public_api_router, prefix="/api/v1")
+
+# OpenAI-compatible routes are now included in public API router at /api/v1/
 
 
 # Health check endpoint
@@ -225,6 +227,7 @@ async def root():
         "message": "Enclava - Modular AI Platform",
         "version": "1.0.0",
         "docs": "/api/v1/docs",
+        "internal_docs": "/api-internal/v1/docs",
     }
 
 

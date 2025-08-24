@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { Settings, Save, RefreshCw, Phone, Bot, Zap } from "lucide-react"
+import { config } from "@/lib/config"
+import { apiClient } from "@/lib/api-client"
 
 interface SignalConfig {
   enabled: boolean
@@ -39,6 +41,11 @@ interface ConfigSchema {
 
 export function SignalConfig() {
   const { toast } = useToast()
+  
+  // Get default Signal service URL from environment or use localhost fallback
+  const getDefaultSignalService = () => {
+    return process.env.NEXT_PUBLIC_DEFAULT_SIGNAL_SERVICE || "localhost:8080"
+  }
   const [config, setConfig] = useState<SignalConfig | null>(null)
   const [schema, setSchema] = useState<ConfigSchema | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,19 +60,13 @@ export function SignalConfig() {
   const fetchConfig = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/modules/signal/config")
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch config: ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await apiClient.get("/api-internal/v1/modules/signal/config")
       setSchema(data.schema)
       
       // Set default config if none exists
       const defaultConfig: SignalConfig = {
         enabled: false,
-        signal_service: "localhost:8080",
+        signal_service: getDefaultSignalService(),
         signal_phone_number: "",
         model: "gpt-3.5-turbo",
         temperature: 0.7,
@@ -102,16 +103,7 @@ export function SignalConfig() {
 
     try {
       setSaving(true)
-      const response = await fetch("/api/modules/signal/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to save configuration")
-      }
+      await apiClient.post("/api-internal/v1/modules/signal/config", config)
 
       toast({
         title: "Success",
@@ -243,7 +235,7 @@ export function SignalConfig() {
                 id="signal_service"
                 value={config.signal_service}
                 onChange={(e) => updateConfig("signal_service", e.target.value)}
-                placeholder="localhost:8080"
+                placeholder={getDefaultSignalService()}
               />
             </div>
             <div className="space-y-2">

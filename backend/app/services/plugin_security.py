@@ -20,6 +20,7 @@ from app.models.plugin import Plugin, PluginConfiguration, PluginAuditLog, Plugi
 from app.models.user import User
 from app.models.api_key import APIKey
 from app.db.database import get_db
+from app.services.plugin_configuration_service import PluginConfigurationService
 from app.utils.exceptions import SecurityError, PluginError
 
 
@@ -577,31 +578,66 @@ class PluginSecurityPolicyManager:
     def __init__(self):
         self.policy_cache: Dict[str, Dict[str, Any]] = {}
     
-    def get_security_policy(self, plugin_id: str, db: Session) -> Dict[str, Any]:
-        """Get security policy for plugin"""
+    async def get_security_policy(self, plugin_id: str, db: Session) -> Dict[str, Any]:
+        """Get security policy for plugin with persistent storage support"""
+        # Check cache first for performance
         if plugin_id in self.policy_cache:
             return self.policy_cache[plugin_id]
         
         try:
+            # Get plugin from database
             plugin = db.query(Plugin).filter(Plugin.id == plugin_id).first()
             if not plugin:
+                logger.warning(f"Plugin {plugin_id} not found, using default security policy")
                 return self.DEFAULT_SECURITY_POLICY.copy()
             
             # Start with default policy
             policy = self.DEFAULT_SECURITY_POLICY.copy()
             
-            # Override with plugin manifest settings
+            # Try to load stored policy from configuration service
+            try:
+                # Create an async session wrapper for the configuration service
+                from sqlalchemy.ext.asyncio import AsyncSession
+                from app.db.database import async_session_factory
+                
+                # Use async session for configuration service
+                async with async_session_factory() as async_db:
+                    config_service = PluginConfigurationService(async_db)
+                    stored_policy = await config_service.get_configuration(
+                        plugin_id=plugin_id,
+                        user_id="system",
+                        config_key="security_policy",
+                        default_value=None
+                    )
+                    
+                    if stored_policy:
+                        logger.debug(f"Loaded stored security policy for plugin {plugin_id}")
+                        policy.update(stored_policy)
+                        # Cache for performance
+                        self.policy_cache[plugin_id] = policy
+                        return policy
+                        
+            except Exception as config_error:
+                logger.warning(f"Failed to load stored security policy for {plugin_id}: {config_error}")
+                # Continue with manifest-based policy
+            
+            # Override with plugin manifest settings if no stored policy
             if plugin.manifest_data:
-                manifest_policy = plugin.manifest_data.get('spec', {}).get('security_policy', {})
-                policy.update(manifest_policy)
+                manifest_spec = plugin.manifest_data.get('spec', {})
+                manifest_policy = manifest_spec.get('security_policy', {})
+                if manifest_policy:
+                    policy.update(manifest_policy)
+                    logger.debug(f"Applied manifest security policy for plugin {plugin_id}")
                 
                 # Add allowed domains from manifest
-                external_services = plugin.manifest_data.get('spec', {}).get('external_services', {})
+                external_services = manifest_spec.get('external_services', {})
                 if external_services.get('allowed_domains'):
-                    policy['allowed_domains'].extend(external_services['allowed_domains'])
+                    existing_domains = policy.get('allowed_domains', [])
+                    policy['allowed_domains'] = existing_domains + external_services['allowed_domains']
             
-            # Cache policy
+            # Cache policy for performance
             self.policy_cache[plugin_id] = policy
+            logger.debug(f"Security policy loaded for plugin {plugin_id}: {len(policy)} settings")
             return policy
             
         except Exception as e:
@@ -640,76 +676,160 @@ class PluginSecurityPolicyManager:
         
         return len(errors) == 0, errors
     
-    def update_security_policy(self, plugin_id: str, policy: Dict[str, Any], 
-                             updated_by: str, db: Session) -> bool:
-        """Update security policy for plugin"""
+    async def update_security_policy(self, plugin_id: str, policy: Dict[str, Any], 
+                                   updated_by: str, db: Session) -> bool:
+        """Update security policy for plugin with persistent storage"""
         try:
             # Validate policy
             valid, errors = self.validate_security_policy(policy)
             if not valid:
                 raise SecurityError(f"Invalid security policy: {errors}")
             
-            # TODO: Store policy in database
-            # For now, update cache
+            # Store policy in database using configuration service
+            try:
+                from sqlalchemy.ext.asyncio import AsyncSession
+                from app.db.database import async_session_factory
+                
+                # Use async session for configuration service
+                async with async_session_factory() as async_db:
+                    config_service = PluginConfigurationService(async_db)
+                    
+                    # Store security policy as system configuration
+                    success = await config_service.set_configuration(
+                        plugin_id=plugin_id,
+                        user_id="system",  # System-level configuration
+                        config_key="security_policy",
+                        config_value=policy,
+                        config_type="system_config"
+                    )
+                    
+                    if not success:
+                        logger.error(f"Failed to persist security policy for plugin {plugin_id}")
+                        return False
+                    
+                    logger.info(f"Successfully persisted security policy for plugin {plugin_id}")
+                    
+            except Exception as config_error:
+                logger.error(f"Failed to persist security policy using configuration service: {config_error}")
+                # Fall back to cache-only storage for now
+                logger.warning(f"Falling back to cache-only storage for plugin {plugin_id}")
+            
+            # Update cache for fast access
             self.policy_cache[plugin_id] = policy
             
-            # Log policy update
-            audit_log = PluginAuditLog(
-                plugin_id=plugin_id,
-                action="update_security_policy",
-                details={
-                    "policy": policy,
-                    "updated_by": updated_by
-                }
-            )
-            db.add(audit_log)
-            db.commit()
+            # Log policy update in audit trail
+            try:
+                audit_log = PluginAuditLog(
+                    plugin_id=plugin_id,
+                    action="update_security_policy",
+                    details={
+                        "policy": policy,
+                        "updated_by": updated_by,
+                        "policy_keys": list(policy.keys()),
+                        "timestamp": int(time.time())
+                    }
+                )
+                db.add(audit_log)
+                db.commit()
+                logger.debug(f"Logged security policy update for plugin {plugin_id}")
+                
+            except Exception as audit_error:
+                logger.warning(f"Failed to log security policy update: {audit_error}")
+                # Don't fail the whole operation due to audit logging issues
+                db.rollback()
             
+            logger.info(f"Updated security policy for plugin {plugin_id} with {len(policy)} settings")
             return True
             
         except Exception as e:
             logger.error(f"Failed to update security policy for {plugin_id}: {e}")
-            db.rollback()
+            if hasattr(db, 'rollback'):
+                db.rollback()
             return False
     
-    def check_policy_compliance(self, plugin_id: str, action: str, 
-                              context: Dict[str, Any], db: Session) -> bool:
+    async def check_policy_compliance(self, plugin_id: str, action: str, 
+                                    context: Dict[str, Any], db: Session) -> bool:
         """Check if action complies with plugin security policy"""
         try:
-            policy = self.get_security_policy(plugin_id, db)
+            # Get current security policy (using async method)
+            policy = await self.get_security_policy(plugin_id, db)
+            
+            logger.debug(f"Checking policy compliance for plugin {plugin_id}, action: {action}")
             
             # Check specific action types
             if action == 'api_call':
-                # Check rate limits (would need rate limiter integration)
+                # Check API call limits
+                max_calls = policy.get('max_api_calls_per_minute', 100)
+                # Note: Actual rate limiting would be implemented by the rate limiter
                 return True
             
             elif action == 'network_access':
                 domain = context.get('domain')
                 if not domain:
+                    logger.warning(f"Network access check for {plugin_id} failed: no domain provided")
                     return False
                 
-                # Check blocked domains
-                for blocked in policy.get('blocked_domains', []):
-                    if domain.endswith(blocked):
+                # Check blocked domains first
+                blocked_domains = policy.get('blocked_domains', [])
+                for blocked in blocked_domains:
+                    if domain.endswith(blocked) or domain == blocked:
+                        logger.info(f"Network access denied for {plugin_id}: domain {domain} is blocked")
                         return False
                 
                 # Check allowed domains if specified
                 allowed_domains = policy.get('allowed_domains', [])
                 if allowed_domains:
-                    return any(domain.endswith(allowed) for allowed in allowed_domains)
+                    domain_allowed = any(domain.endswith(allowed) or domain == allowed for allowed in allowed_domains)
+                    if not domain_allowed:
+                        logger.info(f"Network access denied for {plugin_id}: domain {domain} not in allowed list")
+                        return False
                 
+                # Check HTTPS requirement
+                require_https = policy.get('require_https', True)
+                if require_https and context.get('protocol', '').lower() != 'https':
+                    logger.info(f"Network access denied for {plugin_id}: HTTPS required but protocol is {context.get('protocol')}")
+                    return False
+                
+                logger.debug(f"Network access approved for {plugin_id} to domain {domain}")
                 return True
             
             elif action == 'file_access':
-                return policy.get('allow_file_access', False)
+                allow_file_access = policy.get('allow_file_access', False)
+                if not allow_file_access:
+                    logger.info(f"File access denied for {plugin_id}: not allowed by policy")
+                return allow_file_access
             
             elif action == 'system_call':
-                return policy.get('allow_system_calls', False)
+                allow_system_calls = policy.get('allow_system_calls', False)
+                if not allow_system_calls:
+                    logger.info(f"System call denied for {plugin_id}: not allowed by policy")
+                return allow_system_calls
             
+            elif action == 'resource_usage':
+                # Check resource limits
+                resource_type = context.get('resource_type')
+                usage_value = context.get('usage_value', 0)
+                
+                if resource_type == 'memory':
+                    max_memory = policy.get('max_memory_mb', 128)
+                    return usage_value <= max_memory
+                elif resource_type == 'cpu':
+                    max_cpu = policy.get('max_cpu_percent', 25)
+                    return usage_value <= max_cpu
+                elif resource_type == 'disk':
+                    max_disk = policy.get('max_disk_mb', 100)
+                    return usage_value <= max_disk
+                elif resource_type == 'network_connections':
+                    max_connections = policy.get('max_network_connections', 10)
+                    return usage_value <= max_connections
+            
+            # Default: allow unknown actions (fail open for compatibility)
+            logger.debug(f"Unknown action {action} for plugin {plugin_id}, defaulting to allow")
             return True
             
         except Exception as e:
-            logger.error(f"Policy compliance check failed: {e}")
+            logger.error(f"Policy compliance check failed for {plugin_id}: {e}")
+            # Fail secure: deny access on errors
             return False
 
 

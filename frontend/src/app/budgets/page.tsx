@@ -34,6 +34,7 @@ import {
   Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api-client";
 
 interface Budget {
   id: string;
@@ -105,19 +106,17 @@ export default function BudgetsPage() {
     try {
       setLoading(true);
 
-      const [budgetsResponse, statsResponse] = await Promise.all([
-        fetch("/api/v1/budgets"),
-        fetch("/api/v1/budgets/stats")
+      const [budgetsData, statsData] = await Promise.allSettled([
+        apiClient.get("/api-internal/v1/budgets"),
+        apiClient.get("/api-internal/v1/budgets/stats")
       ]);
 
-      if (budgetsResponse.ok) {
-        const budgetsData = await budgetsResponse.json();
-        setBudgets(budgetsData.budgets || []);
+      if (budgetsData.status === 'fulfilled') {
+        setBudgets(budgetsData.value.budgets || []);
       }
 
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setStats(statsData);
+      if (statsData.status === 'fulfilled') {
+        setStats(statsData.value);
       }
     } catch (error) {
       console.error("Failed to fetch budget data:", error);
@@ -135,18 +134,7 @@ export default function BudgetsPage() {
     try {
       setActionLoading("create");
 
-      const response = await fetch("/api/v1/budgets", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newBudgetData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create budget");
-      }
+      await apiClient.post("/api-internal/v1/budgets", newBudgetData);
 
       toast({
         title: "Budget Created",
@@ -182,18 +170,7 @@ export default function BudgetsPage() {
     try {
       setActionLoading(`update-${budgetId}`);
 
-      const response = await fetch(`/api/v1/budgets/${budgetId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update budget");
-      }
+      await apiClient.put(`/api-internal/v1/budgets/${budgetId}`, updates);
 
       toast({
         title: "Budget Updated",
@@ -226,14 +203,7 @@ export default function BudgetsPage() {
     try {
       setActionLoading(`delete-${budgetId}`);
 
-      const response = await fetch(`/api/v1/budgets/${budgetId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete budget");
-      }
+      await apiClient.delete(`/api-internal/v1/budgets/${budgetId}`);
 
       toast({
         title: "Budget Deleted",

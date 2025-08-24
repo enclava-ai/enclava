@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     
     // Make request to backend Zammad test-connection endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/zammad/test-connection`
+    const url = `${baseUrl}/api/zammad/test-connection`
     
     const response = await fetch(url, {
       method: 'POST',

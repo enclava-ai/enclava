@@ -12,6 +12,7 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.services.plugin_registry import plugin_installer, plugin_discovery
 from app.services.plugin_sandbox import plugin_loader
+from app.services.plugin_context_manager import plugin_context_manager
 from app.core.logging import get_logger
 
 
@@ -314,9 +315,29 @@ async def load_plugin(
         if plugin_id in plugin_loader.loaded_plugins:
             raise HTTPException(status_code=400, detail="Plugin already loaded")
         
-        # Load plugin
+        # Load plugin with proper context management
         plugin_dir = Path(plugin.plugin_dir)
-        plugin_token = "temp_token"  # TODO: Generate proper plugin tokens
+        
+        # Create plugin context for standardized interface
+        plugin_context = plugin_context_manager.create_plugin_context(
+            plugin_id=plugin_id,
+            user_id=str(current_user.get("id", "unknown")),  # Use actual user ID
+            session_type="api_load"
+        )
+        
+        # Generate plugin token based on context
+        plugin_token = plugin_context_manager.generate_plugin_token(plugin_context["context_id"])
+        
+        # Log plugin loading action
+        plugin_context_manager.add_audit_trail_entry(
+            plugin_context["context_id"],
+            "plugin_load_via_api",
+            {
+                "plugin_dir": str(plugin_dir), 
+                "user_id": current_user.get("id", "unknown"),
+                "action": "load_plugin_with_sandbox"
+            }
+        )
         
         await plugin_loader.load_plugin_with_sandbox(plugin_dir, plugin_token)
         

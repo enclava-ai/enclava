@@ -32,14 +32,17 @@ export default function LoginPage() {
         title: "Login successful",
         description: "Welcome to Enclava",
       })
-      router.push("/dashboard")
+      // Add a small delay to ensure token is fully stored and propagated
+      setTimeout(() => {
+        // For now, do a full page reload to ensure everything is initialized with the new token
+        window.location.href = "/dashboard"
+      }, 100)
     } catch (error) {
       toast({
         title: "Login failed",
         description: "Invalid credentials. Please try again.",
         variant: "destructive",
       })
-    } finally {
       setIsLoading(false)
     }
   }

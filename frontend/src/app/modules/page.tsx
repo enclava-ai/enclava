@@ -23,6 +23,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useModules, triggerModuleRefresh } from '@/contexts/ModulesContext'
+import { apiClient } from '@/lib/api-client'
 
 interface Module {
   name: string;
@@ -101,19 +102,7 @@ function ModulesPageContent() {
     try {
       setActionLoading(`${moduleName}-${action}`);
 
-      const response = await fetch(`/api/modules/${moduleName}/${action}`, {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to ${action} module`);
-      }
-
-      const responseData = await response.json();
+      const responseData = await apiClient.post(`/api-internal/v1/modules/${moduleName}/${action}`, {});
 
       toast({
         title: "Success",

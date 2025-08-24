@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { RefreshCw, Zap, Info, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { apiClient } from '@/lib/api-client'
 
 interface Model {
   id: string
@@ -52,31 +53,22 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
     try {
       setLoading(true)
       
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('token')
-      const headers = {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
-      }
-      
-      // Fetch models and provider status in parallel
+      // Fetch models and provider status in parallel using API client
       const [modelsResponse, statusResponse] = await Promise.allSettled([
-        fetch('/api/v1/llm/models', { headers }),
-        fetch('/api/v1/llm/providers/status', { headers })
+        apiClient.get('/api-internal/v1/llm/models'),
+        apiClient.get('/api-internal/v1/llm/providers/status')
       ])
       
       // Handle models response
-      if (modelsResponse.status === 'fulfilled' && modelsResponse.value.ok) {
-        const modelsData = await modelsResponse.value.json()
-        setModels(modelsData.data || [])
+      if (modelsResponse.status === 'fulfilled') {
+        setModels(modelsResponse.value.data || [])
       } else {
         throw new Error('Failed to fetch models')
       }
       
       // Handle provider status response (optional)
-      if (statusResponse.status === 'fulfilled' && statusResponse.value.ok) {
-        const statusData = await statusResponse.value.json()
-        setProviderStatus(statusData.data || {})
+      if (statusResponse.status === 'fulfilled') {
+        setProviderStatus(statusResponse.value.data || {})
       }
       
       setError(null)

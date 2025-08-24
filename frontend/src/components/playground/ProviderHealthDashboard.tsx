@@ -17,6 +17,7 @@ import {
   Shield,
   Server
 } from 'lucide-react'
+import { apiClient } from '@/lib/api-client'
 
 interface ProviderStatus {
   provider: string
@@ -48,27 +49,20 @@ export default function ProviderHealthDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const headers = {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
-      }
 
       const [statusResponse, metricsResponse] = await Promise.allSettled([
-        fetch('/api/v1/llm/providers/status', { headers }),
-        fetch('/api/v1/llm/metrics', { headers })
+        apiClient.get('/api-internal/v1/llm/providers/status'),
+        apiClient.get('/api-internal/v1/llm/metrics')
       ])
 
       // Handle provider status
-      if (statusResponse.status === 'fulfilled' && statusResponse.value.ok) {
-        const statusData = await statusResponse.value.json()
-        setProviders(statusData.data || {})
+      if (statusResponse.status === 'fulfilled') {
+        setProviders(statusResponse.value.data || {})
       }
 
       // Handle metrics (optional, might require admin permissions)
-      if (metricsResponse.status === 'fulfilled' && metricsResponse.value.ok) {
-        const metricsData = await metricsResponse.value.json()
-        setMetrics(metricsData.data)
+      if (metricsResponse.status === 'fulfilled') {
+        setMetrics(metricsResponse.value.data)
       }
 
       setError(null)

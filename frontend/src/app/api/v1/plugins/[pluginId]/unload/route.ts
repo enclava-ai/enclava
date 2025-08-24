@@ -19,7 +19,7 @@ export async function POST(
     
     // Make request to backend plugins unload endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/plugins/${pluginId}/unload`
+    const url = `${baseUrl}/api/plugins/${pluginId}/unload`
     
     const response = await fetch(url, {
       method: 'POST',

@@ -13,7 +13,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/chatbot/${params.id}/api-key`, {
+    const response = await fetch(`${BACKEND_URL}/api/chatbot/${params.id}/api-key`, {
       method: 'POST',
       headers: {
         'Authorization': token,
@@ -48,7 +48,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/chatbot/${params.id}/api-keys`, {
+    const response = await fetch(`${BACKEND_URL}/api/chatbot/${params.id}/api-keys`, {
       method: 'GET',
       headers: {
         'Authorization': token,

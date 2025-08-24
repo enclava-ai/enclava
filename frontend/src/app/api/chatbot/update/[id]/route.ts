@@ -16,7 +16,7 @@ export async function PUT(
     const body = await request.json()
     const chatbotId = params.id
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/chatbot/update/${chatbotId}`, {
+    const response = await fetch(`${BACKEND_URL}/api/chatbot/update/${chatbotId}`, {
       method: 'PUT',
       headers: {
         'Authorization': token,

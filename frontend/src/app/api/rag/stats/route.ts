@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
 
     // Forward request to backend
-    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/rag/stats`, {
+    const backendResponse = await fetch(`${BACKEND_URL}/api/rag/stats`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

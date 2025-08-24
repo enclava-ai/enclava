@@ -19,7 +19,7 @@ export async function POST(
     
     // Make request to backend plugins enable endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/plugins/${pluginId}/enable`
+    const url = `${baseUrl}/api/plugins/${pluginId}/enable`
     
     const response = await fetch(url, {
       method: 'POST',

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/llm/models`, {
+    const response = await fetch(`${BACKEND_URL}/api/llm/models`, {
       method: "GET",
       headers: {
         "Authorization": token,

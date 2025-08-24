@@ -36,6 +36,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { usePlugin, type PluginInfo, type PluginConfiguration } from '../../contexts/PluginContext';
+import { apiClient } from '@/lib/api-client';
 
 interface PluginConfigurationDialogProps {
   plugin: PluginInfo;
@@ -196,18 +197,18 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
     setError(null);
     
     try {
-      const response = await fetch(testConfig.endpoint, {
-        method: testConfig.method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(testData),
-      });
+      let result;
+      if (testConfig.method === 'GET') {
+        result = await apiClient.get(testConfig.endpoint);
+      } else if (testConfig.method === 'POST') {
+        result = await apiClient.post(testConfig.endpoint, testData);
+      } else if (testConfig.method === 'PUT') {
+        result = await apiClient.put(testConfig.endpoint, testData);
+      } else {
+        throw new Error(`Unsupported method: ${testConfig.method}`);
+      }
       
-      const result = await response.json();
-      
-      if (response.ok && result.status === 'success') {
+      if (result.status === 'success') {
         setSuccess(true);
         setError(null);
         setTimeout(() => setSuccess(false), 3000);
@@ -235,21 +236,12 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
 
     try {
       // Test credentials using Zammad API test endpoint
-      const response = await fetch(`/api/v1/plugins/${plugin.id}/test-credentials`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          zammad_url: formValues.zammad_url,
-          api_token: formValues.api_token
-        }),
+      const result = await apiClient.post(`/api-internal/v1/plugins/${plugin.id}/test-credentials`, {
+        zammad_url: formValues.zammad_url,
+        api_token: formValues.api_token
       });
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         setCredentialsTestResult({
           success: true,
           message: result.message || 'Credentials verified successfully!'

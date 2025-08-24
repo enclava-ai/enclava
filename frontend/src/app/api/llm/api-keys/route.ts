@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/api-keys/`, {
+    const response = await fetch(`${BACKEND_URL}/api/api-keys/`, {
       method: 'GET',
       headers: {
         'Authorization': token,
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/api-keys/`, {
+    const response = await fetch(`${BACKEND_URL}/api/api-keys/`, {
       method: 'POST',
       headers: {
         'Authorization': token,

@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Shield, Lock, Eye, RefreshCw, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 interface TEEStatus {
   health: {
@@ -79,23 +80,7 @@ export default function TEEMonitor() {
 
   const fetchTEEStatus = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch('/api/v1/tee/status', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.get('/api-internal/v1/tee/status');
       if (data.success) {
         setTeeStatus(data.data);
       } else {
@@ -109,27 +94,9 @@ export default function TEEMonitor() {
 
   const generateAttestation = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch('/api/v1/tee/attestation', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nonce: Date.now().toString()
-        }),
+      const data = await apiClient.post('/api-internal/v1/tee/attestation', {
+        nonce: Date.now().toString()
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
       if (data.success) {
         setAttestationData(data.data);
       } else {
@@ -143,27 +110,9 @@ export default function TEEMonitor() {
 
   const createSecureSession = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch('/api/v1/tee/session', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          capabilities: ['confidential_inference', 'secure_memory', 'attestation']
-        }),
+      const data = await apiClient.post('/api-internal/v1/tee/session', {
+        capabilities: ['confidential_inference', 'secure_memory', 'attestation']
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
       if (data.success) {
         setSecureSession(data.data);
       } else {

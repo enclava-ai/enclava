@@ -3,7 +3,7 @@ import { proxyRequest, handleProxyResponse } from '@/lib/proxy-auth'
 
 export async function GET() {
   try {
-    const response = await proxyRequest('/api/v1/analytics/')
+    const response = await proxyRequest('/api-internal/v1/analytics/')
     const data = await handleProxyResponse(response, 'Failed to fetch analytics')
     return NextResponse.json(data)
   } catch (error) {

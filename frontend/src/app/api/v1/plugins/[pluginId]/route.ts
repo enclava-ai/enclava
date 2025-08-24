@@ -20,7 +20,7 @@ export async function DELETE(
     
     // Make request to backend plugins uninstall endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/plugins/${pluginId}`
+    const url = `${baseUrl}/api/plugins/${pluginId}`
     
     const response = await fetch(url, {
       method: 'DELETE',

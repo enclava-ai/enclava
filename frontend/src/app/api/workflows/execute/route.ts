@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
 
     const { workflow_def, input_data } = await request.json()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const response = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,

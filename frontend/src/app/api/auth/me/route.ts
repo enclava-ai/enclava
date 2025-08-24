@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     
     // Make request to backend auth endpoint with the user's token
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/auth/me`
+    const url = `${baseUrl}/api/auth/me`
     
     const response = await fetch(url, {
       method: 'GET',

@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Send, User, Bot, Settings, DollarSign } from 'lucide-react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useToast } from '@/hooks/use-toast'
+import { apiClient } from '@/lib/api-client'
 
 interface Message {
   id: string
@@ -69,26 +70,13 @@ export default function ChatPlayground({ selectedModel, onRequestComplete }: Cha
         { role: 'user', content: userMessage.content }
       ]
 
-      const response = await fetch('/api/v1/llm/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: apiMessages,
-          temperature: temperature[0],
-          max_tokens: maxTokens,
-          top_p: topP[0]
-        })
+      const data = await apiClient.post('/api-internal/v1/llm/chat/completions', {
+        model: selectedModel,
+        messages: apiMessages,
+        temperature: temperature[0],
+        max_tokens: maxTokens,
+        top_p: topP[0]
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to get response')
-      }
-
-      const data = await response.json()
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),

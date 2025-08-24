@@ -27,7 +27,7 @@ export async function PUT(
     
     for (const [key, value] of Object.entries(body)) {
       try {
-        const url = `${baseUrl}/api/v1/settings/${category}/${key}`
+        const url = `${baseUrl}/api/settings/${category}/${key}`
         const response = await fetch(url, {
           method: 'PUT',
           headers: {
@@ -104,7 +104,7 @@ export async function GET(
     
     // Get backend API base URL
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/settings?category=${category}`
+    const url = `${baseUrl}/api/settings?category=${category}`
     
     const response = await fetch(url, {
       method: 'GET',

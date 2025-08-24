@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/prompt-templates/improve`, {
+    const response = await fetch(`${BACKEND_URL}/api/prompt-templates/improve`, {
       method: 'POST',
       headers: {
         'Authorization': token,

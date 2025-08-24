@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { apiClient } from "@/lib/api-client"
+import { config } from "@/lib/config"
 import { 
   Save, 
   Play, 
@@ -137,36 +139,22 @@ export default function WorkflowBuilderPage() {
     try {
       setLoading(true)
       
-      // Get auth token for API calls
-      const token = localStorage.getItem('token')
-      const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {}
-      
       if (workflowId) {
         // Load existing workflow
-        const response = await fetch(`/api/workflows/${workflowId}`, {
-          headers: authHeaders
+        const data = await apiClient.get(`/api-internal/v1/workflows/${workflowId}`)
+        setWorkflow({
+          ...data.workflow,
+          steps: ensureStepPositions(data.workflow.steps || [])
         })
-        if (response.ok) {
-          const data = await response.json()
-          setWorkflow({
-            ...data.workflow,
-            steps: ensureStepPositions(data.workflow.steps || [])
-          })
-        }
       } else if (templateId) {
         // Load from template
-        const response = await fetch(`/api/workflows/templates/${templateId}`, {
-          headers: authHeaders
+        const data = await apiClient.get(`/api-internal/v1/workflows/templates/${templateId}`)
+        setWorkflow({
+          ...data.template.definition,
+          id: undefined, // Remove ID for new workflow
+          name: `${data.template.definition.name} (Copy)`,
+          steps: ensureStepPositions(data.template.definition.steps || [])
         })
-        if (response.ok) {
-          const data = await response.json()
-          setWorkflow({
-            ...data.template.definition,
-            id: undefined, // Remove ID for new workflow
-            name: `${data.template.definition.name} (Copy)`,
-            steps: ensureStepPositions(data.template.definition.steps || [])
-          })
-        }
       }
     } catch (error) {
       toast({
@@ -187,41 +175,29 @@ export default function WorkflowBuilderPage() {
       
       // Load available chatbots (existing platform component)
       try {
-        const chatbotsResponse = await fetch('/api/chatbot/list', {
-          headers: authHeaders
-        })
-        if (chatbotsResponse.ok) {
-          const chatbotsData = await chatbotsResponse.json()
+        const chatbotsData = await apiClient.get('/api-internal/v1/chatbot/list')
           
-          // Backend returns a direct array of chatbot objects
-          let chatbotOptions: Array<{id: string, name: string}> = []
-          
-          if (Array.isArray(chatbotsData)) {
-            // Map to both ID and name for display purposes
-            chatbotOptions = chatbotsData.map((chatbot: any) => ({
-              id: chatbot.id || '',
-              name: chatbot.name || chatbot.id || 'Unnamed Chatbot'
-            }))
-          }
-          
-          
-          // Store full chatbot objects for better UX (names + IDs)
-          setAvailableChatbots(chatbotOptions)
-          
+        // Backend returns a direct array of chatbot objects
+        let chatbotOptions: Array<{id: string, name: string}> = []
+        
+        if (Array.isArray(chatbotsData)) {
+          // Map to both ID and name for display purposes
+          chatbotOptions = chatbotsData.map((chatbot: any) => ({
+            id: chatbot.id || '',
+            name: chatbot.name || chatbot.id || 'Unnamed Chatbot'
+          }))
         }
+        
+        // Store full chatbot objects for better UX (names + IDs)
+        setAvailableChatbots(chatbotOptions)
       } catch (error) {
         // Silently handle error - chatbots will be empty array
       }
 
       // Load available RAG collections (existing platform component)
       try {
-        const collectionsResponse = await fetch('/api/rag/collections', {
-          headers: authHeaders
-        })
-        if (collectionsResponse.ok) {
-          const collectionsData = await collectionsResponse.json()
-          setAvailableCollections(collectionsData.collections?.map((c: any) => c.name) || [])
-        }
+        const collectionsData = await apiClient.get('/api-internal/v1/rag/collections')
+        setAvailableCollections(collectionsData.collections?.map((c: any) => c.name) || [])
       } catch (error) {
         // Silently handle error - collections will be empty array
       }
@@ -239,35 +215,22 @@ export default function WorkflowBuilderPage() {
     try {
       setSaving(true)
       
-      // Get auth token for API calls
-      const token = localStorage.getItem('token')
-      const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {}
+      const url = workflowId ? `/api-internal/v1/workflows/${workflowId}` : '/api-internal/v1/workflows'
       
-      const method = workflowId ? 'PUT' : 'POST'
-      const url = workflowId ? `/api/workflows/${workflowId}` : '/api/workflows'
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 
-          'Content-Type': 'application/json',
-          ...authHeaders
-        },
-        body: JSON.stringify(workflow)
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        toast({
-          title: "Success",
-          description: workflowId ? "Workflow updated" : "Workflow created"
-        })
-        
-        // Redirect to workflow list if this was a new workflow
-        if (!workflowId) {
-          router.push('/workflows')
-        }
+      if (workflowId) {
+        await apiClient.put(url, workflow)
       } else {
-        throw new Error('Failed to save workflow')
+        await apiClient.post(url, workflow)
+      }
+      
+      toast({
+        title: "Success",
+        description: workflowId ? "Workflow updated" : "Workflow created"
+      })
+      
+      // Redirect to workflow list if this was a new workflow
+      if (!workflowId) {
+        router.push('/workflows')
       }
     } catch (error) {
       toast({
@@ -282,28 +245,15 @@ export default function WorkflowBuilderPage() {
 
   const testWorkflow = async () => {
     try {
-      // Get auth token for API calls
-      const token = localStorage.getItem('token')
-      const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {}
-      
-      const response = await fetch('/api/workflows/test', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...authHeaders
-        },
-        body: JSON.stringify({ workflow, test_data: {} })
+      const result = await apiClient.post('/api-internal/v1/workflows/test', { 
+        workflow, 
+        test_data: {} 
       })
-
-      if (response.ok) {
-        const result = await response.json()
-        toast({
-          title: "Test Result",
-          description: `Workflow test completed: ${result.status}`
-        })
-      } else {
-        throw new Error('Test failed')
-      }
+      
+      toast({
+        title: "Test Result",
+        description: `Workflow test completed: ${result.status}`
+      })
     } catch (error) {
       toast({
         title: "Test Failed",

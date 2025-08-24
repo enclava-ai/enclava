@@ -34,6 +34,7 @@ import {
   MoreHorizontal
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api-client";
 
 interface ApiKey {
   id: string;
@@ -114,19 +115,7 @@ export default function ApiKeysPage() {
   const fetchApiKeys = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/v1/api-keys", {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch API keys");
-      }
-
-      const result = await response.json();
+      const result = await apiClient.get("/api-internal/v1/api-keys");
       setApiKeys(result.data || []);
     } catch (error) {
       console.error("Failed to fetch API keys:", error);
@@ -143,23 +132,7 @@ export default function ApiKeysPage() {
   const handleCreateApiKey = async () => {
     try {
       setActionLoading("create");
-
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/v1/api-keys", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newKeyData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create API key");
-      }
-
-      const data = await response.json();
+      const data = await apiClient.post("/api-internal/v1/api-keys", newKeyData);
       
       toast({
         title: "API Key Created",
@@ -197,21 +170,7 @@ export default function ApiKeysPage() {
   const handleToggleApiKey = async (keyId: string, active: boolean) => {
     try {
       setActionLoading(`toggle-${keyId}`);
-
-      const token = localStorage.getItem("token");
-      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
-        method: "PUT",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ is_active: active }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update API key");
-      }
+      await apiClient.put(`/api-internal/v1/api-keys/${keyId}`, { is_active: active });
 
       toast({
         title: "API Key Updated",
@@ -234,22 +193,7 @@ export default function ApiKeysPage() {
   const handleRegenerateApiKey = async (keyId: string) => {
     try {
       setActionLoading(`regenerate-${keyId}`);
-
-      const token = localStorage.getItem("token");
-      const response = await fetch(`/api/v1/api-keys/${keyId}/regenerate`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to regenerate API key");
-      }
-
-      const data = await response.json();
+      const data = await apiClient.post(`/api-internal/v1/api-keys/${keyId}/regenerate`);
       
       toast({
         title: "API Key Regenerated",
@@ -278,20 +222,7 @@ export default function ApiKeysPage() {
 
     try {
       setActionLoading(`delete-${keyId}`);
-
-      const token = localStorage.getItem("token");
-      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete API key");
-      }
+      await apiClient.delete(`/api-internal/v1/api-keys/${keyId}`);
 
       toast({
         title: "API Key Deleted",
@@ -314,31 +245,17 @@ export default function ApiKeysPage() {
   const handleEditApiKey = async (keyId: string) => {
     try {
       setActionLoading(`edit-${keyId}`);
-
-      const token = localStorage.getItem("token");
-      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
-        method: "PUT",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: editKeyData.name,
-          description: editKeyData.description,
-          rate_limit_per_minute: editKeyData.rate_limit_per_minute,
-          rate_limit_per_hour: editKeyData.rate_limit_per_hour,
-          rate_limit_per_day: editKeyData.rate_limit_per_day,
-          is_unlimited: editKeyData.is_unlimited,
-          budget_limit_cents: editKeyData.is_unlimited ? null : editKeyData.budget_limit,
-          budget_type: editKeyData.is_unlimited ? null : editKeyData.budget_type,
-          expires_at: editKeyData.expires_at,
-        }),
+      await apiClient.put(`/api-internal/v1/api-keys/${keyId}`, {
+        name: editKeyData.name,
+        description: editKeyData.description,
+        rate_limit_per_minute: editKeyData.rate_limit_per_minute,
+        rate_limit_per_hour: editKeyData.rate_limit_per_hour,
+        rate_limit_per_day: editKeyData.rate_limit_per_day,
+        is_unlimited: editKeyData.is_unlimited,
+        budget_limit_cents: editKeyData.is_unlimited ? null : editKeyData.budget_limit,
+        budget_type: editKeyData.is_unlimited ? null : editKeyData.budget_type,
+        expires_at: editKeyData.expires_at,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update API key");
-      }
 
       toast({
         title: "API Key Updated",

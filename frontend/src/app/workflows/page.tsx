@@ -36,6 +36,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ProtectedRoute from "@/components/ProtectedRoute"
+import { apiClient } from "@/lib/api-client"
+import { config } from "@/lib/config"
+import { uploadFile } from "@/lib/file-download"
 
 interface WorkflowDefinition {
   id: string
@@ -141,60 +144,22 @@ export default function WorkflowsPage() {
 
   const loadWorkflows = async () => {
     try {
-      const response = await fetch('/api/workflows')
-      if (response.ok) {
-        const data = await response.json()
-        setWorkflows(data.workflows || [])
-      } else {
-        // Fallback to empty array if API fails
-        console.error('Failed to load workflows from API')
-        setWorkflows([])
-      }
+      const data = await apiClient.get('/api-internal/v1/workflows')
+      setWorkflows(data.workflows || [])
     } catch (error) {
-      console.error('Error loading workflows:', error)
-      // Fallback to empty array on error
+      // Fallback to empty array if API fails
+      console.error('Failed to load workflows from API', error)
       setWorkflows([])
     }
   }
 
   const loadExecutions = async () => {
     try {
-      const response = await fetch('/api/workflows/executions')
-      if (response.ok) {
-        const data = await response.json()
-        setExecutions(data.executions || [])
-      } else {
-        // Fallback to mock data for development
-        setExecutions([
-          {
-            id: "ex-1",
-            workflow_id: "wf-1",
-            status: "completed",
-            started_at: new Date(Date.now() - 300000).toISOString(),
-            completed_at: new Date().toISOString(),
-            results: { response: "Support ticket resolved successfully" }
-          },
-          {
-            id: "ex-2",
-            workflow_id: "wf-2", 
-            status: "running",
-            current_step: "research_phase",
-            started_at: new Date(Date.now() - 60000).toISOString(),
-            results: {}
-          },
-          {
-            id: "ex-3",
-            workflow_id: "wf-1",
-            status: "failed",
-            started_at: new Date(Date.now() - 180000).toISOString(),
-            completed_at: new Date(Date.now() - 120000).toISOString(),
-            error: "Chatbot service unavailable",
-            results: {}
-          }
-        ])
-      }
+      const data = await apiClient.get('/api-internal/v1/workflows/executions')
+      setExecutions(data.executions || [])
     } catch (error) {
-      // Fallback to mock data
+      // Fallback to mock data for development
+      console.error('Failed to load executions:', error)
       setExecutions([
         {
           id: "ex-1",
@@ -227,11 +192,8 @@ export default function WorkflowsPage() {
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch('/api/workflows/templates')
-      if (response.ok) {
-        const data = await response.json()
-        setTemplates(data.templates || [])
-      }
+      const data = await apiClient.get('/api-internal/v1/workflows/templates')
+      setTemplates(data.templates || [])
     } catch (error) {
       // Set some default templates as fallback
       setTemplates([
@@ -255,25 +217,16 @@ export default function WorkflowsPage() {
 
   const executeWorkflow = async (workflow: WorkflowDefinition) => {
     try {
-      const response = await fetch('/api/workflows/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflow_def: workflow,
-          input_data: {}
-        })
+      const result = await apiClient.post('/api-internal/v1/workflows/execute', {
+        workflow_def: workflow,
+        input_data: {}
       })
-
-      if (response.ok) {
-        const result = await response.json()
-        toast({
-          title: "Workflow Started",
-          description: `Execution ID: ${result.execution_id}`
-        })
-        await loadExecutions()
-      } else {
-        throw new Error('Failed to execute workflow')
-      }
+      
+      toast({
+        title: "Workflow Started",
+        description: `Execution ID: ${result.execution_id}`
+      })
+      await loadExecutions()
     } catch (error) {
       toast({
         title: "Execution Failed",
@@ -307,27 +260,15 @@ export default function WorkflowsPage() {
 
     setIsImporting(true)
     try {
-      const formData = new FormData()
-      formData.append('workflow_file', importFile)
+      const result = await uploadFile('/api-internal/v1/workflows/import', importFile)
 
-      const response = await fetch('/api/workflows/import', {
-        method: 'POST',
-        body: formData
+      toast({
+        title: "Import Successful",
+        description: `Workflow "${result.workflow?.name || 'Unknown'}" has been imported successfully`
       })
-
-      const result = await response.json()
-
-      if (response.ok) {
-        toast({
-          title: "Import Successful",
-          description: `Workflow "${result.workflow?.name || 'Unknown'}" has been imported successfully`
-        })
-        setShowImportDialog(false)
-        setImportFile(null)
-        await loadWorkflows() // Refresh workflow list
-      } else {
-        throw new Error(result.error || 'Import failed')
-      }
+      setShowImportDialog(false)
+      setImportFile(null)
+      await loadWorkflows() // Refresh workflow list
     } catch (error) {
       toast({
         title: "Import Failed",
@@ -355,19 +296,12 @@ export default function WorkflowsPage() {
 
   const cancelExecution = async (executionId: string) => {
     try {
-      const response = await fetch(`/api/workflows/executions/${executionId}/cancel`, {
-        method: 'POST'
+      await apiClient.post(`/api-internal/v1/workflows/executions/${executionId}/cancel`, {})
+      toast({
+        title: "Execution Cancelled",
+        description: `Execution ${executionId} has been cancelled`
       })
-      
-      if (response.ok) {
-        toast({
-          title: "Execution Cancelled",
-          description: `Execution ${executionId} has been cancelled`
-        })
-        await loadExecutions()
-      } else {
-        throw new Error('Failed to cancel execution')
-      }
+      await loadExecutions()
     } catch (error) {
       toast({
         title: "Cancel Failed", 
@@ -405,22 +339,14 @@ export default function WorkflowsPage() {
     if (!workflowToDelete) return
 
     try {
-      const response = await fetch(`/api/workflows/${workflowToDelete.id}`, {
-        method: 'DELETE'
+      await apiClient.delete(`/api-internal/v1/workflows/${workflowToDelete.id}`)
+      toast({
+        title: "Workflow Deleted",
+        description: `"${workflowToDelete.name}" has been deleted successfully`
       })
-
-      if (response.ok) {
-        toast({
-          title: "Workflow Deleted",
-          description: `"${workflowToDelete.name}" has been deleted successfully`
-        })
-        await loadWorkflows() // Refresh the workflow list
-        setShowDeleteDialog(false)
-        setWorkflowToDelete(null)
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete workflow')
-      }
+      await loadWorkflows() // Refresh the workflow list
+      setShowDeleteDialog(false)
+      setWorkflowToDelete(null)
     } catch (error) {
       toast({
         title: "Delete Failed",

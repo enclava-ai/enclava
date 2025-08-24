@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/chatbot/list`, {
+    const response = await fetch(`${BACKEND_URL}/api/chatbot/list`, {
       method: 'GET',
       headers: {
         'Authorization': token,

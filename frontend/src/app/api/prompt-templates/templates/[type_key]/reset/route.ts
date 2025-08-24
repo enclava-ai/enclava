@@ -14,7 +14,7 @@ export async function POST(
     }
 
     const response = await fetch(
-      `${BACKEND_URL}/api/v1/prompt-templates/templates/${params.type_key}/reset`,
+      `${BACKEND_URL}/api/prompt-templates/templates/${params.type_key}/reset`,
       {
         method: 'POST',
         headers: {

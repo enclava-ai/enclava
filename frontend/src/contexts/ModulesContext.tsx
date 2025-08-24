@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react"
+import { apiClient } from "@/lib/api-client"
 
 interface Module {
   name: string
@@ -42,26 +43,7 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
       setIsLoading(true)
       setError(null)
 
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setError("No authentication token")
-        return
-      }
-
-      const response = await fetch("/api/modules", {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        // Disable caching to ensure fresh data
-        cache: "no-store"
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch modules: ${response.status}`)
-      }
-
-      const data: ModulesResponse = await response.json()
+      const data: ModulesResponse = await apiClient.get("/api-internal/v1/modules/")
       
       setModules(data.modules)
       

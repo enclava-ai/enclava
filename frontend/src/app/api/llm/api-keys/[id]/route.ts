@@ -13,7 +13,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/api-keys/${params.id}`, {
+    const response = await fetch(`${BACKEND_URL}/api/api-keys/${params.id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': token,
@@ -52,7 +52,7 @@ export async function PUT(
 
     const body = await request.json()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/api-keys/${params.id}`, {
+    const response = await fetch(`${BACKEND_URL}/api/api-keys/${params.id}`, {
       method: 'PUT',
       headers: {
         'Authorization': token,

@@ -17,7 +17,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     
     // Make request to backend Zammad configurations endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/zammad/configurations/${configId}`
+    const url = `${baseUrl}/api/zammad/configurations/${configId}`
     
     const response = await fetch(url, {
       method: 'PUT',
@@ -60,7 +60,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     
     // Make request to backend Zammad configurations endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/zammad/configurations/${configId}`
+    const url = `${baseUrl}/api/zammad/configurations/${configId}`
     
     const response = await fetch(url, {
       method: 'DELETE',

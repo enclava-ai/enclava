@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const adminToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImlzX3N1cGVydXNlciI6dHJ1ZSwicm9sZSI6InN1cGVyX2FkbWluIiwiZXhwIjoxNzg0Nzk2NDI2LjA0NDYxOX0.YOTlUY8nowkaLAXy5EKfnZEpbDgGCabru5R0jdq_DOQ'
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const response = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,

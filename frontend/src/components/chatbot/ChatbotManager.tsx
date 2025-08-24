@@ -31,6 +31,8 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { ChatInterface } from "./ChatInterface"
 import ModelSelector from "@/components/playground/ModelSelector"
+import { config } from "@/lib/config"
+import { apiClient } from "@/lib/api-client"
 
 interface ChatbotConfig {
   name: string
@@ -213,18 +215,8 @@ export function ChatbotManager() {
 
   const loadChatbots = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/chatbot/list', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setChatbots(data)
-      }
+      const data = await apiClient.get('/api-internal/v1/chatbot/list')
+      setChatbots(data)
     } catch (error) {
       console.error('Failed to load chatbots:', error)
       toast({
@@ -239,18 +231,8 @@ export function ChatbotManager() {
 
   const loadRagCollections = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/rag/collections', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setRagCollections(data.collections || [])
-      }
+      const data = await apiClient.get('/api-internal/v1/rag/collections')
+      setRagCollections(data.collections || [])
     } catch (error) {
       console.error('Failed to load RAG collections:', error)
     }
@@ -258,18 +240,8 @@ export function ChatbotManager() {
 
   const loadPromptTemplates = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/prompt-templates/templates', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.ok) {
-        const templates = await response.json()
-        setPromptTemplates(templates)
-      }
+      const templates = await apiClient.get('/api-internal/v1/prompt-templates/templates')
+      setPromptTemplates(templates)
     } catch (error) {
       console.error('Failed to load prompt templates:', error)
     }
@@ -282,28 +254,14 @@ export function ChatbotManager() {
 
   const createChatbot = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/chatbot/create', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newChatbot)
+      const chatbot = await apiClient.post('/api-internal/v1/chatbot/create', newChatbot)
+      setChatbots(prev => [...prev, chatbot])
+      setShowCreateDialog(false)
+      resetForm()
+      toast({
+        title: "Success",
+        description: "Chatbot created successfully"
       })
-
-      if (response.ok) {
-        const chatbot = await response.json()
-        setChatbots(prev => [...prev, chatbot])
-        setShowCreateDialog(false)
-        resetForm()
-        toast({
-          title: "Success",
-          description: "Chatbot created successfully"
-        })
-      } else {
-        throw new Error('Failed to create chatbot')
-      }
     } catch (error) {
       toast({
         title: "Error",
@@ -317,29 +275,15 @@ export function ChatbotManager() {
     if (!editingChatbot) return
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/chatbot/update/${editingChatbot.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(editChatbot)
+      const updatedChatbot = await apiClient.put(`/api-internal/v1/chatbot/update/${editingChatbot.id}`, editChatbot)
+      setChatbots(prev => prev.map(cb => cb.id === updatedChatbot.id ? updatedChatbot : cb))
+      setShowEditDialog(false)
+      setEditingChatbot(null)
+      resetEditForm()
+      toast({
+        title: "Success",
+        description: "Chatbot updated successfully"
       })
-
-      if (response.ok) {
-        const updatedChatbot = await response.json()
-        setChatbots(prev => prev.map(cb => cb.id === updatedChatbot.id ? updatedChatbot : cb))
-        setShowEditDialog(false)
-        setEditingChatbot(null)
-        resetEditForm()
-        toast({
-          title: "Success",
-          description: "Chatbot updated successfully"
-        })
-      } else {
-        throw new Error('Failed to update chatbot')
-      }
     } catch (error) {
       toast({
         title: "Error",
@@ -394,27 +338,14 @@ export function ChatbotManager() {
     if (!deletingChatbot) return
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/chatbot/delete/${deletingChatbot.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      await apiClient.delete(`/api-internal/v1/chatbot/delete/${deletingChatbot.id}`)
+      setChatbots(prev => prev.filter(c => c.id !== deletingChatbot.id))
+      setShowDeleteDialog(false)
+      setDeletingChatbot(null)
+      toast({
+        title: "Success",
+        description: `${deletingChatbot.name} has been deleted`
       })
-
-      if (response.ok) {
-        setChatbots(prev => prev.filter(c => c.id !== deletingChatbot.id))
-        setShowDeleteDialog(false)
-        setDeletingChatbot(null)
-        toast({
-          title: "Success",
-          description: `${deletingChatbot.name} has been deleted`
-        })
-      } else {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to delete chatbot')
-      }
     } catch (error) {
       console.error('Failed to delete chatbot:', error)
       toast({
@@ -434,21 +365,8 @@ export function ChatbotManager() {
   const loadApiKeys = async (chatbotId: string) => {
     setLoadingApiKeys(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/chatbot/${chatbotId}/api-key`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setApiKeys(data.api_keys || [])
-      } else {
-        console.error('Failed to load API keys')
-        setApiKeys([])
-      }
+      const data = await apiClient.get(`/api-internal/v1/chatbot/${chatbotId}/api-keys`)
+      setApiKeys(data.api_keys || [])
     } catch (error) {
       console.error('Failed to load API keys:', error)
       setApiKeys([])
@@ -461,27 +379,13 @@ export function ChatbotManager() {
     if (!apiKeyChatbot) return
 
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/chatbot/${apiKeyChatbot.id}/api-key`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const data = await apiClient.post(`/api-internal/v1/chatbot/${apiKeyChatbot.id}/api-key`, {})
+      setNewApiKey(data.secret_key)
+      await loadApiKeys(apiKeyChatbot.id)
+      toast({
+        title: "Success",
+        description: "API key created successfully"
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        setNewApiKey(data.secret_key)
-        await loadApiKeys(apiKeyChatbot.id)
-        toast({
-          title: "Success",
-          description: "API key created successfully"
-        })
-      } else {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to create API key')
-      }
     } catch (error) {
       console.error('Failed to create API key:', error)
       toast({
@@ -1208,7 +1112,7 @@ export function ChatbotManager() {
               </div>
               <div className="bg-background p-3 rounded border overflow-x-auto">
                 <code className="text-sm whitespace-nowrap">
-                  POST http://localhost:58000/api/v1/chatbot/external/{apiKeyChatbot?.id}/chat
+                  POST {config.getPublicApiUrl()}/chatbot/external/{apiKeyChatbot?.id}/chat
                 </code>
               </div>
               <p className="text-sm text-muted-foreground mt-2">
@@ -1216,7 +1120,7 @@ export function ChatbotManager() {
               </p>
               <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
                 <p className="text-xs text-blue-700">
-                  🔗 Backend API runs on port <strong>58000</strong> • Frontend runs on port 53000
+                  🔗 Unified API endpoint at <strong>{config.getAppUrl()}</strong> via nginx reverse proxy
                 </p>
               </div>
             </div>
@@ -1343,7 +1247,7 @@ export function ChatbotManager() {
               <h4 className="font-medium mb-2">Usage Example</h4>
               <div className="bg-background p-4 rounded border overflow-x-auto">
                 <pre className="text-sm whitespace-pre-wrap break-all">
-{`curl -X POST "http://localhost:58000/api/v1/chatbot/external/${apiKeyChatbot?.id}/chat" \\
+{`curl -X POST "${config.getPublicApiUrl()}/chatbot/external/${apiKeyChatbot?.id}/chat" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1354,8 +1258,7 @@ export function ChatbotManager() {
               </div>
               <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
                 <p className="text-sm text-yellow-800">
-                  <strong>📌 Important:</strong> Use the backend port <code className="bg-yellow-100 px-1 rounded">:58000</code> for API calls, 
-                  not the frontend port <code className="bg-yellow-100 px-1 rounded">:53000</code>
+                  <strong>📌 Important:</strong> Use the unified API endpoint <code className="bg-yellow-100 px-1 rounded">{config.getAppUrl()}</code> which routes to the appropriate backend service via nginx
                 </p>
               </div>
             </div>

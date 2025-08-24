@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     
     // Build backend URL with query params
-    const backendUrl = new URL(`${BACKEND_URL}/api/v1/rag/collections`)
+    const backendUrl = new URL(`${BACKEND_URL}/api/rag/collections`)
     searchParams.forEach((value, key) => {
       backendUrl.searchParams.append(key, value)
     })
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
 
     // Forward request to backend
-    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/rag/collections`, {
+    const backendResponse = await fetch(`${BACKEND_URL}/api/rag/collections`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -10,6 +10,8 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Upload, FileText, X, AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { config } from "@/lib/config"
+import { uploadFile } from "@/lib/file-download"
 
 interface Collection {
   id: string
@@ -88,48 +90,39 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
       await new Promise(resolve => setTimeout(resolve, 200))
       updateProgress(60)
 
-      const response = await fetch('/api/rag/documents', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: formData,
-      })
+      await uploadFile(
+        '/api-internal/v1/rag/documents',
+        uploadingFile.file,
+        { collection_id: targetCollection }
+      )
 
       updateProgress(80)
+      updateProgress(90)
+      
+      // Set processing status
+      setUploadingFiles(prev => 
+        prev.map(f => f.id === uploadingFile.id ? { ...f, status: 'processing', progress: 95 } : f)
+      )
 
-      if (response.ok) {
-        updateProgress(90)
-        
-        // Set processing status
-        setUploadingFiles(prev => 
-          prev.map(f => f.id === uploadingFile.id ? { ...f, status: 'processing', progress: 95 } : f)
-        )
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 1000))
+      // Complete
+      setUploadingFiles(prev => 
+        prev.map(f => f.id === uploadingFile.id ? { ...f, status: 'completed', progress: 100 } : f)
+      )
 
-        // Complete
-        setUploadingFiles(prev => 
-          prev.map(f => f.id === uploadingFile.id ? { ...f, status: 'completed', progress: 100 } : f)
-        )
+      toast({
+        title: "Success",
+        description: `${uploadingFile.file.name} uploaded successfully`,
+      })
 
-        toast({
-          title: "Success",
-          description: `${uploadingFile.file.name} uploaded successfully`,
-        })
+      onDocumentUploaded()
 
-        onDocumentUploaded()
-
-        // Remove completed file after 3 seconds
-        setTimeout(() => {
-          setUploadingFiles(prev => prev.filter(f => f.id !== uploadingFile.id))
-        }, 3000)
-
-      } else {
-        const error = await response.json()
-        throw new Error(error.message || 'Upload failed')
-      }
+      // Remove completed file after 3 seconds
+      setTimeout(() => {
+        setUploadingFiles(prev => prev.filter(f => f.id !== uploadingFile.id))
+      }, 3000)
     } catch (error) {
       setUploadingFiles(prev => 
         prev.map(f => f.id === uploadingFile.id ? { 

@@ -57,7 +57,7 @@ class RAGService:
         await self.db.commit()
         await self.db.refresh(collection)
         
-        # TODO: Create Qdrant collection
+        # Create Qdrant collection
         await self._create_qdrant_collection(qdrant_name)
         
         return collection
@@ -495,53 +495,135 @@ class RAGService:
         return f"{safe_name}_{timestamp}_{hash_suffix}{ext}"
     
     async def _create_qdrant_collection(self, collection_name: str):
-        """Create collection in Qdrant vector database"""
+        """Create Qdrant collection with proper error handling"""
         try:
-            # Get RAG module to create the collection
-            try:
-                from app.services.module_manager import module_manager
-                rag_module = module_manager.get_module('rag')
-            except ImportError as e:
-                logger.error(f"Failed to import module_manager: {e}")
-                rag_module = None
+            from qdrant_client import QdrantClient
+            from qdrant_client.models import Distance, VectorParams
+            from qdrant_client.http import models
+            from app.core.config import settings
             
-            if rag_module and hasattr(rag_module, 'create_collection'):
-                success = await rag_module.create_collection(collection_name)
-                if success:
-                    logger.info(f"Created Qdrant collection: {collection_name}")
-                else:
-                    logger.error(f"Failed to create Qdrant collection: {collection_name}")
-            else:
-                logger.warning("RAG module not available for collection creation")
+            client = QdrantClient(
+                host=getattr(settings, 'QDRANT_HOST', 'localhost'), 
+                port=getattr(settings, 'QDRANT_PORT', 6333),
+                timeout=30
+            )
+            
+            # Check if collection already exists
+            try:
+                collections = client.get_collections()
+                if collection_name in [c.name for c in collections.collections]:
+                    logger.info(f"Collection {collection_name} already exists")
+                    return True
+            except Exception as e:
+                logger.warning(f"Could not check existing collections: {e}")
                 
+            # Create collection with proper vector configuration  
+            client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(
+                    size=384,  # Standard embedding dimension for sentence-transformers
+                    distance=Distance.COSINE
+                ),
+                optimizers_config=models.OptimizersConfig(
+                    default_segment_number=2
+                ),
+                hnsw_config=models.HnswConfig(
+                    m=16,
+                    ef_construct=100
+                )
+            )
+            logger.info(f"Created Qdrant collection: {collection_name}")
+            return True
+            
+        except ImportError as e:
+            logger.error(f"Qdrant client not available: {e}")
+            logger.warning("Install qdrant-client package to enable vector search: pip install qdrant-client")
+            return False
+            
         except Exception as e:
-            logger.error(f"Error creating Qdrant collection {collection_name}: {e}")
-            # Don't re-raise the error - collection is already saved in database
-            # The Qdrant collection can be created later if needed
+            logger.error(f"Failed to create Qdrant collection {collection_name}: {e}")
+            from app.utils.exceptions import APIException
+            raise APIException(
+                status_code=500,
+                error_code="QDRANT_COLLECTION_ERROR", 
+                detail=f"Vector database collection creation failed: {str(e)}"
+            )
     
     async def _delete_qdrant_collection(self, collection_name: str):
         """Delete collection from Qdrant vector database"""
         try:
-            # Get RAG module to delete the collection
-            try:
-                from app.services.module_manager import module_manager
-                rag_module = module_manager.get_module('rag')
-            except ImportError as e:
-                logger.error(f"Failed to import module_manager: {e}")
-                rag_module = None
+            from qdrant_client import QdrantClient
+            from app.core.config import settings
             
-            if rag_module and hasattr(rag_module, 'delete_collection'):
-                success = await rag_module.delete_collection(collection_name)
-                if success:
-                    logger.info(f"Deleted Qdrant collection: {collection_name}")
-                else:
-                    logger.warning(f"Qdrant collection not found or already deleted: {collection_name}")
-            else:
-                logger.warning("RAG module not available for collection deletion")
+            client = QdrantClient(
+                host=getattr(settings, 'QDRANT_HOST', 'localhost'), 
+                port=getattr(settings, 'QDRANT_PORT', 6333),
+                timeout=30
+            )
+            
+            # Check if collection exists before trying to delete
+            try:
+                collections = client.get_collections()
+                if collection_name not in [c.name for c in collections.collections]:
+                    logger.warning(f"Qdrant collection {collection_name} not found, nothing to delete")
+                    return True
+            except Exception as e:
+                logger.warning(f"Could not check existing collections: {e}")
                 
+            # Delete the collection
+            client.delete_collection(collection_name)
+            logger.info(f"Deleted Qdrant collection: {collection_name}")
+            return True
+            
+        except ImportError as e:
+            logger.error(f"Qdrant client not available: {e}")
+            return False
+            
         except Exception as e:
             logger.error(f"Error deleting Qdrant collection {collection_name}: {e}")
             # Don't re-raise the error for deletion as it's not critical if cleanup fails
+            return False
+    
+    async def check_qdrant_health(self) -> Dict[str, Any]:
+        """Check Qdrant database connectivity and health"""
+        try:
+            from qdrant_client import QdrantClient
+            from app.core.config import settings
+            
+            client = QdrantClient(
+                host=getattr(settings, 'QDRANT_HOST', 'localhost'), 
+                port=getattr(settings, 'QDRANT_PORT', 6333),
+                timeout=5  # Short timeout for health check
+            )
+            
+            # Try to get collections (basic connectivity test)
+            collections = client.get_collections()
+            collection_count = len(collections.collections)
+            
+            return {
+                "status": "healthy",
+                "qdrant_host": getattr(settings, 'QDRANT_HOST', 'localhost'),
+                "qdrant_port": getattr(settings, 'QDRANT_PORT', 6333),
+                "collections_count": collection_count,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+        except ImportError:
+            return {
+                "status": "unavailable",
+                "error": "Qdrant client not installed",
+                "recommendation": "Install qdrant-client package",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+                "qdrant_host": getattr(settings, 'QDRANT_HOST', 'localhost'),
+                "qdrant_port": getattr(settings, 'QDRANT_PORT', 6333),
+                "timestamp": datetime.utcnow().isoformat()
+            }
     
     async def _update_collection_stats(self, collection_id: int):
         """Update collection statistics (document count, size, etc.)"""

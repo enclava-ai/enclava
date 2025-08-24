@@ -3,7 +3,7 @@ import { proxyRequest, handleProxyResponse } from '@/lib/proxy-auth'
 
 export async function GET() {
   try {
-    const response = await proxyRequest('/api/v1/modules/status')
+    const response = await proxyRequest('/api-internal/v1/modules/status')
     
     if (!response.ok) {
       throw new Error(`Backend responded with ${response.status}: ${response.statusText}`)

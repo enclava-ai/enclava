@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Progress } from "@/components/ui/progress"
 import { Plus, Database, Trash2, FileText, Calendar, AlertCircle, CheckCircle2, Clock, Settings, ExternalLink } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { apiClient } from "@/lib/api-client"
 
 interface Collection {
   id: string
@@ -126,32 +127,19 @@ export function CollectionManager({
     setCreating(true)
     
     try {
-      const response = await fetch('/api/rag/collections', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          name: newCollectionName.trim(),
-          description: newCollectionDescription.trim() || undefined,
-        }),
+      const data = await apiClient.post('/api-internal/v1/rag/collections', {
+        name: newCollectionName.trim(),
+        description: newCollectionDescription.trim() || undefined,
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        onCollectionCreated(data.collection)
-        setShowCreateDialog(false)
-        setNewCollectionName("")
-        setNewCollectionDescription("")
-        toast({
-          title: "Success",
-          description: "Collection created successfully",
-        })
-      } else {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to create collection')
-      }
+      
+      onCollectionCreated(data.collection)
+      setShowCreateDialog(false)
+      setNewCollectionName("")
+      setNewCollectionDescription("")
+      toast({
+        title: "Success",
+        description: "Collection created successfully",
+      })
     } catch (error) {
       toast({
         title: "Error",
@@ -167,23 +155,13 @@ export function CollectionManager({
     setDeleting(collectionId)
     
     try {
-      const response = await fetch(`/api/rag/collections/${collectionId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+      await apiClient.delete(`/api-internal/v1/rag/collections/${collectionId}`)
+      
+      onCollectionDeleted(collectionId)
+      toast({
+        title: "Success",
+        description: "Collection deleted successfully",
       })
-
-      if (response.ok) {
-        onCollectionDeleted(collectionId)
-        toast({
-          title: "Success",
-          description: "Collection deleted successfully",
-        })
-      } else {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to delete collection')
-      }
     } catch (error) {
       toast({
         title: "Error",

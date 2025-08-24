@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useState, useEffect } from "react"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
 import { useToast } from "@/hooks/use-toast"
+import { config } from "@/lib/config"
+import { apiClient } from "@/lib/api-client"
 
 // Force dynamic rendering for authentication
 export const dynamic = 'force-dynamic'
@@ -69,16 +71,9 @@ function DashboardContent() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
 
-  // Get the public API URL from the current window location
+  // Get the public API URL from centralized config
   const getPublicApiUrl = () => {
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol
-      const hostname = window.location.hostname
-      const port = window.location.hostname === 'localhost' ? '58000' : window.location.port || (protocol === 'https:' ? '443' : '80')
-      const portSuffix = (protocol === 'https:' && port === '443') || (protocol === 'http:' && port === '80') ? '' : `:${port}`
-      return `${protocol}//${hostname}${portSuffix}/v1`
-    }
-    return 'http://localhost:58000/v1'
+    return config.getPublicApiUrl()
   }
 
   const copyToClipboard = (text: string) => {
@@ -99,60 +94,43 @@ function DashboardContent() {
       
       // Fetch real dashboard stats through API proxy
       
-      const [statsRes, modulesRes, activityRes] = await Promise.all([
-        fetch('/api/analytics/overview').catch(() => null),
-        fetch('/api/modules').catch(() => null),
-        fetch('/api/audit?limit=5').catch(() => null)
+      const [modulesRes] = await Promise.all([
+        apiClient.get('/api-internal/v1/modules/').catch(() => null)
       ])
 
-      // Parse stats response
-      if (statsRes?.ok) {
-        const statsData = await statsRes.json()
-        const moduleStats = await fetch('/api/modules/status').then(r => r.ok ? r.json() : {}).catch(() => ({})) as { total?: number; running?: number; standby?: number }
-        
-        setStats({
-          activeModules: moduleStats.total || 0,
-          runningModules: moduleStats.running || 0,
-          standbyModules: moduleStats.standby || 0,
-          totalRequests: statsData.totalRequests || 0,
-          requestsChange: statsData.requestsChange || 0,
-          totalUsers: statsData.totalUsers || 0,
-          activeSessions: statsData.activeSessions || 0,
-          uptime: statsData.uptime || 0
-        })
-      } else {
-        // No mock data - show zeros when API unavailable
-        setStats({
-          activeModules: 0,
-          runningModules: 0,
-          standbyModules: 0,
-          totalRequests: 0,
-          requestsChange: 0,
-          totalUsers: 0,
-          activeSessions: 0,
-          uptime: 0
-        })
-      }
+      // Set default stats since analytics endpoints removed
+      setStats({
+        activeModules: 0,
+        runningModules: 0,
+        standbyModules: 0,
+        totalRequests: 0,
+        requestsChange: 0,
+        totalUsers: 0,
+        activeSessions: 0,
+        uptime: 0
+      })
 
       // Parse modules response
-      if (modulesRes?.ok) {
-        const modulesData = await modulesRes.json()
-        setModules(modulesData.modules || [])
+      if (modulesRes) {
+        setModules(modulesRes.modules || [])
+        
+        // Update stats with actual module data
+        setStats(prev => ({
+          ...prev!,
+          activeModules: modulesRes.total || 0,
+          runningModules: modulesRes.modules?.filter((m: any) => m.status === 'running').length || 0,
+          standbyModules: modulesRes.modules?.filter((m: any) => m.status === 'standby').length || 0
+        }))
       } else {
         setModules([])
       }
 
-      // Parse activity response
-      if (activityRes?.ok) {
-        const activityData = await activityRes.json()
-        setRecentActivity(activityData.logs || [])
-      } else {
-        setRecentActivity([])
-      }
+      // No activity data since audit endpoint removed
+      setRecentActivity([])
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
-      // Set empty states instead of mock data
+      // Set empty states on error
       setStats({
         activeModules: 0,
         runningModules: 0,
@@ -302,10 +280,10 @@ function DashboardContent() {
         <CardContent>
           <div className="flex items-center gap-3">
             <code className="flex-1 p-3 bg-white border border-blue-200 rounded-md text-sm font-mono">
-              {getPublicApiUrl()}
+              {config.getPublicApiUrl()}
             </code>
             <Button
-              onClick={() => copyToClipboard(getPublicApiUrl())}
+              onClick={() => copyToClipboard(config.getPublicApiUrl())}
               variant="outline"
               size="sm"
               className="flex items-center gap-1 border-blue-300 text-blue-700 hover:bg-blue-100"

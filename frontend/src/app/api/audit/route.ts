@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     // Get query parameters from the request
     const { searchParams } = new URL(request.url)
     const queryString = searchParams.toString()
-    const endpoint = `/api/v1/audit${queryString ? `?${queryString}` : ''}`
+    const endpoint = `/api-internal/v1/audit${queryString ? `?${queryString}` : ''}`
     
     const response = await proxyRequest(endpoint)
     const data = await handleProxyResponse(response, 'Failed to fetch audit logs')

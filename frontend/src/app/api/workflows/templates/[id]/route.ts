@@ -12,7 +12,7 @@ export async function GET(
     const templateId = params.id
 
     // First get all templates
-    const response = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const response = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,

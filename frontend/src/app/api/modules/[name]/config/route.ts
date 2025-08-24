@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { name } = params
     
-    const response = await proxyRequest(`/api/v1/modules/${name}/config`)
+    const response = await proxyRequest(`/api-internal/v1/modules/${name}/config`)
 
     if (!response.ok) {
       throw new Error(`Backend responded with ${response.status}: ${response.statusText}`)
@@ -33,7 +33,7 @@ export async function POST(
     const { name } = params
     const config = await request.json()
     
-    const response = await proxyRequest(`/api/v1/modules/${name}/config`, {
+    const response = await proxyRequest(`/api-internal/v1/modules/${name}/config`, {
       method: 'POST',
       body: JSON.stringify(config)
     })

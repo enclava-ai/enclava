@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     
     // Make request to backend Zammad configurations endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/zammad/configurations`
+    const url = `${baseUrl}/api/zammad/configurations`
     
     const response = await fetch(url, {
       method: 'GET',
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     
     // Make request to backend Zammad configurations endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/zammad/configurations`
+    const url = `${baseUrl}/api/zammad/configurations`
     
     const response = await fetch(url, {
       method: 'POST',

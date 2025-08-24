@@ -20,6 +20,7 @@ import {
   Zap,
   AlertCircle
 } from 'lucide-react'
+import { apiClient } from '@/lib/api-client'
 
 interface BudgetData {
   id: string
@@ -57,17 +58,7 @@ export default function BudgetMonitor() {
   const fetchBudgetStatus = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/v1/llm/budget/status', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImlzX3N1cGVydXNlciI6dHJ1ZSwicm9sZSI6InN1cGVyX2FkbWluIiwiZXhwIjoxNzU1ODQ1ODg3fQ.lrYJpoA2fUCvY97RX1Mpli4qtIhuDZjQ_LbDlqxTl6I'}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch budget status')
-      }
-
-      const data = await response.json()
+      const data = await apiClient.get('/api-internal/v1/llm/budget/status')
       setBudgetStatus(data)
       setError(null)
       setLastRefresh(new Date())

@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePlugin, type PluginInfo } from '../../contexts/PluginContext';
+import { config } from '../../lib/config';
 
 interface PluginPageRendererProps {
   pluginId: string;
@@ -47,7 +48,8 @@ const PluginIframe: React.FC<PluginIframeProps> = ({
       // Validate origin - should be from our backend
       const allowedOrigins = [
         window.location.origin,
-        'http://localhost:58000',
+        config.getBackendUrl(),
+        config.getApiUrl(),
         process.env.NEXT_PUBLIC_API_URL
       ].filter(Boolean);
       
@@ -94,7 +96,7 @@ const PluginIframe: React.FC<PluginIframeProps> = ({
     };
   }, [pluginId, onLoad, onError]);
   
-  const iframeUrl = `/api/v1/plugins/${pluginId}/ui${pagePath}?token=${encodeURIComponent(token)}`;
+  const iframeUrl = `/api-internal/v1/plugins/${pluginId}/ui${pagePath}?token=${encodeURIComponent(token)}`;
   
   return (
     <div className="relative w-full">

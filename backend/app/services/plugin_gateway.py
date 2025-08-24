@@ -23,6 +23,7 @@ from app.models.api_key import APIKey
 from app.models.user import User
 from app.db.database import get_db
 from app.services.plugin_sandbox import plugin_loader
+from app.services.plugin_context_manager import plugin_context_manager
 from app.utils.exceptions import SecurityError, PluginError
 from sqlalchemy.orm import Session
 
@@ -504,9 +505,25 @@ class PluginAPIGateway:
                 raise HTTPException(status_code=400, detail="Plugin already loaded")
             
             try:
-                # Load plugin
+                # Load plugin with proper context management
                 plugin_dir = f"/plugins/{plugin_id}"
-                plugin_token = "temp_token"  # TODO: Generate proper plugin token
+                
+                # Create plugin context for standardized interface
+                plugin_context = plugin_context_manager.create_plugin_context(
+                    plugin_id=plugin_id,
+                    user_id="system",  # System loading context
+                    session_type="plugin_load"
+                )
+                
+                # Generate plugin token based on context
+                plugin_token = plugin_context_manager.generate_plugin_token(plugin_context["context_id"])
+                
+                # Log plugin loading action
+                plugin_context_manager.add_audit_trail_entry(
+                    plugin_context["context_id"],
+                    "plugin_load",
+                    {"plugin_dir": plugin_dir, "action": "load_plugin_with_sandbox"}
+                )
                 
                 await plugin_loader.load_plugin_with_sandbox(plugin_dir, plugin_token)
                 

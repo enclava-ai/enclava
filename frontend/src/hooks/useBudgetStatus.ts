@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { apiClient } from '@/lib/api-client'
 
 interface BudgetData {
   id: string
@@ -39,19 +40,7 @@ export function useBudgetStatus(autoRefresh = true, refreshInterval = 30000) {
     try {
       setLoading(true)
 
-      const response = await fetch('/api/v1/llm/budget/status')
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Authentication failed')
-        }
-        if (response.status === 403) {
-          throw new Error('Insufficient permissions')
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
+      const data = await apiClient.get('/api-internal/v1/llm/budget/status')
       setBudgetStatus(data)
       setError(null)
       setLastRefresh(new Date())

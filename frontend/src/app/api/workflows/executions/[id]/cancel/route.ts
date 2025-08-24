@@ -12,7 +12,7 @@ export async function POST(
     const executionId = params.id
 
     // Cancel execution via workflow module
-    const response = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const response = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,

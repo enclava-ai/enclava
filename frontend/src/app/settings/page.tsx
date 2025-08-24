@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import {
   Info
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api-client";
 
 interface SystemSettings {
   // Security Settings
@@ -93,7 +95,7 @@ interface SystemSettings {
   };
 }
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,21 +110,7 @@ export default function SettingsPage() {
     try {
       setLoading(true);
       
-      // Get auth token from localStorage
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch("/api/v1/settings", {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch settings");
-      }
-
-      const data = await response.json();
+      const data = await apiClient.get("/api-internal/v1/settings/");
       
       // Transform backend format to frontend format
       const transformedSettings = {} as SystemSettings;
@@ -176,22 +164,7 @@ export default function SettingsPage() {
     try {
       setSaving(category);
       
-      // Get auth token from localStorage
-      const token = localStorage.getItem("token");
-
-      const response = await fetch(`/api/v1/settings/${category}`, {
-        method: "PUT",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(settings[category]),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to save settings");
-      }
+      await apiClient.put(`/api-internal/v1/settings/${category}`, settings[category]);
 
       toast({
         title: "Settings Saved",
@@ -213,13 +186,7 @@ export default function SettingsPage() {
 
   const handleTestConnection = async (type: "smtp") => {
     try {
-      const response = await fetch(`/api/v1/settings/test-connection/${type}`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error(`${type.toUpperCase()} connection test failed`);
-      }
+      await apiClient.post(`/api-internal/v1/settings/test-connection/${type}`, {});
 
       toast({
         title: "Connection Test Successful",
@@ -883,5 +850,13 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <ProtectedRoute>
+      <SettingsPageContent />
+    </ProtectedRoute>
   );
 }

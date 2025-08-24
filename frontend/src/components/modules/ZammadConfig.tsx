@@ -13,6 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { config } from "@/lib/config"
+import { apiClient } from "@/lib/api-client"
 import { 
   Settings, 
   Save, 
@@ -100,11 +102,16 @@ export function ZammadConfig() {
   // Form states
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingConfig, setEditingConfig] = useState<ZammadConfiguration | null>(null)
+  // Get default Zammad URL from environment or use localhost fallback
+  const getDefaultZammadUrl = () => {
+    return process.env.NEXT_PUBLIC_DEFAULT_ZAMMAD_URL || "http://localhost:8080"
+  }
+
   const [newConfig, setNewConfig] = useState<Partial<ZammadConfiguration>>({
     name: "",
     description: "",
     is_default: false,
-    zammad_url: "http://localhost:8080",
+    zammad_url: getDefaultZammadUrl(),
     api_token: "",
     chatbot_id: "",
     process_state: "open",
@@ -141,50 +148,38 @@ export function ZammadConfig() {
   }
 
   const fetchConfigurations = async () => {
-    const response = await fetch("/api/v1/zammad/configurations", {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      }
-    })
-    if (response.ok) {
-      const data = await response.json()
+    try {
+      const data = await apiClient.get("/api-internal/v1/zammad/configurations")
       setConfigurations(data.configurations || [])
+    } catch (error) {
+      console.error("Error fetching configurations:", error)
     }
   }
 
   const fetchChatbots = async () => {
-    const response = await fetch("/api/v1/zammad/chatbots", {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      }
-    })
-    if (response.ok) {
-      const data = await response.json()
+    try {
+      const data = await apiClient.get("/api-internal/v1/zammad/chatbots")
       setChatbots(data.chatbots || [])
+    } catch (error) {
+      console.error("Error fetching chatbots:", error)
     }
   }
 
   const fetchProcessingLogs = async () => {
-    const response = await fetch("/api/v1/zammad/processing-logs?limit=5", {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      }
-    })
-    if (response.ok) {
-      const data = await response.json()
+    try {
+      const data = await apiClient.get("/api-internal/v1/zammad/processing-logs?limit=5")
       setProcessingLogs(data.logs || [])
+    } catch (error) {
+      console.error("Error fetching processing logs:", error)
     }
   }
 
   const fetchModuleStatus = async () => {
-    const response = await fetch("/api/v1/zammad/status", {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      }
-    })
-    if (response.ok) {
-      const data = await response.json()
+    try {
+      const data = await apiClient.get("/api-internal/v1/zammad/status")
       setModuleStatus(data)
+    } catch (error) {
+      console.error("Error fetching module status:", error)
     }
   }
 
@@ -193,23 +188,15 @@ export function ZammadConfig() {
       setSaving(true)
       
       const url = editingConfig 
-        ? `/api/v1/zammad/configurations/${editingConfig.id}`
-        : "/api/v1/zammad/configurations"
+        ? `/api-internal/v1/zammad/configurations/${editingConfig.id}`
+        : "/api-internal/v1/zammad/configurations"
       
       const method = editingConfig ? "PUT" : "POST"
       
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(newConfig)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to save configuration")
+      if (editingConfig) {
+        await apiClient.put(url, newConfig)
+      } else {
+        await apiClient.post(url, newConfig)
       }
 
       toast({
@@ -225,7 +212,7 @@ export function ZammadConfig() {
         name: "",
         description: "",
         is_default: false,
-        zammad_url: "http://localhost:8080",
+        zammad_url: getDefaultZammadUrl(),
         api_token: "",
         chatbot_id: "",
         process_state: "open",
@@ -262,19 +249,10 @@ export function ZammadConfig() {
     try {
       setTestingConnection(true)
       
-      const response = await fetch("/api/v1/zammad/test-connection", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          zammad_url: newConfig.zammad_url,
-          api_token: newConfig.api_token
-        })
+      const data = await apiClient.post("/api-internal/v1/zammad/test-connection", {
+        zammad_url: newConfig.zammad_url,
+        api_token: newConfig.api_token
       })
-
-      const data = await response.json()
       console.log("Test connection response:", data)
 
       if (data.status === "success") {
@@ -308,24 +286,10 @@ export function ZammadConfig() {
     try {
       setProcessing(true)
       
-      const response = await fetch("/api/v1/zammad/process", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          config_id: configId,
-          filters: {}
-        })
+      const data = await apiClient.post("/api-internal/v1/zammad/process", {
+        config_id: configId,
+        filters: {}
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to start processing")
-      }
-
-      const data = await response.json()
 
       toast({
         title: "Processing Started",
@@ -351,16 +315,7 @@ export function ZammadConfig() {
 
   const handleDeleteConfiguration = async (id: number) => {
     try {
-      const response = await fetch(`/api/v1/zammad/configurations/${id}`, {
-        method: "DELETE",
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to delete configuration")
-      }
+      await apiClient.delete(`/api-internal/v1/zammad/configurations/${id}`)
 
       toast({
         title: "Success",
@@ -495,7 +450,7 @@ export function ZammadConfig() {
                         id="zammad_url"
                         value={newConfig.zammad_url || ""}
                         onChange={(e) => setNewConfig({ ...newConfig, zammad_url: e.target.value })}
-                        placeholder="http://localhost:8080"
+                        placeholder={getDefaultZammadUrl()}
                       />
                     </div>
                     <div>

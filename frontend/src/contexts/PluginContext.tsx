@@ -5,6 +5,7 @@
  */
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
+import { apiClient } from '@/lib/api-client';
 
 export interface PluginInfo {
   id: string;
@@ -111,21 +112,20 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       throw new Error('Authentication required');
     }
     
-    const response = await fetch(`/api/v1/plugins${endpoint}`, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
+    const method = (options.method || 'GET').toLowerCase() as 'get' | 'post' | 'put' | 'delete';
+    const body = options.body ? JSON.parse(options.body as string) : undefined;
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || `HTTP ${response.status}`);
+    if (method === 'get') {
+      return await apiClient.get(`/api-internal/v1/plugins${endpoint}`);
+    } else if (method === 'post') {
+      return await apiClient.post(`/api-internal/v1/plugins${endpoint}`, body);
+    } else if (method === 'put') {
+      return await apiClient.put(`/api-internal/v1/plugins${endpoint}`, body);
+    } else if (method === 'delete') {
+      return await apiClient.delete(`/api-internal/v1/plugins${endpoint}`);
     }
     
-    return response.json();
+    throw new Error(`Unsupported method: ${method}`);
   };
   
   const refreshInstalledPlugins = useCallback(async () => {
@@ -369,24 +369,15 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       if (schema && pluginName === 'zammad') {
         // Populate chatbot options for Zammad
         try {
-          const chatbotsResponse = await fetch('/api/v1/chatbot/list', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            }
-          });
+          const chatbotsData = await apiClient.get('/api-internal/v1/chatbot/list');
+          const chatbots = chatbotsData.chatbots || [];
           
-          if (chatbotsResponse.ok) {
-            const chatbotsData = await chatbotsResponse.json();
-            const chatbots = chatbotsData.chatbots || [];
-            
-            if (schema.properties?.chatbot_id) {
-              schema.properties.chatbot_id.type = 'select';
-              schema.properties.chatbot_id.options = chatbots.map((chatbot: any) => ({
-                value: chatbot.id,
-                label: `${chatbot.name} (${chatbot.chatbot_type})`
-              }));
-            }
+          if (schema.properties?.chatbot_id) {
+            schema.properties.chatbot_id.type = 'select';
+            schema.properties.chatbot_id.options = chatbots.map((chatbot: any) => ({
+              value: chatbot.id,
+              label: `${chatbot.name} (${chatbot.chatbot_type})`
+            }));
           }
         } catch (chatbotError) {
           console.warn('Failed to load chatbots for Zammad configuration:', chatbotError);
@@ -394,33 +385,24 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
 
         // Populate model options for AI settings
         try {
-          const modelsResponse = await fetch('/api/v1/llm/models', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            }
-          });
+          const modelsData = await apiClient.get('/api-internal/v1/llm/models');
+          const models = modelsData.data || [];
           
-          if (modelsResponse.ok) {
-            const modelsData = await modelsResponse.json();
-            const models = modelsData.data || [];
-            
-            const modelOptions = models.map((model: any) => ({
-              value: model.id,
-              label: model.id
-            }));
+          const modelOptions = models.map((model: any) => ({
+            value: model.id,
+            label: model.id
+          }));
 
-            // Set model options for AI summarization
-            if (schema.properties?.ai_summarization?.properties?.model) {
-              schema.properties.ai_summarization.properties.model.type = 'select';
-              schema.properties.ai_summarization.properties.model.options = modelOptions;
-            }
+          // Set model options for AI summarization
+          if (schema.properties?.ai_summarization?.properties?.model) {
+            schema.properties.ai_summarization.properties.model.type = 'select';
+            schema.properties.ai_summarization.properties.model.options = modelOptions;
+          }
 
-            // Set model options for draft settings
-            if (schema.properties?.draft_settings?.properties?.model) {
-              schema.properties.draft_settings.properties.model.type = 'select';
-              schema.properties.draft_settings.properties.model.options = modelOptions;
-            }
+          // Set model options for draft settings
+          if (schema.properties?.draft_settings?.properties?.model) {
+            schema.properties.draft_settings.properties.model.type = 'select';
+            schema.properties.draft_settings.properties.model.options = modelOptions;
           }
         } catch (modelError) {
           console.warn('Failed to load models for Zammad configuration:', modelError);
@@ -430,23 +412,14 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       if (schema && pluginName === 'signal') {
         // Populate model options for Signal bot
         try {
-          const modelsResponse = await fetch('/api/v1/llm/models', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            }
-          });
+          const modelsData = await apiClient.get('/api-internal/v1/llm/models');
+          const models = modelsData.models || [];
           
-          if (modelsResponse.ok) {
-            const modelsData = await modelsResponse.json();
-            const models = modelsData.models || [];
-            
-            if (schema.properties?.model) {
-              schema.properties.model.options = models.map((model: any) => ({
-                value: model.id,
-                label: model.name || model.id
-              }));
-            }
+          if (schema.properties?.model) {
+            schema.properties.model.options = models.map((model: any) => ({
+              value: model.id,
+              label: model.name || model.id
+            }));
           }
         } catch (modelError) {
           console.warn('Failed to load models for Signal configuration:', modelError);

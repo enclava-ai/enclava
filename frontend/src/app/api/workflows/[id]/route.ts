@@ -12,7 +12,7 @@ export async function GET(
     const workflowId = params.id
 
     // Fetch workflow from the backend workflow module
-    const response = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const response = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,
@@ -57,7 +57,7 @@ export async function PUT(
     const workflowData = await request.json()
 
     // Validate workflow first
-    const validateResponse = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const validateResponse = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,
@@ -78,7 +78,7 @@ export async function PUT(
     }
 
     // Update workflow via backend workflow module
-    const updateResponse = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const updateResponse = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,
@@ -122,7 +122,7 @@ export async function DELETE(
     const workflowId = params.id
 
     // Delete workflow via backend workflow module
-    const response = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const response = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,

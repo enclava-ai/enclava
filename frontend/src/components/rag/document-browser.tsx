@@ -11,6 +11,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Search, FileText, Trash2, Eye, Download, Calendar, Hash, FileIcon, Filter } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { apiClient } from "@/lib/api-client"
+import { config } from "@/lib/config"
+import { downloadFile } from "@/lib/file-download"
 
 interface Collection {
   id: string
@@ -72,16 +75,8 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
   const loadDocuments = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/rag/documents', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setDocuments(data.documents || [])
-      }
+      const data = await apiClient.get('/api-internal/v1/rag/documents')
+      setDocuments(data.documents || [])
     } catch (error) {
       console.error('Failed to load documents:', error)
     } finally {
@@ -124,23 +119,13 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
     setDeleting(documentId)
     
     try {
-      const response = await fetch(`/api/rag/documents/${documentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+      await apiClient.delete(`/api-internal/v1/rag/documents/${documentId}`)
+      
+      setDocuments(prev => prev.filter(doc => doc.id !== documentId))
+      toast({
+        title: "Success",
+        description: "Document deleted successfully",
       })
-
-      if (response.ok) {
-        setDocuments(prev => prev.filter(doc => doc.id !== documentId))
-        toast({
-          title: "Success",
-          description: "Document deleted successfully",
-        })
-      } else {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to delete document')
-      }
     } catch (error) {
       toast({
         title: "Error",
@@ -154,26 +139,10 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
 
   const handleDownloadDocument = async (document: Document) => {
     try {
-      const response = await fetch(`/api/rag/documents/${document.id}/download`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      })
-
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const linkElement = window.document.createElement('a')
-        linkElement.style.display = 'none'
-        linkElement.href = url
-        linkElement.download = document.original_filename
-        window.document.body.appendChild(linkElement)
-        linkElement.click()
-        window.URL.revokeObjectURL(url)
-        window.document.body.removeChild(linkElement)
-      } else {
-        throw new Error('Download failed')
-      }
+      await downloadFile(
+        `/api-internal/v1/rag/documents/${document.id}/download`,
+        document.original_filename
+      )
     } catch (error) {
       toast({
         title: "Error",

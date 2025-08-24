@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate workflow through backend
-    const validateResponse = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const validateResponse = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create workflow via backend
-    const createResponse = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const createResponse = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,

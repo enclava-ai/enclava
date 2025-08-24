@@ -8,7 +8,7 @@ export async function POST(
   try {
     const { name, action } = params
     
-    const response = await proxyRequest(`/api/v1/modules/${name}/${action}`, { method: 'POST' })
+    const response = await proxyRequest(`/api-internal/v1/modules/${name}/${action}`, { method: 'POST' })
 
     if (!response.ok) {
       const errorData = await response.text()

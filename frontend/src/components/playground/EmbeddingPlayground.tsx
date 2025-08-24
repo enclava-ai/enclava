@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { Download, Zap, Calculator, BarChart3, AlertCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { apiClient } from '@/lib/api-client'
 
 interface EmbeddingResult {
   text: string
@@ -56,24 +57,11 @@ export default function EmbeddingPlayground() {
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/v1/llm/embeddings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          input: text,
-          model: model,
-          encoding_format: encodingFormat
-        })
+      const data = await apiClient.post('/api-internal/v1/llm/embeddings', {
+        input: text,
+        model: model,
+        encoding_format: encodingFormat
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to generate embedding')
-      }
-
-      const data = await response.json()
       const embedding = data.data[0].embedding
       const tokens = data.usage.total_tokens
       const cost = calculateCost(tokens, model)

@@ -20,6 +20,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { apiClient } from '@/lib/api-client'
 
 interface AnalyticsData {
   overview: {
@@ -63,18 +64,7 @@ function AnalyticsPageContent() {
       setLoading(true);
       
       // Fetch real analytics data from backend API via proxy
-      const response = await fetch('/api/analytics', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const analyticsData = await response.json();
+      const analyticsData = await apiClient.get('/api-internal/v1/analytics');
       setData(analyticsData);
       setLastUpdated(new Date());
     } catch (error) {

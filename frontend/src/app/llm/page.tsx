@@ -28,6 +28,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { apiClient } from '@/lib/api-client'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
 interface APIKey {
@@ -111,41 +112,27 @@ function LLMPageContent() {
         throw new Error('No authentication token found')
       }
       
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      }
-      
-      // Fetch API keys, budgets, and models
-      const [keysRes, budgetsRes, modelsRes] = await Promise.all([
-        fetch('/api/v1/api-keys', { headers }),
-        fetch('/api/v1/llm/budget/status', { headers }),
-        fetch('/api/v1/llm/models', { headers })
+      // Fetch API keys, budgets, and models using API client
+      const [keysData, budgetsData, modelsData] = await Promise.all([
+        apiClient.get('/api-internal/v1/api-keys').catch(e => {
+          console.error('Failed to fetch API keys:', e)
+          return { data: [] }
+        }),
+        apiClient.get('/api-internal/v1/llm/budget/status').catch(e => {
+          console.error('Failed to fetch budgets:', e)
+          return { data: [] }
+        }),
+        apiClient.get('/api-internal/v1/llm/models').catch(e => {
+          console.error('Failed to fetch models:', e)
+          return { data: [] }
+        })
       ])
 
-      console.log('API keys response status:', keysRes.status)
-      if (keysRes.ok) {
-        const keysData = await keysRes.json()
-        console.log('API keys data:', keysData)
-        setApiKeys(keysData.data || [])
-        console.log('API keys state updated, count:', keysData.data?.length || 0)
-      } else {
-        console.error('Failed to fetch API keys:', keysRes.status)
-      }
-
-      if (budgetsRes.ok) {
-        const budgetsData = await budgetsRes.json()
-        setBudgets(budgetsData.data || [])
-      } else {
-        console.error('Failed to fetch budgets:', budgetsRes.status)
-      }
-
-      if (modelsRes.ok) {
-        const modelsData = await modelsRes.json()
-        setModels(modelsData.data || [])
-      } else {
-        console.error('Failed to fetch models:', modelsRes.status)
-      }
+      console.log('API keys data:', keysData)
+      setApiKeys(keysData.data || [])
+      console.log('API keys state updated, count:', keysData.data?.length || 0)
+      setBudgets(budgetsData.data || [])
+      setModels(modelsData.data || [])
       
       console.log('Data fetch completed successfully')
     } catch (error) {
@@ -162,34 +149,20 @@ function LLMPageContent() {
 
   const createAPIKey = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/v1/api-keys', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newKey)
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        setNewSecretKey(result.secret_key)
-        setShowCreateDialog(false)
-        setShowSecretKeyDialog(true)
-        setNewKey({
-          name: '',
-          model: '',
-          is_unlimited: true,
-          budget_limit_cents: 1000, // $10.00 default
-          budget_type: 'monthly',
-          expires_at: '',
-          description: ''
+      const result = await apiClient.post('/api-internal/v1/api-keys', newKey)
+      setNewSecretKey(result.secret_key)
+      setShowCreateDialog(false)
+      setShowSecretKeyDialog(true)
+      setNewKey({
+        name: '',
+        model: '',
+        is_unlimited: true,
+        budget_limit_cents: 1000, // $10.00 default
+        budget_type: 'monthly',
+        expires_at: '',
+        description: ''
         })
         fetchData()
-      } else {
-        throw new Error('Failed to create API key')
-      }
     } catch (error) {
       toast({
         title: "Error",
@@ -204,38 +177,17 @@ function LLMPageContent() {
       console.log('Deleting API key with ID:', keyId)
       setLoading(true)
       
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No authentication token found')
-      }
-
-      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const responseData = await apiClient.delete(`/api-internal/v1/api-keys/${keyId}`)
+      console.log('Delete response data:', responseData)
+        
+      toast({
+        title: "Success",
+        description: "API key deleted successfully"
       })
-
-      console.log('Delete response status:', response.status)
       
-      if (response.ok) {
-        const responseData = await response.json()
-        console.log('Delete response data:', responseData)
-        
-        toast({
-          title: "Success",
-          description: "API key deleted successfully"
-        })
-        
-        // Force refresh data and wait for it to complete
-        await fetchData()
-        console.log('Data refreshed after deletion')
-      } else {
-        const errorData = await response.text()
-        console.error('Delete failed:', response.status, errorData)
-        throw new Error(`Failed to delete API key: ${response.status}`)
-      }
+      // Force refresh data and wait for it to complete
+      await fetchData()
+      console.log('Data refreshed after deletion')
     } catch (error) {
       console.error('Error deleting API key:', error)
       toast({
@@ -283,11 +235,11 @@ function LLMPageContent() {
     if (typeof window !== 'undefined') {
       const protocol = window.location.protocol
       const hostname = window.location.hostname
-      const port = window.location.hostname === 'localhost' ? '58000' : window.location.port || (protocol === 'https:' ? '443' : '80')
+      const port = window.location.hostname === 'localhost' ? '3000' : window.location.port || (protocol === 'https:' ? '443' : '80')
       const portSuffix = (protocol === 'https:' && port === '443') || (protocol === 'http:' && port === '80') ? '' : `:${port}`
       return `${protocol}//${hostname}${portSuffix}/v1`
     }
-    return 'http://localhost:58000/v1'
+    return 'http://localhost:3000/v1'
   }
 
   const publicApiUrl = getPublicApiUrl()
@@ -635,7 +587,7 @@ function LLMPageContent() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {budgets.map((budget) => (
+                {Array.isArray(budgets) && budgets.map((budget) => (
                   <div key={budget.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="font-medium">{budget.name}</h3>
@@ -660,7 +612,7 @@ function LLMPageContent() {
                     </div>
                   </div>
                 ))}
-                {budgets.length === 0 && (
+                {(!Array.isArray(budgets) || budgets.length === 0) && (
                   <div className="text-center py-8 text-muted-foreground">
                     No budgets configured. Configure budgets in the Analytics section.
                   </div>

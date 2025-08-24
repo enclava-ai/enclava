@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { downloadFile } from "@/lib/file-download";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,8 @@ import {
   ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api-client";
+import { config } from "@/lib/config";
 
 interface AuditLog {
   id: string;
@@ -100,22 +103,15 @@ export default function AuditPage() {
         ),
       });
 
-      const [logsResponse, statsResponse] = await Promise.all([
-        fetch(`/api/v1/audit?${params}`),
-        fetch("/api/v1/audit/stats")
+      const [logsData, statsData] = await Promise.all([
+        apiClient.get(`/api-internal/v1/audit?${params}`),
+        apiClient.get("/api-internal/v1/audit/stats")
       ]);
 
-      if (logsResponse.ok) {
-        const logsData = await logsResponse.json();
-        setAuditLogs(logsData.logs || []);
-        setTotalCount(logsData.total || 0);
-        setTotalPages(Math.ceil((logsData.total || 0) / pageSize));
-      }
-
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setStats(statsData);
-      }
+      setAuditLogs(logsData.logs || []);
+      setTotalCount(logsData.total || 0);
+      setTotalPages(Math.ceil((logsData.total || 0) / pageSize));
+      setStats(statsData);
     } catch (error) {
       console.error("Failed to fetch audit data:", error);
       toast({
@@ -161,21 +157,8 @@ export default function AuditPage() {
         ),
       });
 
-      const response = await fetch(`/api/v1/audit/export?${params}`);
-
-      if (!response.ok) {
-        throw new Error("Failed to export audit logs");
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const filename = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+      await downloadFile('/api-internal/v1/audit/export', filename, params);
 
       toast({
         title: "Export Successful",

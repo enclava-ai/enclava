@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from app.core.security import get_current_user
 from app.core.logging import get_logger
 from app.services.llm.service import llm_service
 from app.services.llm.models import ChatRequest as LLMChatRequest, ChatMessage as LLMChatMessage
@@ -28,6 +29,7 @@ from app.services.llm.exceptions import LLMError, ProviderError, SecurityError
 from app.services.base_module import Permission
 from app.db.database import SessionLocal
 from app.models.workflow import WorkflowDefinition as DBWorkflowDefinition, WorkflowExecution as DBWorkflowExecution
+from app.services.workflow_execution_service import WorkflowExecutionService
 
 # Import protocols for type hints and dependency injection
 from ..protocols import ChatbotServiceProtocol
@@ -235,33 +237,76 @@ class WorkflowExecution(BaseModel):
 
 
 class WorkflowEngine:
-    """Core workflow execution engine"""
+    """Core workflow execution engine with user context tracking"""
     
-    def __init__(self, chatbot_service: Optional[ChatbotServiceProtocol] = None):
+    def __init__(self, chatbot_service: Optional[ChatbotServiceProtocol] = None, execution_service: Optional[WorkflowExecutionService] = None):
         self.chatbot_service = chatbot_service
+        self.execution_service = execution_service
         self.executions: Dict[str, WorkflowExecution] = {}
         self.workflows: Dict[str, WorkflowDefinition] = {}
     
     async def execute_workflow(self, workflow: WorkflowDefinition, 
-                             input_data: Dict[str, Any] = None) -> WorkflowExecution:
-        """Execute a workflow definition"""
+                             input_data: Dict[str, Any] = None, 
+                             user_context: Optional[Dict[str, Any]] = None) -> WorkflowExecution:
+        """Execute a workflow definition with proper user context tracking"""
+        
+        # Create user context if not provided
+        if not user_context:
+            user_context = {"user_id": "system", "username": "System", "session_id": str(uuid.uuid4())}
+        
+        # Create execution record in database if service is available
+        db_execution = None
+        if self.execution_service:
+            try:
+                db_execution = await self.execution_service.create_execution_record(
+                    workflow_id=workflow.id,
+                    user_context=user_context,
+                    execution_params=input_data
+                )
+                
+                # Start the execution
+                await self.execution_service.start_execution(
+                    db_execution.id,
+                    workflow_context={"workflow_name": workflow.name}
+                )
+                
+            except Exception as e:
+                logger.error(f"Failed to create database execution record: {e}")
+        
+        # Create in-memory execution for backward compatibility
         execution = WorkflowExecution(
             workflow_id=workflow.id,
             status=WorkflowStatus.RUNNING,
             started_at=datetime.utcnow()
         )
         
-        # Initialize context
+        # Use database execution ID if available
+        if db_execution:
+            execution.id = db_execution.id
+        
+        # Initialize context with user information
         context = WorkflowContext(
             workflow_id=workflow.id,
             execution_id=execution.id,
-            variables={**workflow.variables, **(input_data or {})},
+            variables={
+                **workflow.variables, 
+                **(input_data or {}),
+                # Add user context to variables for step access
+                "_user_id": user_context.get("user_id", "system"),
+                "_username": user_context.get("username", "System"),
+                "_session_id": user_context.get("session_id")
+            },
             results={},
-            metadata={},
+            metadata={
+                "user_context": user_context,
+                "execution_started_by": user_context.get("username", "System")
+            },
             step_history=[]
         )
         
         try:
+            logger.info(f"Starting workflow execution {execution.id} for workflow {workflow.name} by user {user_context.get('username', 'System')}")
+            
             # Execute steps
             await self._execute_steps(workflow.steps, context)
             
@@ -269,11 +314,31 @@ class WorkflowEngine:
             execution.results = context.results
             execution.completed_at = datetime.utcnow()
             
+            # Update database execution record if available
+            if self.execution_service and db_execution:
+                await self.execution_service.complete_execution(
+                    db_execution.id,
+                    context.results,
+                    context.step_history
+                )
+            
+            logger.info(f"Completed workflow execution {execution.id} successfully")
+            
         except Exception as e:
-            logger.error(f"Workflow execution failed: {e}")
+            error_message = str(e)
+            logger.error(f"Workflow execution {execution.id} failed: {error_message}")
+            
             execution.status = WorkflowStatus.FAILED
-            execution.error = str(e)
+            execution.error = error_message
             execution.completed_at = datetime.utcnow()
+            
+            # Update database execution record if available
+            if self.execution_service and db_execution:
+                await self.execution_service.fail_execution(
+                    db_execution.id,
+                    error_message,
+                    context.step_history
+                )
         
         self.executions[execution.id] = execution
         return execution
@@ -339,7 +404,7 @@ class WorkflowEngine:
                     raise
     
     async def _execute_llm_step(self, step: WorkflowStep, context: WorkflowContext):
-        """Execute an LLM call step"""
+        """Execute an LLM call step with proper user context"""
         llm_step = LLMCallStep(**step.dict())
         
         # Template message content with context variables
@@ -348,11 +413,15 @@ class WorkflowEngine:
         # Convert messages to LLM service format
         llm_messages = [LLMChatMessage(role=msg["role"], content=msg["content"]) for msg in messages]
         
-        # Create LLM service request
+        # Get user context from workflow metadata
+        user_context = context.metadata.get("user_context", {})
+        user_id = user_context.get("user_id", "system")
+        
+        # Create LLM service request with proper user context
         llm_request = LLMChatRequest(
             model=llm_step.model,
             messages=llm_messages,
-            user_id="workflow_user",
+            user_id=str(user_id),  # Use actual user ID from context
             api_key_id=0,  # Workflow module uses internal service
             **{k: v for k, v in llm_step.parameters.items() if k in ['temperature', 'max_tokens', 'top_p', 'frequency_penalty', 'presence_penalty', 'stop']}
         )
@@ -365,7 +434,7 @@ class WorkflowEngine:
         context.variables[llm_step.output_variable] = result
         context.results[step.id] = result
         
-        logger.info(f"LLM step {step.id} completed")
+        logger.info(f"LLM step {step.id} completed for user {user_context.get('username', user_id)}")
     
     async def _execute_conditional_step(self, step: WorkflowStep, context: WorkflowContext):
         """Execute a conditional step"""
@@ -473,12 +542,14 @@ class WorkflowEngine:
                 context=chatbot_context
             )
             
-            # Make the chatbot call using the service protocol
-            # NOTE: DB session dependency should be injected via WorkflowEngine constructor
-            # for proper chatbot database operations (conversation persistence, etc.)
+            # Make the chatbot call using the service protocol with proper user context
+            # Get user context from workflow metadata
+            user_context = context.metadata.get("user_context", {})
+            user_id = user_context.get("user_id", "system")
+            
             response = await self.chatbot_service.chat_completion(
                 request=chat_request,
-                user_id="workflow_system",  # Identifier for workflow-initiated chats
+                user_id=str(user_id),  # Use actual user ID from context
                 db=None  # Database session needed for conversation persistence
             )
             
@@ -647,7 +718,7 @@ class WorkflowEngine:
         llm_request = LLMChatRequest(
             model=step.model,
             messages=llm_messages,
-            user_id="workflow_system",
+            user_id=str(variables.get("_user_id", "system")),
             api_key_id=0,
             temperature=step.temperature,
             max_tokens=step.max_tokens
@@ -674,7 +745,7 @@ class WorkflowEngine:
         response = await self.litellm_client.create_chat_completion(
             model=step.model,
             messages=messages,
-            user_id="workflow_system",
+            user_id=str(variables.get("_user_id", "system")),
             api_key_id="workflow",
             temperature=step.temperature,
             max_tokens=step.max_tokens
@@ -708,7 +779,7 @@ class WorkflowEngine:
         llm_request = LLMChatRequest(
             model=step.model,
             messages=llm_messages,
-            user_id="workflow_system",
+            user_id=str(variables.get("_user_id", "system")),
             api_key_id=0,
             temperature=step.temperature,
             max_tokens=step.max_tokens
@@ -731,7 +802,7 @@ class WorkflowEngine:
         llm_request = LLMChatRequest(
             model=step.model,
             messages=llm_messages,
-            user_id="workflow_system",
+            user_id=str(variables.get("_user_id", "system")),
             api_key_id=0,
             temperature=step.temperature,
             max_tokens=step.max_tokens
@@ -937,8 +1008,19 @@ class WorkflowModule:
         if config:
             self.config = config
         
-        # Initialize the workflow engine
-        self.engine = WorkflowEngine(LiteLLMClient(), chatbot_service=self.chatbot_service)
+        # Initialize the workflow engine with execution service
+        # Create execution service if database is available
+        execution_service = None
+        try:
+            from app.db.database import async_session_factory
+            # Create an async session for the execution service
+            async_db = async_session_factory()
+            execution_service = WorkflowExecutionService(async_db)
+            logger.info("Workflow execution service initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize execution service: {e}")
+        
+        self.engine = WorkflowEngine(chatbot_service=self.chatbot_service, execution_service=execution_service)
         self.setup_routes()
         self.initialized = True
         
@@ -948,19 +1030,36 @@ class WorkflowModule:
         """Setup workflow API routes"""
         
         @self.router.post("/execute")
-        async def execute_workflow(workflow_def: WorkflowDefinition, 
-                                 input_data: Optional[Dict[str, Any]] = None):
-            """Execute a workflow"""
+        async def execute_workflow(
+            workflow_def: WorkflowDefinition, 
+            input_data: Optional[Dict[str, Any]] = None,
+            current_user: Dict[str, Any] = Depends(get_current_user)
+        ):
+            """Execute a workflow with proper user context"""
             if not self.initialized or not self.engine:
                 raise HTTPException(status_code=503, detail="Workflow module not initialized")
             
             try:
-                execution = await self.engine.execute_workflow(workflow_def, input_data)
+                # Create user context from authenticated user
+                user_context = {
+                    "user_id": str(current_user.get("id", "system")),
+                    "username": current_user.get("username") or current_user.get("email", "Unknown User"),
+                    "session_id": str(uuid.uuid4())
+                }
+                
+                # Execute workflow with user context
+                execution = await self.engine.execute_workflow(
+                    workflow_def, 
+                    input_data, 
+                    user_context=user_context
+                )
+                
                 return {
                     "execution_id": execution.id,
                     "status": execution.status,
                     "results": execution.results if execution.status == WorkflowStatus.COMPLETED else None,
-                    "error": execution.error
+                    "error": execution.error,
+                    "executed_by": user_context.get("username", "Unknown")
                 }
             except Exception as e:
                 logger.error(f"Workflow execution failed: {e}")
@@ -1409,7 +1508,7 @@ class WorkflowModule:
                     variables=variables,
                     workflow_metadata=workflow_metadata,
                     timeout=timeout,
-                    created_by="system",  # TODO: Get from user context
+                    created_by="system",  # Note: This method needs user context parameter to track creator properly
                     is_active=True
                 )
                 

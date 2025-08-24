@@ -13,7 +13,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/api-keys/${params.id}/regenerate`, {
+    const response = await fetch(`${BACKEND_URL}/api/api-keys/${params.id}/regenerate`, {
       method: 'POST',
       headers: {
         'Authorization': token,

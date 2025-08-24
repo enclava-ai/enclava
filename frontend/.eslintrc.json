@@ -1,0 +1,28 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-globals": [
+      "warn",
+      {
+        "name": "fetch",
+        "message": "Please use apiClient from @/lib/api-client for API calls, or downloadFile/uploadFile from @/lib/file-download for file operations. Raw fetch() should only be used in special cases with explicit authentication."
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "CallExpression[callee.name='fetch'][arguments.0.value=/^\\\\/api-internal/]",
+        "message": "Use apiClient from @/lib/api-client instead of raw fetch for /api-internal endpoints"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/lib/api-client.ts", "src/lib/file-download.ts", "src/app/api/**/*.ts"],
+      "rules": {
+        "no-restricted-globals": "off",
+        "no-restricted-syntax": "off"
+      }
+    }
+  ]
+}

@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const { workflow, test_data } = await request.json()
 
     // First validate the workflow
-    const validateResponse = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const validateResponse = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If validation passes, try a test execution
-    const executeResponse = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const executeResponse = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,

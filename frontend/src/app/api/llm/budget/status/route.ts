@@ -3,7 +3,7 @@ import { proxyRequest, handleProxyResponse } from '@/lib/proxy-auth'
 
 export async function GET() {
   try {
-    const response = await proxyRequest('/api/v1/llm/budget/status')
+    const response = await proxyRequest('/api-internal/v1/llm/budget/status')
     const data = await handleProxyResponse(response, 'Failed to fetch budget status')
     return NextResponse.json(data)
   } catch (error) {

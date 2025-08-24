@@ -16,7 +16,7 @@ export async function PUT(
     const body = await request.json()
     
     const response = await fetch(
-      `${BACKEND_URL}/api/v1/prompt-templates/templates/${params.type_key}`, 
+      `${BACKEND_URL}/api/prompt-templates/templates/${params.type_key}`, 
       {
         method: 'PUT',
         headers: {
@@ -55,7 +55,7 @@ export async function GET(
     }
 
     const response = await fetch(
-      `${BACKEND_URL}/api/v1/prompt-templates/templates/${params.type_key}`,
+      `${BACKEND_URL}/api/prompt-templates/templates/${params.type_key}`,
       {
         headers: {
           'Authorization': token,

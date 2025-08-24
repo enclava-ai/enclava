@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     // Get the request body
     const body = await request.json()
     
-    const response = await proxyRequest('/api/v1/llm/chat/completions', {
+    const response = await proxyRequest('/api-internal/v1/llm/chat/completions', {
       method: 'POST',
       body: JSON.stringify(body)
     })

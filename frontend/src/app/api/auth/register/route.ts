@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     
     // Make request to backend auth endpoint without requiring existing auth
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/auth/register`
+    const url = `${baseUrl}/api/auth/register`
     
     const response = await fetch(url, {
       method: 'POST',

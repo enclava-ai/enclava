@@ -29,6 +29,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Edit3, RotateCcw, Loader2, Save, AlertTriangle, Plus, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { apiClient } from '@/lib/api-client'
+import { config } from '@/lib/config'
 
 interface PromptTemplate {
   id: string
@@ -106,30 +108,17 @@ export default function PromptTemplatesPage() {
       }
 
       // Load templates and variables in parallel
-      const [templatesResponse, variablesResponse] = await Promise.all([
-        fetch('/api/prompt-templates/templates', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
-        }),
-        fetch('/api/prompt-templates/variables', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
-        })
+      const [templatesResult, variablesResult] = await Promise.allSettled([
+        apiClient.get('/api-internal/v1/prompt-templates/templates'),
+        apiClient.get('/api-internal/v1/prompt-templates/variables')
       ])
 
-      if (!templatesResponse.ok || !variablesResponse.ok) {
+      if (templatesResult.status === 'rejected' || variablesResult.status === 'rejected') {
         throw new Error('Failed to load data')
       }
 
-      const templatesData = await templatesResponse.json()
-      const variablesData = await variablesResponse.json()
-
-      setTemplates(templatesData)
-      setVariables(variablesData)
+      setTemplates(templatesResult.value)
+      setVariables(variablesResult.value)
     } catch (error) {
       console.error('Error loading data:', error)
       toast.error('Failed to load prompt templates')
@@ -155,33 +144,13 @@ export default function PromptTemplatesPage() {
     try {
       setSaving(true)
       
-      // Get auth token
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No authentication token found')
-      }
-      
-      const response = await fetch(`/api/prompt-templates/templates/${editingTemplate.type_key}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: editForm.name,
-          type_key: editingTemplate.type_key,
-          description: editForm.description,
-          system_prompt: editForm.system_prompt,
-          is_active: editForm.is_active
-        })
+      const updatedTemplate = await apiClient.put(`/api-internal/v1/prompt-templates/templates/${editingTemplate.type_key}`, {
+        name: editForm.name,
+        type_key: editingTemplate.type_key,
+        description: editForm.description,
+        system_prompt: editForm.system_prompt,
+        is_active: editForm.is_active
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to save template')
-      }
-
-      const updatedTemplate = await response.json()
       
       // Update the template in state
       setTemplates(templates.map(t => 
@@ -202,24 +171,7 @@ export default function PromptTemplatesPage() {
 
   const handleResetTemplate = async (template: PromptTemplate) => {
     try {
-      // Get auth token
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No authentication token found')
-      }
-      
-      const response = await fetch(`/api/prompt-templates/templates/${template.type_key}/reset`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to reset template')
-      }
+      await apiClient.post(`/api-internal/v1/prompt-templates/templates/${template.type_key}/reset`, {})
 
       toast.success('Prompt template reset to default')
       // Reload data to get the updated template
@@ -250,27 +202,13 @@ export default function PromptTemplatesPage() {
         throw new Error('No authentication token found')
       }
       
-      const response = await fetch('/api/prompt-templates/create', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: finalForm.name,
-          type_key: finalForm.type_key,
-          description: finalForm.description,
-          system_prompt: finalForm.system_prompt,
-          is_active: finalForm.is_active
-        })
+      const newTemplate = await apiClient.post('/api-internal/v1/prompt-templates/create', {
+        name: finalForm.name,
+        type_key: finalForm.type_key,
+        description: finalForm.description,
+        system_prompt: finalForm.system_prompt,
+        is_active: finalForm.is_active
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to create template')
-      }
-
-      const newTemplate = await response.json()
       
       // Add the new template to state
       setTemplates([...templates, newTemplate])
@@ -307,25 +245,11 @@ export default function PromptTemplatesPage() {
         throw new Error('No authentication token found')
       }
       
-      const response = await fetch('/api/prompt-templates/improve', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          current_prompt: currentPrompt,
-          chatbot_type: chatbotType,
-          improvement_instructions: null
-        })
+      const result = await apiClient.post('/api-internal/v1/prompt-templates/improve', {
+        current_prompt: currentPrompt,
+        chatbot_type: chatbotType,
+        improvement_instructions: null
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to improve prompt')
-      }
-
-      const result = await response.json()
       
       // Update the appropriate form with improved prompt
       if (isEditing) {

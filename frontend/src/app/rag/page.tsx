@@ -13,6 +13,7 @@ import { DocumentUpload } from "@/components/rag/document-upload"
 import { DocumentBrowser } from "@/components/rag/document-browser"
 import { useAuth } from "@/contexts/AuthContext"
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { apiClient } from '@/lib/api-client'
 
 interface Collection {
   id: string
@@ -61,16 +62,8 @@ function RAGPageContent() {
 
   const loadCollections = async () => {
     try {
-      const response = await fetch('/api/rag/collections', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setCollections(data.collections || [])
-      }
+      const data = await apiClient.get('/api-internal/v1/rag/collections')
+      setCollections(data.collections || [])
     } catch (error) {
       console.error('Failed to load collections:', error)
     } finally {
@@ -80,16 +73,8 @@ function RAGPageContent() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch('/api/rag/stats', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setStats(data.stats)
-      }
+      const data = await apiClient.get('/api-internal/v1/rag/stats')
+      setStats(data.stats)
     } catch (error) {
       console.error('Failed to load stats:', error)
     }

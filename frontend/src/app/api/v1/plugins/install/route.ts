@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     
     // Make request to backend plugins install endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/plugins/install`
+    const url = `${baseUrl}/api/plugins/install`
     
     const response = await fetch(url, {
       method: 'POST',

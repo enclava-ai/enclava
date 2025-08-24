@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const adminToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImlzX3N1cGVydXNlciI6dHJ1ZSwicm9sZSI6InN1cGVyX2FkbWluIiwiZXhwIjoxNzg0Nzk2NDI2LjA0NDYxOX0.YOTlUY8nowkaLAXy5EKfnZEpbDgGCabru5R0jdq_DOQ'
 
     // Fetch workflows from the backend workflow module
-    const response = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const response = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const workflowData = await request.json()
 
     // Validate workflow first
-    const validateResponse = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const validateResponse = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create workflow via backend workflow module
-    const createResponse = await fetch(`${BACKEND_URL}/api/v1/modules/workflow/execute`, {
+    const createResponse = await fetch(`${BACKEND_URL}/api/modules/workflow/execute`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${adminToken}`,

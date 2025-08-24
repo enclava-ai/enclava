@@ -21,36 +21,33 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isMounted, setIsMounted] = useState(false)
-  const router = useRouter()
-
-  useEffect(() => {
-    setIsMounted(true)
-    
-    // Check for existing session on mount (client-side only)
+  // Initialize state with values from localStorage if available (synchronous)
+  const getInitialAuth = () => {
     if (typeof window !== "undefined") {
       const storedToken = localStorage.getItem("token")
       if (storedToken) {
-        // In a real app, validate the token with the backend
-        // For now, just set a demo user - also handle both email domains
-        setUser({
-          id: "1",
-          email: "admin@example.com",
-          name: "Admin User",
-          role: "admin"
-        })
-        setToken(storedToken)
-        // Ensure we have a fresh token with extended expiration
-        const freshToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImlzX3N1cGVydXNlciI6dHJ1ZSwicm9sZSI6InN1cGVyX2FkbWluIiwiZXhwIjoxNzg3Mzg5NjM3fQ.DKAx-rpNvrlRxb0YG1C63QWDvH63pIAsi8QniFvDXmc"
+        // Ensure we have the correct token
+        const freshToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImlzX3N1cGVydXNlciI6dHJ1ZSwicm9sZSI6InN1cGVyX2FkbWluIiwiZXhwIjoxNzU2NjE4Mzk2fQ.DFZOtAzJbpF_PcKhj2DWRDXUvTKFss-8lEt5H3ST2r0"
         localStorage.setItem("token", freshToken)
-        setToken(freshToken)
+        return {
+          user: {
+            id: "1",
+            email: "admin@example.com",
+            name: "Admin User",
+            role: "admin"
+          },
+          token: freshToken
+        }
       }
     }
-    setIsLoading(false)
-  }, [])
+    return { user: null, token: null }
+  }
+
+  const initialAuth = getInitialAuth()
+  const [user, setUser] = useState<User | null>(initialAuth.user)
+  const [token, setToken] = useState<string | null>(initialAuth.token)
+  const [isLoading, setIsLoading] = useState(false) // Not loading if we already have auth
+  const router = useRouter()
 
   const login = async (email: string, password: string) => {
     setIsLoading(true)
@@ -65,15 +62,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: "admin"
         }
         
-        const authToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImlzX3N1cGVydXNlciI6dHJ1ZSwicm9sZSI6InN1cGVyX2FkbWluIiwiZXhwIjoxNzg3Mzg5NjM3fQ.DKAx-rpNvrlRxb0YG1C63QWDvH63pIAsi8QniFvDXmc"
+        const authToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsImlzX3N1cGVydXNlciI6dHJ1ZSwicm9sZSI6InN1cGVyX2FkbWluIiwiZXhwIjoxNzU2NjE4Mzk2fQ.DFZOtAzJbpF_PcKhj2DWRDXUvTKFss-8lEt5H3ST2r0"
         
-        setUser(demoUser)
-        setToken(authToken)
+        // Store in localStorage first to ensure it's immediately available
         if (typeof window !== "undefined") {
           // Use the actual JWT token for API calls
           localStorage.setItem("token", authToken)
           localStorage.setItem("user", JSON.stringify(demoUser))
         }
+        
+        // Then update state
+        setUser(demoUser)
+        setToken(authToken)
+        
+        // Wait a tick to ensure state has propagated
+        await new Promise(resolve => setTimeout(resolve, 50))
       } else {
         throw new Error("Invalid credentials")
       }

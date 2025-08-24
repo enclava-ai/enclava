@@ -18,6 +18,7 @@ import {
   CheckCircle,
   XCircle
 } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
 
 interface SystemStats {
   total_users: number;
@@ -53,17 +54,19 @@ export default function AdminPage() {
   const fetchAdminData = async () => {
     try {
       // Fetch system stats
-      const statsResponse = await fetch("/api/v1/settings/system-info");
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
+      try {
+        const statsData = await apiClient.get<SystemStats>("/api-internal/v1/settings/system-info");
         setStats(statsData);
+      } catch (error) {
+        console.error("Failed to fetch system stats:", error);
       }
 
       // Fetch recent activity
-      const activityResponse = await fetch("/api/v1/audit?page=1&size=10");
-      if (activityResponse.ok) {
-        const activityData = await activityResponse.json();
+      try {
+        const activityData = await apiClient.get("/api-internal/v1/audit?page=1&size=10");
         setRecentActivity(activityData.logs || []);
+      } catch (error) {
+        console.error("Failed to fetch recent activity:", error);
       }
     } catch (error) {
       console.error("Failed to fetch admin data:", error);

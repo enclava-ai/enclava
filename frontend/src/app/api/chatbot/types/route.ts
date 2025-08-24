@@ -4,7 +4,7 @@ const BACKEND_URL = process.env.INTERNAL_API_URL || 'http://enclava-backend:8000
 
 export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/v1/chatbot/types`, {
+    const response = await fetch(`${BACKEND_URL}/api/chatbot/types`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

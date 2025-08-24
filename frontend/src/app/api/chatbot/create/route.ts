@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/chatbot/create`, {
+    const response = await fetch(`${BACKEND_URL}/api/chatbot/create`, {
       method: 'POST',
       headers: {
         'Authorization': token,

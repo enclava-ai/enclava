@@ -56,8 +56,9 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             # Store analysis in request state for later use
             request.state.security_analysis = analysis
             
-            # Log security events
-            if analysis.is_threat:
+            # Log security events (only for significant threats to reduce false positive noise)
+            # Only log if: being blocked OR risk score above warning threshold (0.6)
+            if analysis.is_threat and (analysis.should_block or analysis.risk_score >= settings.API_SECURITY_WARNING_THRESHOLD):
                 await self._log_security_event(request, analysis)
             
             # Check if request should be blocked

@@ -13,7 +13,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/chatbot/delete/${params.id}`, {
+    const response = await fetch(`${BACKEND_URL}/api/chatbot/delete/${params.id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': token,

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     
     // Make request to backend settings endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/settings?${queryParams.toString()}`
+    const url = `${baseUrl}/api/settings?${queryParams.toString()}`
     
     const response = await fetch(url, {
       method: 'GET',
@@ -66,7 +66,7 @@ export async function PUT(request: NextRequest) {
     
     // Make request to backend settings endpoint
     const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
-    const url = `${baseUrl}/api/v1/settings`
+    const url = `${baseUrl}/api/settings`
     
     const response = await fetch(url, {
       method: 'PUT',

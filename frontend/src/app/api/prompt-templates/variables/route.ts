@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/prompt-templates/variables`, {
+    const response = await fetch(`${BACKEND_URL}/api/prompt-templates/variables`, {
       headers: {
         'Authorization': token,
         'Content-Type': 'application/json',

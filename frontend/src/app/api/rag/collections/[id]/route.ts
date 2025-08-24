@@ -13,7 +13,7 @@ export async function DELETE(
     const authHeader = request.headers.get('authorization')
 
     // Forward request to backend
-    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/rag/collections/${collectionId}`, {
+    const backendResponse = await fetch(`${BACKEND_URL}/api/rag/collections/${collectionId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -51,7 +51,7 @@ export async function GET(
     const authHeader = request.headers.get('authorization')
 
     // Forward request to backend
-    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/rag/collections/${collectionId}`, {
+    const backendResponse = await fetch(`${BACKEND_URL}/api/rag/collections/${collectionId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

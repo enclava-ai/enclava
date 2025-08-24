@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
+import { apiClient } from "@/lib/api-client"
 
 interface User {
   id: string
@@ -49,19 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const validateToken = async (token: string) => {
     try {
-      const response = await fetch("/api/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      // Temporarily set token in localStorage for apiClient to use
+      const previousToken = localStorage.getItem('token')
+      localStorage.setItem('token', token)
       
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData)
-      } else {
-        // Token is invalid
-        localStorage.removeItem("access_token")
-        localStorage.removeItem("refresh_token")
+      const userData = await apiClient.get("/api-internal/v1/auth/me")
+      setUser(userData)
+      
+      // Restore previous token if different
+      if (previousToken && previousToken !== token) {
+        localStorage.setItem('token', previousToken)
       }
     } catch (error) {
       console.error("Token validation failed:", error)
@@ -74,24 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (username: string, password: string) => {
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || "Login failed")
-      }
-
-      const data = await response.json()
+      const data = await apiClient.post("/api-internal/v1/auth/login", { username, password })
       
       // Store tokens
       localStorage.setItem("access_token", data.access_token)
       localStorage.setItem("refresh_token", data.refresh_token)
+      localStorage.setItem("token", data.access_token) // Also set token for apiClient
       
       // Get user info
       await validateToken(data.access_token)
@@ -102,24 +88,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (username: string, email: string, password: string) => {
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, email, password }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || "Registration failed")
-      }
-
-      const data = await response.json()
+      const data = await apiClient.post("/api-internal/v1/auth/register", { username, email, password })
       
       // Store tokens
       localStorage.setItem("access_token", data.access_token)
       localStorage.setItem("refresh_token", data.refresh_token)
+      localStorage.setItem("token", data.access_token) // Also set token for apiClient
       
       // Get user info
       await validateToken(data.access_token)
@@ -131,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem("access_token")
     localStorage.removeItem("refresh_token")
+    localStorage.removeItem("token") // Also clear token for apiClient
     setUser(null)
   }
 
@@ -141,20 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("No refresh token available")
       }
 
-      const response = await fetch("/api/auth/refresh", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refresh_token }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Token refresh failed")
-      }
-
-      const data = await response.json()
+      const data = await apiClient.post("/api-internal/v1/auth/refresh", { refresh_token })
       localStorage.setItem("access_token", data.access_token)
+      localStorage.setItem("token", data.access_token) // Also set token for apiClient
       
       return data.access_token
     } catch (error) {

@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     let response: Response
     try {
-      response = await fetch(`${BACKEND_URL}/api/v1/chatbot/chat/${encodeURIComponent(chatbot_id)}`, {
+      response = await fetch(`${BACKEND_URL}/api/chatbot/chat/${encodeURIComponent(chatbot_id)}`, {
         method: 'POST',
         headers: {
           'Authorization': token,
