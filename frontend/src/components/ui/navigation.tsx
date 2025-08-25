@@ -22,9 +22,6 @@ import { ChevronDown } from "lucide-react"
 const MODULE_NAV_MAP = {
   chatbot: { href: "/chatbot", label: "Chatbot" },
   rag: { href: "/rag", label: "RAG" },
-  signal: { href: "/signal", label: "Signal Bot" },
-  workflow: { href: "/workflows", label: "Workflows" },
-  analytics: { href: "/analytics", label: "Analytics" },
   // Add more mappings as needed
 }
 

@@ -27,12 +27,12 @@ class LiveModuleIntegrationTest:
         print(f"✓ API Response: {response.status_code}")
         print(f"✓ Total modules: {data['total']}")
         
-        # Verify we have all 5 modules (updated after 2025-08-10 cleanup)
-        assert data["total"] >= 5, f"Expected at least 5 modules, got {data['total']}"
-        assert data["module_count"] >= 5
+        # Verify we have all 2 modules (rag and chatbot only)
+        assert data["total"] >= 2, f"Expected at least 2 modules, got {data['total']}"
+        assert data["module_count"] >= 2
         assert data["initialized"] is True
         
-        expected_modules = ['cache', 'chatbot', 'rag', 'signal', 'workflow']
+        expected_modules = ['chatbot', 'rag']
         loaded_modules = [mod["name"] for mod in data["modules"]]
         
         for expected in expected_modules:
@@ -63,14 +63,6 @@ class LiveModuleIntegrationTest:
         print("\n🧪 Testing specific module functionality...")
         
         modules_by_name = {mod["name"]: mod for mod in modules_data["modules"]}
-        
-        # Test Cache Module
-        if "cache" in modules_by_name:
-            cache_stats = modules_by_name["cache"].get("stats", {})
-            expected_cache_fields = ["hits", "misses", "errors", "total_requests"]
-            for field in expected_cache_fields:
-                assert field in cache_stats, f"Cache module missing {field} stat"
-            print("✓ Cache module stats structure verified")
         
         # Test Monitoring Module 
         if "monitoring" in modules_by_name:

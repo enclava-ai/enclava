@@ -155,8 +155,7 @@ class ModuleManager:
         logger.warning("Falling back to legacy module configuration")
         
         default_modules = [
-            ModuleConfig(name="rag", enabled=True, config={}),
-            ModuleConfig(name="workflow", enabled=True, config={})
+            ModuleConfig(name="rag", enabled=True, config={})
         ]
         
         for config in default_modules:
@@ -591,7 +590,6 @@ class ModuleManager:
             "provides": manifest.provides,
             "consumes": manifest.consumes,
             "endpoints": manifest.endpoints,
-            "workflow_steps": manifest.workflow_steps,
             "permissions": manifest.permissions,
             "ui_config": manifest.ui_config,
             "has_schema": module_config_manager.get_module_schema(module_name) is not None,
@@ -630,9 +628,6 @@ class ModuleManager:
             log_module_event(module_name, "config_update_failed", {"error": str(e)})
             return False
     
-    def get_workflow_steps(self) -> Dict[str, List[Dict]]:
-        """Get all available workflow steps from modules"""
-        return module_config_manager.get_workflow_steps()
     
     async def get_module_health(self, module_name: str) -> Dict:
         """Get module health status"""

@@ -32,7 +32,6 @@ class ModuleManifest:
     provides: List[str] = None
     consumes: List[str] = None
     endpoints: List[Dict] = None
-    workflow_steps: List[Dict] = None
     permissions: List[Dict] = None
     analytics_events: List[Dict] = None
     health_checks: List[Dict] = None
@@ -50,8 +49,6 @@ class ModuleManifest:
             self.consumes = []
         if self.endpoints is None:
             self.endpoints = []
-        if self.workflow_steps is None:
-            self.workflow_steps = []
         if self.permissions is None:
             self.permissions = []
         if self.analytics_events is None:
@@ -266,15 +263,6 @@ class ModuleConfigManager:
         
         return modules
     
-    def get_workflow_steps(self) -> Dict[str, List[Dict]]:
-        """Get all available workflow steps from modules"""
-        workflow_steps = {}
-        
-        for name, manifest in self.manifests.items():
-            if manifest.workflow_steps:
-                workflow_steps[name] = manifest.workflow_steps
-        
-        return workflow_steps
     
     async def update_module_status(self, module_name: str, enabled: bool) -> bool:
         """Update module enabled status"""

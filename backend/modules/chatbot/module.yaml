@@ -9,7 +9,6 @@ enabled: true
 auto_start: true
 dependencies: 
   - rag
-  - workflow
 optional_dependencies:
   - analytics
 
@@ -22,12 +21,10 @@ provides:
   - "chat_completion"
   - "conversation_management"
   - "chatbot_configuration"
-  - "workflow_chat_step"
 
 consumes:
   - "rag_search"
   - "llm_completion"
-  - "workflow_execution"
 
 # API endpoints
 endpoints:
@@ -42,39 +39,6 @@ endpoints:
   - path: "/chatbot/list"
     method: "GET"
     description: "List user chatbots"
-
-# Workflow integration
-workflow_steps:
-  - name: "chatbot_response"
-    description: "Generate chatbot response with optional RAG context"
-    inputs:
-      - name: "message"
-        type: "string"
-        required: true
-        description: "User message to respond to"
-      - name: "chatbot_id" 
-        type: "string"
-        required: true
-        description: "ID of configured chatbot instance"
-      - name: "use_rag"
-        type: "boolean"
-        required: false
-        default: false
-        description: "Whether to use RAG for context"
-      - name: "context"
-        type: "object"
-        required: false
-        description: "Additional context data"
-    outputs:
-      - name: "response"
-        type: "string"
-        description: "Generated chatbot response"
-      - name: "conversation_id"
-        type: "string"
-        description: "Conversation ID for follow-up"
-      - name: "sources"
-        type: "array"
-        description: "RAG sources used (if any)"
 
 # UI Configuration
 ui_config:
