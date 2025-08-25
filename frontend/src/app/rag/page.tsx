@@ -31,10 +31,22 @@ interface Collection {
 }
 
 interface CollectionStats {
-  total_collections: number
-  total_documents: number
-  total_size: number
-  active_collections: number
+  collections: {
+    total: number
+    active: number
+  }
+  documents: {
+    total: number
+    processing: number
+    processed: number
+  }
+  storage: {
+    total_size_bytes: number
+    total_size_mb: number
+  }
+  vectors: {
+    total: number
+  }
 }
 
 export default function RAGPage() {
@@ -117,8 +129,8 @@ function RAGPageContent() {
     )
   }
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
+  const formatBytes = (bytes: number | null | undefined) => {
+    if (!bytes || bytes === 0) return '0 Bytes'
     const k = 1024
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
@@ -145,9 +157,9 @@ function RAGPageContent() {
               <Database className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.total_collections}</div>
+              <div className="text-2xl font-bold">{stats.collections.total}</div>
               <p className="text-xs text-muted-foreground">
-                {stats.active_collections} active
+                {stats.collections.active} active
               </p>
             </CardContent>
           </Card>
@@ -157,7 +169,7 @@ function RAGPageContent() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.total_documents}</div>
+              <div className="text-2xl font-bold">{stats.documents.total}</div>
               <p className="text-xs text-muted-foreground">
                 Across all collections
               </p>
@@ -169,7 +181,7 @@ function RAGPageContent() {
               <Upload className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatBytes(stats.total_size)}</div>
+              <div className="text-2xl font-bold">{formatBytes(stats.storage.total_size_bytes)}</div>
               <p className="text-xs text-muted-foreground">
                 Total indexed content
               </p>
