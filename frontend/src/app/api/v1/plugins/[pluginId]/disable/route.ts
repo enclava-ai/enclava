@@ -18,7 +18,7 @@ export async function POST(
     const { pluginId } = params
     
     // Make request to backend plugins disable endpoint
-    const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
+    const baseUrl = process.env.INTERNAL_API_URL || `http://enclava-backend:${process.env.BACKEND_INTERNAL_PORT || '8000'}`
     const url = `${baseUrl}/api/plugins/${pluginId}/disable`
     
     const response = await fetch(url, {

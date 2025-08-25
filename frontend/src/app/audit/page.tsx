@@ -106,7 +106,7 @@ export default function AuditPage() {
       const [logsData, statsData] = await Promise.all([
         apiClient.get(`/api-internal/v1/audit?${params}`),
         apiClient.get("/api-internal/v1/audit/stats")
-      ]);
+      ]) as any[];
 
       setAuditLogs(logsData.logs || []);
       setTotalCount(logsData.total || 0);

@@ -49,8 +49,7 @@ const PluginIframe: React.FC<PluginIframeProps> = ({
       const allowedOrigins = [
         window.location.origin,
         config.getBackendUrl(),
-        config.getApiUrl(),
-        process.env.NEXT_PUBLIC_API_URL
+        config.getApiUrl()
       ].filter(Boolean);
       
       if (!allowedOrigins.some(origin => event.origin.startsWith(origin))) {

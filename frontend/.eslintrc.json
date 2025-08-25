@@ -11,7 +11,7 @@
     "no-restricted-syntax": [
       "warn",
       {
-        "selector": "CallExpression[callee.name='fetch'][arguments.0.value=/^\\\\/api-internal/]",
+        "selector": "CallExpression[callee.name='fetch'][arguments.0.type='Literal'][arguments.0.value*='/api-internal']",
         "message": "Use apiClient from @/lib/api-client instead of raw fetch for /api-internal endpoints"
       }
     ]

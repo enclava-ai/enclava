@@ -19,7 +19,9 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY tests/requirements-test.txt ./tests/
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r tests/requirements-test.txt
 
 # Optional: Download spaCy English model for NLP processing (commented out for faster builds)
 # Uncomment if you install requirements-nlp.txt and need entity extraction

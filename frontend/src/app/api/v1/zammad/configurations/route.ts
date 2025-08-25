@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Make request to backend Zammad configurations endpoint
-    const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
+    const baseUrl = process.env.INTERNAL_API_URL || `http://enclava-backend:${process.env.BACKEND_INTERNAL_PORT || '8000'}`
     const url = `${baseUrl}/api/zammad/configurations`
     
     const response = await fetch(url, {
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     // Make request to backend Zammad configurations endpoint
-    const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
+    const baseUrl = process.env.INTERNAL_API_URL || `http://enclava-backend:${process.env.BACKEND_INTERNAL_PORT || '8000'}`
     const url = `${baseUrl}/api/zammad/configurations`
     
     const response = await fetch(url, {

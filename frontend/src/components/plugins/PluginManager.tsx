@@ -237,6 +237,12 @@ export const PluginManager: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [configuringPlugin, setConfiguringPlugin] = useState<PluginInfo | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Fix hydration mismatch with client-side detection
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Load initial data only when authenticated
   useEffect(() => {
@@ -301,8 +307,8 @@ export const PluginManager: React.FC = () => {
 
   const categories = Array.from(new Set(availablePlugins.map(p => p.category)));
 
-  // Show authentication required message if not authenticated
-  if (!user || !token) {
+  // Show authentication required message if not authenticated (client-side only)
+  if (isClient && (!user || !token)) {
     return (
       <div className="space-y-6">
         <Alert>
@@ -311,6 +317,18 @@ export const PluginManager: React.FC = () => {
             Please <a href="/login" className="underline">log in</a> to access the plugin manager.
           </AlertDescription>
         </Alert>
+      </div>
+    );
+  }
+
+  // Show loading state during hydration
+  if (!isClient) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-8">
+          <RotateCw className="h-6 w-6 animate-spin mr-2" />
+          Loading...
+        </div>
       </div>
     );
   }

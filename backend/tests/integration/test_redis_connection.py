@@ -5,7 +5,7 @@ Verifies that Redis is available and working for the cached API key service
 """
 
 import asyncio
-import aioredis
+import redis.asyncio as redis
 import time
 
 
@@ -15,7 +15,7 @@ async def test_redis_connection():
         print("🔌 Testing Redis connection...")
         
         # Connect to Redis
-        redis = aioredis.from_url(
+        redis_client = redis.from_url(
             "redis://localhost:6379",
             encoding="utf-8",
             decode_responses=True,
@@ -28,11 +28,11 @@ async def test_redis_connection():
         test_value = f"test_value_{int(time.time())}"
         
         # Set a value
-        await redis.set(test_key, test_value, ex=60)
+        await redis_client.set(test_key, test_value, ex=60)
         print("✅ Successfully wrote to Redis")
         
         # Get the value
-        retrieved_value = await redis.get(test_key)
+        retrieved_value = await redis_client.get(test_key)
         if retrieved_value == test_value:
             print("✅ Successfully read from Redis")
         else:
@@ -40,22 +40,22 @@ async def test_redis_connection():
             return False
         
         # Test expiration
-        ttl = await redis.ttl(test_key)
+        ttl = await redis_client.ttl(test_key)
         if 0 < ttl <= 60:
             print(f"✅ TTL working correctly: {ttl} seconds")
         else:
             print(f"⚠️  TTL may not be working: {ttl}")
         
         # Clean up
-        await redis.delete(test_key)
+        await redis_client.delete(test_key)
         print("✅ Cleanup successful")
         
         # Test Redis info
-        info = await redis.info()
+        info = await redis_client.info()
         print(f"✅ Redis version: {info.get('redis_version', 'unknown')}")
         print(f"✅ Redis memory usage: {info.get('used_memory_human', 'unknown')}")
         
-        await redis.close()
+        await redis_client.close()
         print("✅ Redis connection test passed!")
         return True
         
@@ -73,7 +73,7 @@ async def test_api_key_cache_operations():
     try:
         print("\n🔑 Testing API key cache operations...")
         
-        redis = aioredis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
+        redis_client = redis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
         
         # Test API key data caching
         test_prefix = "ce_test123"
@@ -87,11 +87,11 @@ async def test_api_key_cache_operations():
         
         # Cache data
         import json
-        await redis.setex(cache_key, 300, json.dumps(test_data))
+        await redis_client.setex(cache_key, 300, json.dumps(test_data))
         print("✅ API key data cached successfully")
         
         # Retrieve data
-        cached_data = await redis.get(cache_key)
+        cached_data = await redis_client.get(cache_key)
         if cached_data:
             parsed_data = json.loads(cached_data)
             if parsed_data["user_id"] == 1:
@@ -101,9 +101,9 @@ async def test_api_key_cache_operations():
         
         # Test verification cache
         verification_key = f"api_key:verified:{test_prefix}:abcd1234"
-        await redis.setex(verification_key, 3600, "valid")
+        await redis_client.setex(verification_key, 3600, "valid")
         
-        verification_result = await redis.get(verification_key)
+        verification_result = await redis_client.get(verification_key)
         if verification_result == "valid":
             print("✅ Verification cache working")
         else:
@@ -111,14 +111,14 @@ async def test_api_key_cache_operations():
         
         # Test pattern-based deletion
         pattern = f"api_key:verified:{test_prefix}:*"
-        keys = await redis.keys(pattern)
+        keys = await redis_client.keys(pattern)
         if keys:
-            await redis.delete(*keys)
+            await redis_client.delete(*keys)
             print("✅ Pattern-based cache invalidation working")
         
         # Cleanup
-        await redis.delete(cache_key)
-        await redis.close()
+        await redis_client.delete(cache_key)
+        await redis_client.close()
         
         print("✅ API key cache operations test passed!")
         return True

@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     """Service for generating text embeddings using LLM service"""
     
-    def __init__(self, model_name: str = "privatemode-embeddings"):
+    def __init__(self, model_name: str = "intfloat/multilingual-e5-large-instruct"):
         self.model_name = model_name
-        self.dimension = 1024  # Actual dimension for privatemode-embeddings
+        self.dimension = 1024  # Actual dimension for intfloat/multilingual-e5-large-instruct
         self.initialized = False
         
     async def initialize(self):
@@ -66,7 +66,7 @@ class EmbeddingService:
                 for text in batch:
                     try:
                         # Truncate text if it's too long for the model's context window
-                        # privatemode-embeddings has a 512 token limit, truncate to ~400 tokens worth of chars
+                        # intfloat/multilingual-e5-large-instruct has a 512 token limit, truncate to ~400 tokens worth of chars
                         # Rough estimate: 1 token ≈ 4 characters, so 400 tokens ≈ 1600 chars
                         max_chars = 1600
                         if len(text) > max_chars:
@@ -126,7 +126,7 @@ class EmbeddingService:
     
     def _generate_fallback_embedding(self, text: str) -> List[float]:
         """Generate a single fallback embedding"""
-        dimension = self.dimension or 1024  # Default dimension for privatemode-embeddings
+        dimension = self.dimension or 1024  # Default dimension for intfloat/multilingual-e5-large-instruct
         # Use hash for reproducible random embeddings
         np.random.seed(hash(text) % 2**32)
         return np.random.random(dimension).tolist()

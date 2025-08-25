@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     if (limit) queryParams.set('limit', limit)
     
     // Make request to backend plugins discover endpoint
-    const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
+    const baseUrl = process.env.INTERNAL_API_URL || `http://enclava-backend:${process.env.BACKEND_INTERNAL_PORT || '8000'}`
     const url = `${baseUrl}/api/plugins/discover?${queryParams.toString()}`
     
     const response = await fetch(url, {

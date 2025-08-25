@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -11,15 +11,21 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
+  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    if (isClient && !isLoading && !user) {
       router.push("/login")
     }
-  }, [user, isLoading, router])
+  }, [user, isLoading, router, isClient])
 
-  // Show loading spinner while checking authentication
-  if (isLoading) {
+  // During SSR and initial client render, always show loading
+  // This ensures consistent rendering between server and client
+  if (!isClient || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
@@ -27,9 +33,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     )
   }
 
-  // If user is not authenticated, don't render anything (redirect is handled by useEffect)
+  // If user is not authenticated after client hydration, don't render anything
+  // (redirect is handled by useEffect)
   if (!user) {
-    return null
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
+      </div>
+    )
   }
 
   // User is authenticated, render the protected content

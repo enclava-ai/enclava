@@ -19,7 +19,7 @@ export async function PUT(
     const body = await request.json()
     
     // Get backend API base URL
-    const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
+    const baseUrl = process.env.INTERNAL_API_URL || `http://enclava-backend:${process.env.BACKEND_INTERNAL_PORT || '8000'}`
     
     // Update each setting in the category individually
     const results = []
@@ -103,7 +103,7 @@ export async function GET(
     const { category } = params
     
     // Get backend API base URL
-    const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
+    const baseUrl = process.env.INTERNAL_API_URL || `http://enclava-backend:${process.env.BACKEND_INTERNAL_PORT || '8000'}`
     const url = `${baseUrl}/api/settings?category=${category}`
     
     const response = await fetch(url, {

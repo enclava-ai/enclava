@@ -201,7 +201,7 @@ class RAGModule(BaseModule):
             self.initialized = True
             log_module_event("rag", "initialized", {
                 "vector_db": self.config.get("vector_db", "qdrant"),
-                "embedding_model": self.embedding_model.get("model_name", "privatemode-embeddings"),
+                "embedding_model": self.embedding_model.get("model_name", "intfloat/multilingual-e5-large-instruct"),
                 "chunk_size": self.config.get("chunk_size", 400),
                 "max_results": self.config.get("max_results", 10),
                 "supported_file_types": list(self.supported_types.keys()),
@@ -401,8 +401,8 @@ class RAGModule(BaseModule):
         """Initialize embedding model"""
         from app.services.embedding_service import embedding_service
         
-        # Use privatemode-embeddings for LLM service integration
-        model_name = self.config.get("embedding_model", "privatemode-embeddings")
+        # Use intfloat/multilingual-e5-large-instruct for LLM service integration
+        model_name = self.config.get("embedding_model", "intfloat/multilingual-e5-large-instruct")
         embedding_service.model_name = model_name
         
         # Initialize the embedding service
@@ -421,7 +421,7 @@ class RAGModule(BaseModule):
             self.embedding_service = None
             return {
                 "model_name": model_name,
-                "dimension": 768  # Default dimension for privatemode-embeddings
+                "dimension": 1024  # Default dimension for intfloat/multilingual-e5-large-instruct
             }
     
     async def _initialize_content_processing(self):

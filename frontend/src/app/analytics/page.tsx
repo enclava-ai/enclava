@@ -64,7 +64,7 @@ function AnalyticsPageContent() {
       setLoading(true);
       
       // Fetch real analytics data from backend API via proxy
-      const analyticsData = await apiClient.get('/api-internal/v1/analytics');
+      const analyticsData = await apiClient.get('/api-internal/v1/analytics') as any;
       setData(analyticsData);
       setLastUpdated(new Date());
     } catch (error) {

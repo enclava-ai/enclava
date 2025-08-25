@@ -33,6 +33,11 @@ const Navigation = () => {
   const { user, logout } = useAuth()
   const { isModuleEnabled } = useModules()
   const { installedPlugins, getPluginPages } = usePlugin()
+  const [isClient, setIsClient] = React.useState(false)
+
+  React.useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Get plugin navigation items
   const pluginNavItems = installedPlugins
@@ -96,13 +101,13 @@ const Navigation = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 hidden md:flex">
-          <Link href={user ? "/dashboard" : "/"} className="mr-6 flex items-center space-x-2">
+          <Link href={isClient && user ? "/dashboard" : "/"} className="mr-6 flex items-center space-x-2">
             <div className="h-6 w-6 rounded bg-gradient-to-br from-empire-600 to-empire-800" />
             <span className="hidden font-bold sm:inline-block">
               Enclava
             </span>
           </Link>
-          {user && (
+          {isClient && user && (
             <nav className="flex items-center space-x-6 text-sm font-medium">
               {navItems.map((item) => (
               item.children ? (
@@ -155,7 +160,7 @@ const Navigation = () => {
           <nav className="flex items-center space-x-2">
             <ThemeToggle />
             
-            {user ? (
+            {isClient && user ? (
               <div className="flex items-center space-x-2">
                 <Badge variant="secondary" className="hidden sm:inline-flex">
                   {user.email}
@@ -169,7 +174,7 @@ const Navigation = () => {
                   Logout
                 </Button>
               </div>
-            ) : (
+            ) : isClient ? (
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -187,7 +192,7 @@ const Navigation = () => {
                   <Link href="/register">Register</Link>
                 </Button>
               </div>
-            )}
+            ) : null}
           </nav>
         </div>
       </div>

@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  metadataBase: new URL(`http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`),
   title: 'Enclava Platform',
   description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
   keywords: ['AI', 'Enclava', 'Confidential Computing', 'LLM', 'TEE'],
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    url: `http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`,
     title: 'Enclava Platform',
     description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
     siteName: 'Enclava',

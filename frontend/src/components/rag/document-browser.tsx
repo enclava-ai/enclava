@@ -60,11 +60,12 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
 
   useEffect(() => {
     loadDocuments()
-  }, [])
+  }, [filterCollection])
 
   useEffect(() => {
+    // Apply client-side filters for search, type, and status
     filterDocuments()
-  }, [documents, searchTerm, filterCollection, filterType, filterStatus])
+  }, [documents, searchTerm, filterType, filterStatus])
 
   useEffect(() => {
     if (selectedCollection !== filterCollection) {
@@ -75,7 +76,16 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
   const loadDocuments = async () => {
     setLoading(true)
     try {
-      const data = await apiClient.get('/api-internal/v1/rag/documents')
+      // Build query parameters based on current filter
+      const params = new URLSearchParams()
+      if (filterCollection && filterCollection !== "all") {
+        params.append('collection_id', filterCollection)
+      }
+      
+      const queryString = params.toString()
+      const url = queryString ? `/api-internal/v1/rag/documents?${queryString}` : '/api-internal/v1/rag/documents'
+      
+      const data = await apiClient.get(url)
       setDocuments(data.documents || [])
     } catch (error) {
       console.error('Failed to load documents:', error)
@@ -97,11 +107,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
       )
     }
 
-    // Collection filter
-    if (filterCollection !== "all") {
-      filtered = filtered.filter(doc => doc.collection_id === filterCollection)
-    }
-
+    // Collection filter is now handled server-side
     // Type filter
     if (filterType !== "all") {
       filtered = filtered.filter(doc => doc.file_type === filterType)

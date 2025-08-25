@@ -40,8 +40,20 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "admin123"
     ADMIN_EMAIL: Optional[str] = None
     
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    # Base URL for deriving CORS origins
+    BASE_URL: str = "localhost"
+    
+    @field_validator('CORS_ORIGINS', mode='before')
+    @classmethod
+    def derive_cors_origins(cls, v, info):
+        """Derive CORS origins from BASE_URL if not explicitly set"""
+        if v is None:
+            base_url = info.data.get('BASE_URL', 'localhost')
+            return [f"http://{base_url}"]
+        return v if isinstance(v, list) else [v]
+    
+    # CORS origins (derived from BASE_URL)
+    CORS_ORIGINS: Optional[List[str]] = None
     
     # LLM Service Configuration (replaced LiteLLM)
     # LLM service configuration is now handled in app/services/llm/config.py
@@ -122,14 +134,6 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"
     LOG_LEVEL: str = "INFO"
     
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
     
     model_config = {
         "env_file": ".env",

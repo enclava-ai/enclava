@@ -61,7 +61,10 @@ async def get_cached_models() -> List[Dict[str, Any]]:
                 "id": model_info.id,
                 "object": model_info.object,
                 "created": model_info.created or int(time.time()),
-                "owned_by": model_info.owned_by
+                "owned_by": model_info.owned_by,
+                # Add frontend-expected fields
+                "name": getattr(model_info, 'name', model_info.id),  # Use name if available, fallback to id
+                "provider": getattr(model_info, 'provider', model_info.owned_by)  # Use provider if available, fallback to owned_by
             })
         
         # Update cache

@@ -380,6 +380,115 @@ async def get_setting(
     }
 
 
+@router.put("/{category}")
+async def update_category_settings(
+    category: str,
+    settings_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update multiple settings in a category"""
+    
+    # Check permissions
+    require_permission(current_user.get("permissions", []), "platform:settings:update")
+    
+    if category not in SETTINGS_STORE:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Settings category '{category}' not found"
+        )
+    
+    updated_settings = []
+    errors = []
+    
+    for key, new_value in settings_data.items():
+        if key not in SETTINGS_STORE[category]:
+            errors.append(f"Setting '{key}' not found in category '{category}'")
+            continue
+        
+        setting = SETTINGS_STORE[category][key]
+        
+        # Check if it's a secret setting
+        if setting.get("is_secret", False):
+            require_permission(current_user.get("permissions", []), "platform:settings:admin")
+        
+        # Store original value for audit
+        original_value = setting["value"]
+        
+        # Validate value type
+        expected_type = setting["type"]
+        
+        try:
+            if expected_type == "integer" and not isinstance(new_value, int):
+                if isinstance(new_value, str) and new_value.isdigit():
+                    new_value = int(new_value)
+                else:
+                    errors.append(f"Setting '{key}' expects an integer value")
+                    continue
+            elif expected_type == "boolean" and not isinstance(new_value, bool):
+                if isinstance(new_value, str):
+                    new_value = new_value.lower() in ('true', '1', 'yes', 'on')
+                else:
+                    errors.append(f"Setting '{key}' expects a boolean value")
+                    continue
+            elif expected_type == "float" and not isinstance(new_value, (int, float)):
+                if isinstance(new_value, str):
+                    try:
+                        new_value = float(new_value)
+                    except ValueError:
+                        errors.append(f"Setting '{key}' expects a numeric value")
+                        continue
+                else:
+                    errors.append(f"Setting '{key}' expects a numeric value")
+                    continue
+            elif expected_type == "list" and not isinstance(new_value, list):
+                errors.append(f"Setting '{key}' expects a list value")
+                continue
+            
+            # Update setting
+            SETTINGS_STORE[category][key]["value"] = new_value
+            updated_settings.append({
+                "key": key,
+                "original_value": original_value,
+                "new_value": new_value
+            })
+            
+        except Exception as e:
+            errors.append(f"Error updating setting '{key}': {str(e)}")
+    
+    # Log audit event for bulk update
+    await log_audit_event(
+        db=db,
+        user_id=current_user['id'],
+        action="bulk_update_settings",
+        resource_type="setting",
+        resource_id=category,
+        details={
+            "updated_count": len(updated_settings),
+            "errors_count": len(errors),
+            "updated_settings": updated_settings,
+            "errors": errors
+        }
+    )
+    
+    logger.info(f"Bulk settings updated in category '{category}': {len(updated_settings)} settings by {current_user['username']}")
+    
+    if errors and not updated_settings:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No settings were updated. Errors: {errors}"
+        )
+    
+    return {
+        "category": category,
+        "updated_count": len(updated_settings),
+        "errors_count": len(errors),
+        "updated_settings": [{"key": s["key"], "new_value": s["new_value"]} for s in updated_settings],
+        "errors": errors,
+        "message": f"Updated {len(updated_settings)} settings in category '{category}'"
+    }
+
+
 @router.put("/{category}/{key}")
 async def update_setting(
     category: str,

@@ -10,9 +10,8 @@ alembic==1.12.1
 psycopg2-binary==2.9.9
 asyncpg==0.29.0
 
-# Redis
+# Redis (includes async support, no need for separate aioredis)
 redis==5.0.1
-aioredis==2.0.1
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0

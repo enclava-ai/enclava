@@ -521,15 +521,20 @@ class RAGService:
             client.create_collection(
                 collection_name=collection_name,
                 vectors_config=VectorParams(
-                    size=384,  # Standard embedding dimension for sentence-transformers
+                    size=1024,  # Updated for multilingual-e5-large-instruct model
                     distance=Distance.COSINE
                 ),
-                optimizers_config=models.OptimizersConfig(
-                    default_segment_number=2
+                optimizers_config=models.OptimizersConfigDiff(
+                    default_segment_number=2,
+                    deleted_threshold=0.2,
+                    vacuum_min_vector_number=1000,
+                    flush_interval_sec=5,
+                    max_optimization_threads=1
                 ),
-                hnsw_config=models.HnswConfig(
+                hnsw_config=models.HnswConfigDiff(
                     m=16,
-                    ef_construct=100
+                    ef_construct=100,
+                    full_scan_threshold=10000
                 )
             )
             logger.info(f"Created Qdrant collection: {collection_name}")

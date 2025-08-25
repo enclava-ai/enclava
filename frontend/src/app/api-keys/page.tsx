@@ -115,7 +115,7 @@ export default function ApiKeysPage() {
   const fetchApiKeys = async () => {
     try {
       setLoading(true);
-      const result = await apiClient.get("/api-internal/v1/api-keys");
+      const result = await apiClient.get("/api-internal/v1/api-keys") as any;
       setApiKeys(result.data || []);
     } catch (error) {
       console.error("Failed to fetch API keys:", error);
@@ -132,7 +132,7 @@ export default function ApiKeysPage() {
   const handleCreateApiKey = async () => {
     try {
       setActionLoading("create");
-      const data = await apiClient.post("/api-internal/v1/api-keys", newKeyData);
+      const data = await apiClient.post("/api-internal/v1/api-keys", newKeyData) as any;
       
       toast({
         title: "API Key Created",
@@ -193,7 +193,7 @@ export default function ApiKeysPage() {
   const handleRegenerateApiKey = async (keyId: string) => {
     try {
       setActionLoading(`regenerate-${keyId}`);
-      const data = await apiClient.post(`/api-internal/v1/api-keys/${keyId}/regenerate`);
+      const data = await apiClient.post(`/api-internal/v1/api-keys/${keyId}/regenerate`) as any;
       
       toast({
         title: "API Key Regenerated",

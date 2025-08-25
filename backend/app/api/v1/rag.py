@@ -171,7 +171,7 @@ async def delete_collection(
 
 @router.get("/documents", response_model=dict)
 async def get_documents(
-    collection_id: Optional[int] = None,
+    collection_id: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
@@ -179,9 +179,28 @@ async def get_documents(
 ):
     """Get documents, optionally filtered by collection"""
     try:
+        # Handle collection_id filtering
+        collection_id_int = None
+        if collection_id:
+            # Check if this is an external collection ID (starts with "ext_")
+            if collection_id.startswith("ext_"):
+                # External collections exist only in Qdrant and have no documents in PostgreSQL
+                # Return empty list since they don't have managed documents
+                return {
+                    "success": True,
+                    "documents": [],
+                    "total": 0
+                }
+            else:
+                # Try to convert to integer for managed collections
+                try:
+                    collection_id_int = int(collection_id)
+                except (ValueError, TypeError):
+                    raise HTTPException(status_code=400, detail="Invalid collection_id format")
+        
         rag_service = RAGService(db)
         documents = await rag_service.get_documents(
-            collection_id=collection_id,
+            collection_id=collection_id_int,
             skip=skip,
             limit=limit
         )

@@ -1,0 +1,206 @@
+services:
+  # Test Nginx Proxy
+  enclava-nginx-test:
+    image: nginx:alpine
+    container_name: enclava-nginx-test
+    ports:
+      - "3005:80"  # Different port from main app
+    volumes:
+      - ./nginx/nginx.test.conf:/etc/nginx/nginx.conf:ro
+      - nginx-test-logs:/var/log/nginx
+    depends_on:
+      - enclava-backend-test
+    networks:
+      - enclava-test-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Test PostgreSQL Database
+  enclava-postgres-test:
+    image: postgres:15-alpine
+    container_name: enclava-postgres-test
+    environment:
+      POSTGRES_USER: enclava_user
+      POSTGRES_PASSWORD: enclava_pass
+      POSTGRES_DB: enclava_test_db
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5435:5432"  # Different port from main database
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    networks:
+      - enclava-test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enclava_user -d enclava_test_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Redis Cache
+  enclava-redis-test:
+    image: redis:7-alpine
+    container_name: enclava-redis-test
+    ports:
+      - "6380:6379"  # Different port from main Redis
+    networks:
+      - enclava-test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Qdrant Vector Database
+  enclava-qdrant-test:
+    image: qdrant/qdrant:latest
+    container_name: enclava-qdrant-test
+    ports:
+      - "6334:6333"  # Different port from main Qdrant
+    volumes:
+      - qdrant-test-data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6335
+    networks:
+      - enclava-test-network
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # Test Backend Service
+  enclava-backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: enclava-backend-test
+    environment:
+      # Database
+      DATABASE_URL: postgresql://enclava_user:enclava_pass@enclava-postgres-test:5432/enclava_test_db
+      TEST_DATABASE_URL: postgresql+asyncpg://enclava_user:enclava_pass@enclava-postgres-test:5432/enclava_test_db
+      
+      # Redis
+      REDIS_URL: redis://enclava-redis-test:6379
+      
+      # Qdrant
+      QDRANT_HOST: enclava-qdrant-test
+      QDRANT_PORT: 6333
+      
+      # JWT & Security
+      JWT_SECRET: test-jwt-secret-key-for-testing-only
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_MINUTES: 30
+      
+      # Testing flags
+      TESTING: "true"
+      APP_DEBUG: "true"
+      LOG_LLM_PROMPTS: "true"
+      APP_LOG_LEVEL: DEBUG
+      
+      # LLM Service (use test/mock providers)
+      LLM_PROVIDER: test
+      LLM_TEST_MODE: "true"
+      
+      # Disable external services
+      DISABLE_PRIVATEMODE: "true"
+      DISABLE_OPENROUTER: "true"
+      
+    ports:
+      - "8001:8000"  # Different port from main backend
+    volumes:
+      - ./backend:/app
+      - ./backend/tests:/app/tests
+      - test-uploads:/app/uploads
+    depends_on:
+      enclava-postgres-test:
+        condition: service_healthy
+      enclava-redis-test:
+        condition: service_healthy
+      enclava-qdrant-test:
+        condition: service_healthy
+    networks:
+      - enclava-test-network
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        sleep 5 &&
+        echo 'Starting backend server...' &&
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  # Test Frontend Service (simplified - skip for now to focus on backend testing)
+  # enclava-frontend-test:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: enclava-frontend-test
+  #   environment:
+  #     NODE_ENV: test
+  #     BASE_URL: enclava-nginx-test
+  #     NEXT_PUBLIC_INTERNAL_API_URL: http://enclava-nginx-test/api-internal
+  #   ports:
+  #     - "3003:3000"  # Different port from main frontend
+  #   volumes:
+  #     - ./frontend:/app
+  #     - ./frontend/tests:/app/tests
+  #     - /app/node_modules  # Prevent overwriting node_modules
+  #   networks:
+  #     - enclava-test-network
+  #   command: npm run dev
+
+  # Test Runner Container (for E2E tests)
+  enclava-test-runner:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: enclava-test-runner
+    environment:
+      # URLs for testing through nginx
+      BASE_URL: http://enclava-nginx-test
+      API_URL: http://enclava-nginx-test/api
+      INTERNAL_API_URL: http://enclava-nginx-test/api-internal
+      
+      # Direct service URLs (for specific tests)
+      BACKEND_URL: http://enclava-backend-test:8000
+      FRONTEND_URL: http://enclava-frontend-test:3000
+      
+      # Database connection for test data setup  
+      DATABASE_URL: postgresql+asyncpg://enclava_user:enclava_pass@enclava-postgres-test:5432/enclava_test_db
+      
+      # Qdrant connection
+      QDRANT_HOST: enclava-qdrant-test
+      QDRANT_PORT: 6333
+      
+      # Test configuration
+      PYTEST_ARGS: "-v --tb=short --maxfail=10"
+      TEST_TIMEOUT: 300
+      
+    volumes:
+      - ./backend/tests:/tests
+      - ./test-reports:/test-reports
+      - ./coverage-reports:/coverage-reports
+    depends_on:
+      - enclava-nginx-test
+      - enclava-backend-test
+    networks:
+      - enclava-test-network
+    command: >
+      sh -c "
+        echo 'Test runner ready. Use docker exec to run tests.' &&
+        tail -f /dev/null
+      "
+
+networks:
+  enclava-test-network:
+    driver: bridge
+
+volumes:
+  postgres-test-data:
+  qdrant-test-data:
+  test-uploads:
+  nginx-test-logs:

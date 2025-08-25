@@ -180,7 +180,7 @@ function DashboardContent() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-empire-gold">
-            Welcome back, {user.name}
+            Welcome back, {user?.name || 'User'}
           </h1>
           <p className="text-empire-gold/60 mt-1">
             Manage your Enclava platform and modules

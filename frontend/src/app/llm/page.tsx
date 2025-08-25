@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -20,7 +19,6 @@ import {
   Settings, 
   Trash2, 
   Copy,
-  DollarSign, 
   Calendar, 
   Lock, 
   Unlock,
@@ -49,18 +47,7 @@ interface APIKey {
   rate_limit_per_day?: number
   allowed_ips: string[]
   allowed_models: string[]
-  budget_limit_cents?: number
-  budget_type?: string
-  is_unlimited: boolean
   tags: string[]
-}
-
-interface Budget {
-  id: string
-  name: string
-  limit_cents: number
-  used_cents: number
-  is_active: boolean
 }
 
 interface Model {
@@ -80,7 +67,6 @@ export default function LLMPage() {
 function LLMPageContent() {
   const [activeTab, setActiveTab] = useState('api-keys')
   const [apiKeys, setApiKeys] = useState<APIKey[]>([])
-  const [budgets, setBudgets] = useState<Budget[]>([])
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -92,9 +78,6 @@ function LLMPageContent() {
   const [newKey, setNewKey] = useState({
     name: '',
     model: '',
-    is_unlimited: true,
-    budget_limit_cents: 1000, // $10.00 default
-    budget_type: 'monthly',
     expires_at: '',
     description: ''
   })
@@ -112,14 +95,10 @@ function LLMPageContent() {
         throw new Error('No authentication token found')
       }
       
-      // Fetch API keys, budgets, and models using API client
-      const [keysData, budgetsData, modelsData] = await Promise.all([
+      // Fetch API keys and models using API client
+      const [keysData, modelsData] = await Promise.all([
         apiClient.get('/api-internal/v1/api-keys').catch(e => {
           console.error('Failed to fetch API keys:', e)
-          return { data: [] }
-        }),
-        apiClient.get('/api-internal/v1/llm/budget/status').catch(e => {
-          console.error('Failed to fetch budgets:', e)
           return { data: [] }
         }),
         apiClient.get('/api-internal/v1/llm/models').catch(e => {
@@ -129,9 +108,8 @@ function LLMPageContent() {
       ])
 
       console.log('API keys data:', keysData)
-      setApiKeys(keysData.data || [])
-      console.log('API keys state updated, count:', keysData.data?.length || 0)
-      setBudgets(budgetsData.data || [])
+      setApiKeys(keysData.api_keys || [])
+      console.log('API keys state updated, count:', keysData.api_keys?.length || 0)
       setModels(modelsData.data || [])
       
       console.log('Data fetch completed successfully')
@@ -149,16 +127,25 @@ function LLMPageContent() {
 
   const createAPIKey = async () => {
     try {
-      const result = await apiClient.post('/api-internal/v1/api-keys', newKey)
+      // Clean the data before sending - remove empty optional fields
+      const cleanedKey = { ...newKey }
+      if (!cleanedKey.expires_at || cleanedKey.expires_at.trim() === '') {
+        delete cleanedKey.expires_at
+      }
+      if (!cleanedKey.description || cleanedKey.description.trim() === '') {
+        delete cleanedKey.description
+      }
+      if (!cleanedKey.model || cleanedKey.model === 'all') {
+        delete cleanedKey.model
+      }
+      
+      const result = await apiClient.post('/api-internal/v1/api-keys', cleanedKey)
       setNewSecretKey(result.secret_key)
       setShowCreateDialog(false)
       setShowSecretKeyDialog(true)
       setNewKey({
         name: '',
         model: '',
-        is_unlimited: true,
-        budget_limit_cents: 1000, // $10.00 default
-        budget_type: 'monthly',
         expires_at: '',
         description: ''
         })
@@ -226,9 +213,6 @@ function LLMPageContent() {
     return new Date(dateStr).toLocaleDateString()
   }
 
-  const getBudgetUsagePercentage = (budget: Budget) => {
-    return budget.limit_cents > 0 ? (budget.used_cents / budget.limit_cents) * 100 : 0
-  }
 
   // Get the public API URL from the current window location
   const getPublicApiUrl = () => {
@@ -249,7 +233,7 @@ function LLMPageContent() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">LLM Configuration</h1>
         <p className="text-muted-foreground">
-          Manage API keys, budgets, and model access for your LLM integrations.
+          Manage API keys and model access for your LLM integrations.
         </p>
       </div>
 
@@ -325,9 +309,8 @@ function LLMPageContent() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="api-keys">API Keys</TabsTrigger>
-          <TabsTrigger value="budgets">Budgets</TabsTrigger>
           <TabsTrigger value="models">Models</TabsTrigger>
         </TabsList>
 
@@ -350,7 +333,7 @@ function LLMPageContent() {
                     <DialogHeader>
                       <DialogTitle>Create New API Key</DialogTitle>
                       <DialogDescription>
-                        Create a new API key with optional model and budget restrictions.
+                        Create a new API key with optional model restrictions.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -384,53 +367,12 @@ function LLMPageContent() {
                             <SelectItem value="all">All Models</SelectItem>
                             {models.map(model => (
                               <SelectItem key={model.id} value={model.id}>
-                                {model.name} ({model.provider})
+                                {model.id}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="unlimited"
-                          checked={newKey.is_unlimited}
-                          onCheckedChange={(checked) => setNewKey(prev => ({ ...prev, is_unlimited: checked }))}
-                        />
-                        <Label htmlFor="unlimited">Unlimited budget</Label>
-                      </div>
-
-                      {!newKey.is_unlimited && (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="budget-type">Budget Type</Label>
-                            <Select value={newKey.budget_type} onValueChange={(value) => setNewKey(prev => ({ ...prev, budget_type: value }))}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select budget type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="total">Total Budget</SelectItem>
-                                <SelectItem value="monthly">Monthly Budget</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label htmlFor="budget-limit">Budget Limit ($)</Label>
-                            <Input
-                              id="budget-limit"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={(newKey.budget_limit_cents || 0) / 100}
-                              onChange={(e) => setNewKey(prev => ({ 
-                                ...prev, 
-                                budget_limit_cents: Math.round(parseFloat(e.target.value || "0") * 100)
-                              }))}
-                              placeholder="0.00"
-                            />
-                          </div>
-                        </div>
-                      )}
 
                       <div>
                         <Label htmlFor="expires">Expiration Date (Optional)</Label>
@@ -471,7 +413,6 @@ function LLMPageContent() {
                       <TableHead>Name</TableHead>
                       <TableHead>Key</TableHead>
                       <TableHead>Model</TableHead>
-                      <TableHead>Budget</TableHead>
                       <TableHead>Expires</TableHead>
                       <TableHead>Usage</TableHead>
                       <TableHead>Status</TableHead>
@@ -497,15 +438,6 @@ function LLMPageContent() {
                             <Badge variant="secondary">{apiKey.allowed_models[0]}</Badge>
                           ) : (
                             <Badge variant="outline">All Models</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {apiKey.is_unlimited ? (
-                            <Badge variant="outline">Unlimited</Badge>
-                          ) : (
-                            <Badge variant="secondary">
-                              {formatCurrency(apiKey.budget_limit_cents || 0)}
-                            </Badge>
                           )}
                         </TableCell>
                         <TableCell>{formatDate(apiKey.expires_at)}</TableCell>
@@ -574,54 +506,6 @@ function LLMPageContent() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="budgets" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Budget Management
-              </CardTitle>
-              <CardDescription>
-                Monitor and manage spending limits for your API keys.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Array.isArray(budgets) && budgets.map((budget) => (
-                  <div key={budget.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium">{budget.name}</h3>
-                      <Badge variant={budget.is_active ? "default" : "secondary"}>
-                        {budget.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Used: {formatCurrency(budget.used_cents)}</span>
-                        <span>Limit: {formatCurrency(budget.limit_cents)}</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
-                          style={{ width: `${Math.min(getBudgetUsagePercentage(budget), 100)}%` }}
-                        ></div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {getBudgetUsagePercentage(budget).toFixed(1)}% used
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {(!Array.isArray(budgets) || budgets.length === 0) && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No budgets configured. Configure budgets in the Analytics section.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="models" className="mt-6">
           <Card>
             <CardHeader>
@@ -634,10 +518,10 @@ function LLMPageContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {models.map((model) => (
                   <div key={model.id} className="border rounded-lg p-4">
-                    <h3 className="font-medium">{model.name}</h3>
-                    <p className="text-sm text-muted-foreground">{model.provider}</p>
+                    <h3 className="font-medium">{model.id}</h3>
+                    <p className="text-sm text-muted-foreground">Provider: {model.owned_by}</p>
                     <Badge variant="outline" className="mt-2">
-                      {model.id}
+                      {model.object}
                     </Badge>
                   </div>
                 ))}

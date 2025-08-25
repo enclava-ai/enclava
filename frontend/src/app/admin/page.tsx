@@ -63,7 +63,7 @@ export default function AdminPage() {
 
       // Fetch recent activity
       try {
-        const activityData = await apiClient.get("/api-internal/v1/audit?page=1&size=10");
+        const activityData = await apiClient.get("/api-internal/v1/audit?page=1&size=10") as any;
         setRecentActivity(activityData.logs || []);
       } catch (error) {
         console.error("Failed to fetch recent activity:", error);

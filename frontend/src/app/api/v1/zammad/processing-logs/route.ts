@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     if (offset) queryParams.set('offset', offset)
     
     // Make request to backend Zammad processing-logs endpoint
-    const baseUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL
+    const baseUrl = process.env.INTERNAL_API_URL || `http://enclava-backend:${process.env.BACKEND_INTERNAL_PORT || '8000'}`
     const url = `${baseUrl}/api/zammad/processing-logs?${queryParams.toString()}`
     
     const response = await fetch(url, {
