@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
-import ConfidentialityDashboard from "@/components/settings/ConfidentialityDashboard";
 
 interface SystemSettings {
   // Security Settings
@@ -262,11 +261,10 @@ function SettingsPageContent() {
       )}
 
       <Tabs defaultValue="security" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="api">API</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="confidentiality">Confidentiality</TabsTrigger>
         </TabsList>
 
         <TabsContent value="security" className="space-y-6">
@@ -852,9 +850,6 @@ function SettingsPageContent() {
         </TabsContent>
 
 
-        <TabsContent value="confidentiality" className="space-y-6">
-          <ConfidentialityDashboard />
-        </TabsContent>
       </Tabs>
     </div>
   );
