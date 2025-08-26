@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  MoreHorizontal
+  MoreHorizontal,
+  Bot
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
@@ -42,9 +44,6 @@ interface ApiKey {
   description: string;
   key_prefix: string;
   scopes: string[];
-  rate_limit_per_minute: number;
-  rate_limit_per_hour: number;
-  rate_limit_per_day: number;
   is_active: boolean;
   expires_at: string | null;
   last_used_at: string | null;
@@ -56,35 +55,30 @@ interface ApiKey {
   budget_limit?: number;
   budget_type?: "total" | "monthly";
   is_unlimited: boolean;
+  allowed_models: string[];
+  allowed_chatbots: string[];
 }
 
 interface NewApiKeyData {
   name: string;
   description: string;
   scopes: string[];
-  rate_limit_per_minute: number;
-  rate_limit_per_hour: number;
-  rate_limit_per_day: number;
   expires_at: string | null;
   is_unlimited: boolean;
   budget_limit_cents?: number;
   budget_type?: "total" | "monthly";
+  allowed_models: string[];
+  allowed_chatbots: string[];
 }
 
 const PERMISSION_OPTIONS = [
   { value: "llm:chat", label: "LLM Chat Completions" },
   { value: "llm:embeddings", label: "LLM Embeddings" },
-  { value: "modules:read", label: "Read Modules" },
-  { value: "modules:write", label: "Manage Modules" },
-  { value: "users:read", label: "Read Users" },
-  { value: "users:write", label: "Manage Users" },
-  { value: "audit:read", label: "Read Audit Logs" },
-  { value: "settings:read", label: "Read Settings" },
-  { value: "settings:write", label: "Manage Settings" },
 ];
 
 export default function ApiKeysPage() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -94,23 +88,48 @@ export default function ApiKeysPage() {
   const [newKeyVisible, setNewKeyVisible] = useState<string | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
   const [editKeyData, setEditKeyData] = useState<Partial<ApiKey>>({});
+  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const [availableChatbots, setAvailableChatbots] = useState<any[]>([]);
 
   const [newKeyData, setNewKeyData] = useState<NewApiKeyData>({
     name: "",
     description: "",
     scopes: [],
-    rate_limit_per_minute: 100,
-    rate_limit_per_hour: 1000,
-    rate_limit_per_day: 10000,
     expires_at: null,
-    is_unlimited: true,
+    is_unlimited: false,
     budget_limit_cents: 1000, // $10.00 default
     budget_type: "monthly",
+    allowed_models: [],
+    allowed_chatbots: [],
   });
 
   useEffect(() => {
     fetchApiKeys();
-  }, []);
+    fetchAvailableModels();
+    fetchAvailableChatbots();
+    
+    // Check URL parameters for chatbot pre-selection
+    const chatbotId = searchParams.get('chatbot');
+    const chatbotName = searchParams.get('chatbot_name');
+    
+    if (chatbotId && chatbotName) {
+      // Pre-populate the form with the chatbot selected and required permissions
+      setNewKeyData(prev => ({
+        ...prev,
+        name: `${decodeURIComponent(chatbotName)} API Key`,
+        allowed_chatbots: [chatbotId],
+        scopes: ["llm:chat"] // Chatbots need chat completion permission
+      }));
+      
+      // Automatically open the create dialog
+      setShowCreateDialog(true);
+      
+      toast({
+        title: "Chatbot Selected",
+        description: `Creating API key for ${decodeURIComponent(chatbotName)}`
+      });
+    }
+  }, [searchParams, toast]);
 
   const fetchApiKeys = async () => {
     try {
@@ -126,6 +145,26 @@ export default function ApiKeysPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAvailableModels = async () => {
+    try {
+      const result = await apiClient.get("/api-internal/v1/llm/models") as any;
+      setAvailableModels(result.data || []);
+    } catch (error) {
+      console.error("Failed to fetch models:", error);
+      setAvailableModels([]);
+    }
+  };
+
+  const fetchAvailableChatbots = async () => {
+    try {
+      const result = await apiClient.get("/api-internal/v1/chatbot/list") as any;
+      setAvailableChatbots(result || []);
+    } catch (error) {
+      console.error("Failed to fetch chatbots:", error);
+      setAvailableChatbots([]);
     }
   };
 
@@ -145,13 +184,12 @@ export default function ApiKeysPage() {
         name: "",
         description: "",
         scopes: [],
-        rate_limit_per_minute: 100,
-        rate_limit_per_hour: 1000,
-        rate_limit_per_day: 10000,
         expires_at: null,
-        is_unlimited: true,
+        is_unlimited: false,
         budget_limit_cents: 1000, // $10.00 default
         budget_type: "monthly",
+        allowed_models: [],
+        allowed_chatbots: [],
       });
 
       await fetchApiKeys();
@@ -248,9 +286,6 @@ export default function ApiKeysPage() {
       await apiClient.put(`/api-internal/v1/api-keys/${keyId}`, {
         name: editKeyData.name,
         description: editKeyData.description,
-        rate_limit_per_minute: editKeyData.rate_limit_per_minute,
-        rate_limit_per_hour: editKeyData.rate_limit_per_hour,
-        rate_limit_per_day: editKeyData.rate_limit_per_day,
         is_unlimited: editKeyData.is_unlimited,
         budget_limit_cents: editKeyData.is_unlimited ? null : editKeyData.budget_limit,
         budget_type: editKeyData.is_unlimited ? null : editKeyData.budget_type,
@@ -281,9 +316,6 @@ export default function ApiKeysPage() {
     setEditKeyData({
       name: apiKey.name,
       description: apiKey.description,
-      rate_limit_per_minute: apiKey.rate_limit_per_minute,
-      rate_limit_per_hour: apiKey.rate_limit_per_hour,
-      rate_limit_per_day: apiKey.rate_limit_per_day,
       is_unlimited: apiKey.is_unlimited,
       budget_limit: apiKey.budget_limit,
       budget_type: apiKey.budget_type || "monthly",
@@ -419,6 +451,79 @@ export default function ApiKeysPage() {
                 </div>
               </div>
 
+              {/* Model Restrictions - Hidden for chatbot API keys since model is already selected by chatbot */}
+              {newKeyData.allowed_chatbots.length === 0 && (
+                <div className="space-y-2">
+                  <Label>Model Restrictions (Optional)</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Leave empty to allow all models, or select specific models to restrict access.
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                    {availableModels.map((model) => (
+                      <div key={model.id} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`model-${model.id}`}
+                          checked={newKeyData.allowed_models.includes(model.id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setNewKeyData(prev => ({
+                              ...prev,
+                              allowed_models: checked
+                                ? [...prev.allowed_models, model.id]
+                                : prev.allowed_models.filter(m => m !== model.id)
+                            }));
+                          }}
+                          className="rounded"
+                        />
+                        <Label htmlFor={`model-${model.id}`} className="text-sm">
+                          {model.name}
+                        </Label>
+                      </div>
+                    ))}
+                    {availableModels.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No models available</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+
+              {/* Chatbot Restrictions */}
+              <div className="space-y-2">
+                <Label>Chatbot Restrictions (Optional)</Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Leave empty to allow all chatbots, or select specific chatbots to restrict access.
+                </p>
+                <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                  {availableChatbots.map((chatbot) => (
+                    <div key={chatbot.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`chatbot-${chatbot.id}`}
+                        checked={newKeyData.allowed_chatbots.includes(chatbot.id)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setNewKeyData(prev => ({
+                            ...prev,
+                            allowed_chatbots: checked
+                              ? [...prev.allowed_chatbots, chatbot.id]
+                              : prev.allowed_chatbots.filter(c => c !== chatbot.id)
+                          }));
+                        }}
+                        className="rounded"
+                      />
+                      <Label htmlFor={`chatbot-${chatbot.id}`} className="text-sm">
+                        {chatbot.name}
+                      </Label>
+                    </div>
+                  ))}
+                  {availableChatbots.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No chatbots available</p>
+                  )}
+                </div>
+              </div>
+
               {/* Budget Configuration */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
@@ -429,10 +534,10 @@ export default function ApiKeysPage() {
                     onChange={(e) => setNewKeyData(prev => ({ ...prev, is_unlimited: e.target.checked }))}
                     className="rounded"
                   />
-                  <Label htmlFor="unlimited-budget">Unlimited budget</Label>
+                  <Label htmlFor="unlimited-budget">Set budget</Label>
                 </div>
 
-                {!newKeyData.is_unlimited && (
+                {newKeyData.is_unlimited && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="budget-type">Budget Type</Label>
@@ -468,35 +573,6 @@ export default function ApiKeysPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="minute-limit">Per Minute</Label>
-                  <Input
-                    id="minute-limit"
-                    type="number"
-                    value={newKeyData.rate_limit_per_minute}
-                    onChange={(e) => setNewKeyData(prev => ({ ...prev, rate_limit_per_minute: parseInt(e.target.value) }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hour-limit">Per Hour</Label>
-                  <Input
-                    id="hour-limit"
-                    type="number"
-                    value={newKeyData.rate_limit_per_hour}
-                    onChange={(e) => setNewKeyData(prev => ({ ...prev, rate_limit_per_hour: parseInt(e.target.value) }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="day-limit">Per Day</Label>
-                  <Input
-                    id="day-limit"
-                    type="number"
-                    value={newKeyData.rate_limit_per_day}
-                    onChange={(e) => setNewKeyData(prev => ({ ...prev, rate_limit_per_day: parseInt(e.target.value) }))}
-                  />
-                </div>
-              </div>
             </div>
 
             <DialogFooter>
@@ -641,20 +717,6 @@ export default function ApiKeysPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 mb-4">
-                  <span className="text-sm font-medium">Rate Limits:</span>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Per Minute:</span> {apiKey.rate_limit_per_minute}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Per Hour:</span> {apiKey.rate_limit_per_hour}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Per Day:</span> {apiKey.rate_limit_per_day}
-                    </div>
-                  </div>
-                </div>
 
                 <div className="flex items-center space-x-2">
                   <Button 
@@ -760,10 +822,10 @@ export default function ApiKeysPage() {
                   onChange={(e) => setEditKeyData(prev => ({ ...prev, is_unlimited: e.target.checked }))}
                   className="rounded"
                 />
-                <Label htmlFor="edit-unlimited-budget">Unlimited budget</Label>
+                <Label htmlFor="edit-unlimited-budget">Set budget</Label>
               </div>
 
-              {!editKeyData.is_unlimited && (
+              {editKeyData.is_unlimited && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-budget-type">Budget Type</Label>
@@ -799,36 +861,6 @@ export default function ApiKeysPage() {
               )}
             </div>
 
-            {/* Rate Limits */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-minute-limit">Per Minute</Label>
-                <Input
-                  id="edit-minute-limit"
-                  type="number"
-                  value={editKeyData.rate_limit_per_minute || 0}
-                  onChange={(e) => setEditKeyData(prev => ({ ...prev, rate_limit_per_minute: parseInt(e.target.value) }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-hour-limit">Per Hour</Label>
-                <Input
-                  id="edit-hour-limit"
-                  type="number"
-                  value={editKeyData.rate_limit_per_hour || 0}
-                  onChange={(e) => setEditKeyData(prev => ({ ...prev, rate_limit_per_hour: parseInt(e.target.value) }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-day-limit">Per Day</Label>
-                <Input
-                  id="edit-day-limit"
-                  type="number"
-                  value={editKeyData.rate_limit_per_day || 0}
-                  onChange={(e) => setEditKeyData(prev => ({ ...prev, rate_limit_per_day: parseInt(e.target.value) }))}
-                />
-              </div>
-            </div>
 
             {/* Expiration */}
             <div className="space-y-2">

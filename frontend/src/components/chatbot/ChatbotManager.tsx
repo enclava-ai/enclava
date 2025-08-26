@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -123,6 +124,7 @@ interface PromptTemplate {
 }
 
 export function ChatbotManager() {
+  const router = useRouter()
   const [chatbots, setChatbots] = useState<ChatbotInstance[]>([])
   const [ragCollections, setRagCollections] = useState<RagCollection[]>([])
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
@@ -135,11 +137,6 @@ export function ChatbotManager() {
   const [editingChatbot, setEditingChatbot] = useState<ChatbotInstance | null>(null)
   const [showChatInterface, setShowChatInterface] = useState(false)
   const [testingChatbot, setTestingChatbot] = useState<ChatbotInstance | null>(null)
-  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false)
-  const [apiKeyChatbot, setApiKeyChatbot] = useState<ChatbotInstance | null>(null)
-  const [apiKeys, setApiKeys] = useState<any[]>([])
-  const [loadingApiKeys, setLoadingApiKeys] = useState(false)
-  const [newApiKey, setNewApiKey] = useState<string | null>(null)
   const { toast } = useToast()
 
   // New chatbot form state
@@ -356,44 +353,9 @@ export function ChatbotManager() {
     }
   }
 
-  const handleManageApiKeys = async (chatbot: ChatbotInstance) => {
-    setApiKeyChatbot(chatbot)
-    setShowApiKeyDialog(true)
-    await loadApiKeys(chatbot.id)
-  }
-
-  const loadApiKeys = async (chatbotId: string) => {
-    setLoadingApiKeys(true)
-    try {
-      const data = await apiClient.get(`/api-internal/v1/chatbot/${chatbotId}/api-keys`)
-      setApiKeys(data.api_keys || [])
-    } catch (error) {
-      console.error('Failed to load API keys:', error)
-      setApiKeys([])
-    } finally {
-      setLoadingApiKeys(false)
-    }
-  }
-
-  const createApiKey = async () => {
-    if (!apiKeyChatbot) return
-
-    try {
-      const data = await apiClient.post(`/api-internal/v1/chatbot/${apiKeyChatbot.id}/api-key`, {})
-      setNewApiKey(data.secret_key)
-      await loadApiKeys(apiKeyChatbot.id)
-      toast({
-        title: "Success",
-        description: "API key created successfully"
-      })
-    } catch (error) {
-      console.error('Failed to create API key:', error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create API key",
-        variant: "destructive"
-      })
-    }
+  const handleManageApiKeys = (chatbot: ChatbotInstance) => {
+    // Navigate to unified API keys page with chatbot context
+    router.push(`/api-keys?chatbot=${chatbot.id}&chatbot_name=${encodeURIComponent(chatbot.name)}`)
   }
 
   const getChatbotTypeInfo = (type: string) => {
@@ -1082,200 +1044,6 @@ export function ChatbotManager() {
         </Dialog>
       )}
 
-      {/* API Key Management Dialog */}
-      <Dialog open={showApiKeyDialog} onOpenChange={(open) => {
-        setShowApiKeyDialog(open)
-        if (!open) {
-          setApiKeyChatbot(null)
-          setApiKeys([])
-          setNewApiKey(null)
-        }
-      }}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              API Access - {apiKeyChatbot?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Generate API keys to integrate this chatbot into external applications.
-              Each API key is restricted to this specific chatbot only.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-6">
-            {/* API Endpoint Info */}
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Globe className="h-4 w-4" />
-                <span className="font-medium">API Endpoint (Direct HTTP/curl)</span>
-              </div>
-              <div className="bg-background p-3 rounded border overflow-x-auto">
-                <code className="text-sm whitespace-nowrap">
-                  POST {config.getPublicApiUrl()}/chatbot/external/{apiKeyChatbot?.id}/chat/completions
-                </code>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Send POST requests with your API key in the Authorization header: Bearer YOUR_API_KEY
-              </p>
-              <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-                <p className="text-xs text-blue-700">
-                  🔗 Unified API endpoint at <strong>{config.getAppUrl()}</strong> via nginx reverse proxy
-                </p>
-              </div>
-            </div>
-
-            {/* Create API Key Section */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-medium">API Keys</h3>
-                <p className="text-sm text-muted-foreground">
-                  Create and manage API keys for external access
-                </p>
-              </div>
-              <Button onClick={createApiKey} disabled={loadingApiKeys}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create API Key
-              </Button>
-            </div>
-
-            {/* New API Key Display */}
-            {newApiKey && (
-              <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Key className="h-4 w-4 text-green-600" />
-                  <span className="font-medium text-green-800">New API Key Created</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={newApiKey}
-                    readOnly
-                    className="font-mono text-sm flex-1 min-w-0"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(newApiKey)
-                      toast({
-                        title: "Copied",
-                        description: "API key copied to clipboard"
-                      })
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-green-700 mt-2">
-                  ⚠️ Save this API key now - it won't be shown again!
-                </p>
-                <Button
-                  variant="outline" 
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => setNewApiKey(null)}
-                >
-                  Dismiss
-                </Button>
-              </div>
-            )}
-
-            {/* API Keys List */}
-            {loadingApiKeys ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-2 text-muted-foreground">Loading API keys...</p>
-              </div>
-            ) : apiKeys.length > 0 ? (
-              <div className="space-y-3">
-                {apiKeys.map((apiKey) => (
-                  <Card key={apiKey.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{apiKey.name}</span>
-                            <Badge variant={apiKey.is_active ? "default" : "secondary"}>
-                              {apiKey.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1 space-y-1">
-                            <div className="font-mono text-xs bg-muted px-2 py-1 rounded w-fit">
-                              {apiKey.key_prefix}
-                            </div>
-                            <div>
-                              Created {new Date(apiKey.created_at).toLocaleDateString()} • 
-                              {apiKey.total_requests} requests • 
-                              Limit: {apiKey.rate_limit_per_minute}/min
-                            </div>
-                          </div>
-                          {apiKey.last_used_at && (
-                            <div className="text-xs text-muted-foreground">
-                              Last used: {new Date(apiKey.last_used_at).toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No API Keys</h3>
-                <p className="text-muted-foreground mb-4">
-                  Create your first API key to enable external access to this chatbot.
-                </p>
-                <Button onClick={createApiKey}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create API Key
-                </Button>
-              </div>
-            )}
-
-            {/* Usage Example */}
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <h4 className="font-medium mb-2">Usage Example</h4>
-              
-              <div className="bg-background p-4 rounded border overflow-x-auto">
-                <pre className="text-sm whitespace-pre-wrap break-all">
-{`curl -X POST "${config.getPublicApiUrl()}/chatbot/external/${apiKeyChatbot?.id}/chat/completions" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "messages": [
-      {"role": "user", "content": "Hello, how can you help me?"}
-    ],
-    "max_tokens": 1000,
-    "temperature": 0.7
-  }'`}
-                </pre>
-              </div>
-              
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-                <p className="text-sm text-blue-800">
-                  <strong>💡 OpenAI Library Usage:</strong> For OpenAI Python/JavaScript libraries, use base_url without /chat/completions:
-                </p>
-                <code className="block mt-1 text-xs bg-blue-100 p-2 rounded">
-                  base_url="{config.getPublicApiUrl()}/chatbot/external/{apiKeyChatbot?.id}"
-                </code>
-                <p className="text-xs text-blue-700 mt-1">
-                  The OpenAI client automatically appends /chat/completions to the base_url
-                </p>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

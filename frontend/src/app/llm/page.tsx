@@ -28,6 +28,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { apiClient } from '@/lib/api-client'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { useRouter } from 'next/navigation'
 
 interface APIKey {
   id: number
@@ -69,20 +70,11 @@ function LLMPageContent() {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([])
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [editingKey, setEditingKey] = useState<APIKey | null>(null)
-  const [showSecretKeyDialog, setShowSecretKeyDialog] = useState(false)
-  const [newSecretKey, setNewSecretKey] = useState('')
   const { toast } = useToast()
+  const router = useRouter()
 
-  // New API Key form state
-  const [newKey, setNewKey] = useState({
-    name: '',
-    model: '',
-    expires_at: '',
-    description: ''
-  })
 
   // Edit API Key form state
   const [editKey, setEditKey] = useState({
@@ -134,39 +126,6 @@ function LLMPageContent() {
     }
   }
 
-  const createAPIKey = async () => {
-    try {
-      // Clean the data before sending - remove empty optional fields
-      const cleanedKey = { ...newKey }
-      if (!cleanedKey.expires_at || cleanedKey.expires_at.trim() === '') {
-        delete cleanedKey.expires_at
-      }
-      if (!cleanedKey.description || cleanedKey.description.trim() === '') {
-        delete cleanedKey.description
-      }
-      if (!cleanedKey.model || cleanedKey.model === 'all') {
-        delete cleanedKey.model
-      }
-      
-      const result = await apiClient.post('/api-internal/v1/api-keys', cleanedKey)
-      setNewSecretKey(result.secret_key)
-      setShowCreateDialog(false)
-      setShowSecretKeyDialog(true)
-      setNewKey({
-        name: '',
-        model: '',
-        expires_at: '',
-        description: ''
-        })
-        fetchData()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create API key",
-        variant: "destructive"
-      })
-    }
-  }
 
   const openEditDialog = (apiKey: APIKey) => {
     setEditingKey(apiKey)
@@ -237,14 +196,6 @@ function LLMPageContent() {
     })
   }
 
-  const handleSecretKeyAcknowledged = () => {
-    setShowSecretKeyDialog(false)
-    setNewSecretKey('')
-    toast({
-      title: "API Key Created",
-      description: "Your API key has been created successfully"
-    })
-  }
 
   const formatCurrency = (cents: number) => {
     return `$${(cents / 100).toFixed(4)}`
@@ -364,79 +315,10 @@ function LLMPageContent() {
                   <Key className="h-5 w-5" />
                   API Keys
                 </CardTitle>
-                <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create API Key
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Create New API Key</DialogTitle>
-                      <DialogDescription>
-                        Create a new API key with optional model restrictions.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="name">Name</Label>
-                        <Input
-                          id="name"
-                          value={newKey.name}
-                          onChange={(e) => setNewKey(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="e.g., Frontend Application"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="description">Description (Optional)</Label>
-                        <Textarea
-                          id="description"
-                          value={newKey.description}
-                          onChange={(e) => setNewKey(prev => ({ ...prev, description: e.target.value }))}
-                          placeholder="Brief description of what this key is for"
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="model">Model Restriction (Optional)</Label>
-                        <Select value={newKey.model || "all"} onValueChange={(value) => setNewKey(prev => ({ ...prev, model: value === "all" ? "" : value }))}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Allow all models" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Models</SelectItem>
-                            {models.map(model => (
-                              <SelectItem key={model.id} value={model.id}>
-                                {model.id}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="expires">Expiration Date (Optional)</Label>
-                        <Input
-                          id="expires"
-                          type="date"
-                          value={newKey.expires_at}
-                          onChange={(e) => setNewKey(prev => ({ ...prev, expires_at: e.target.value }))}
-                        />
-                      </div>
-
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={createAPIKey} disabled={!newKey.name}>
-                          Create API Key
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <Button onClick={() => router.push('/api-keys')}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create API Key
+                </Button>
               </div>
               <CardDescription>
                 OpenAI-compatible API keys for accessing your LLM endpoints.
@@ -643,65 +525,6 @@ function LLMPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Secret Key Display Dialog */}
-      <Dialog open={showSecretKeyDialog} onOpenChange={() => {}}>
-        <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
-              Your API Key - Copy It Now!
-            </DialogTitle>
-            <DialogDescription className="text-orange-600 font-medium">
-              This is the only time you'll see your complete API key. Make sure to copy it and store it securely.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-                <span className="text-sm font-medium text-orange-800">Important Security Notice</span>
-              </div>
-              <p className="text-sm text-orange-700">
-                • This API key will never be shown again after you close this dialog
-                <br />
-                • Store it in a secure location (password manager, secure notes, etc.)
-                <br />
-                • Anyone with this key can access your API - keep it confidential
-                <br />
-                • If you lose it, you'll need to regenerate a new one
-              </p>
-            </div>
-
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Your API Key</Label>
-              <div className="mt-1 flex items-center gap-2">
-                <code className="flex-1 p-3 bg-gray-100 border rounded-md text-sm font-mono break-all">
-                  {newSecretKey}
-                </code>
-                <Button
-                  onClick={() => copyToClipboard(newSecretKey, "API key")}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                onClick={handleSecretKeyAcknowledged}
-                className="bg-orange-600 hover:bg-orange-700"
-              >
-                I've Copied My API Key
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
