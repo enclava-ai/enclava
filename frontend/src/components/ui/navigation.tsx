@@ -79,7 +79,6 @@ const Navigation = () => {
       label: "Settings",
       children: [
         { href: "/settings", label: "System Settings" },
-        { href: "/modules", label: "Modules" },
         { href: "/plugins", label: "Plugins" },
         { href: "/prompt-templates", label: "Prompt Templates" },
       ]

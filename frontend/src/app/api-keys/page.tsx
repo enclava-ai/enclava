@@ -59,6 +59,22 @@ interface ApiKey {
   allowed_chatbots: string[];
 }
 
+interface Model {
+  id: string;
+  object: string;
+  created?: number;
+  owned_by?: string;
+  permission?: any[];
+  root?: string;
+  parent?: string;
+  provider?: string;
+  capabilities?: string[];
+  context_window?: number;
+  max_output_tokens?: number;
+  supports_streaming?: boolean;
+  supports_function_calling?: boolean;
+}
+
 interface NewApiKeyData {
   name: string;
   description: string;
@@ -88,7 +104,7 @@ export default function ApiKeysPage() {
   const [newKeyVisible, setNewKeyVisible] = useState<string | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
   const [editKeyData, setEditKeyData] = useState<Partial<ApiKey>>({});
-  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [availableChatbots, setAvailableChatbots] = useState<any[]>([]);
 
   const [newKeyData, setNewKeyData] = useState<NewApiKeyData>({
@@ -108,9 +124,10 @@ export default function ApiKeysPage() {
     fetchAvailableModels();
     fetchAvailableChatbots();
     
-    // Check URL parameters for chatbot pre-selection
+    // Check URL parameters for auto-opening create dialog
     const chatbotId = searchParams.get('chatbot');
     const chatbotName = searchParams.get('chatbot_name');
+    const createParam = searchParams.get('create');
     
     if (chatbotId && chatbotName) {
       // Pre-populate the form with the chatbot selected and required permissions
@@ -128,6 +145,9 @@ export default function ApiKeysPage() {
         title: "Chatbot Selected",
         description: `Creating API key for ${decodeURIComponent(chatbotName)}`
       });
+    } else if (createParam === 'true') {
+      // Automatically open the create dialog for general API key creation
+      setShowCreateDialog(true);
     }
   }, [searchParams, toast]);
 
@@ -135,7 +155,7 @@ export default function ApiKeysPage() {
     try {
       setLoading(true);
       const result = await apiClient.get("/api-internal/v1/api-keys") as any;
-      setApiKeys(result.data || []);
+      setApiKeys(result.api_keys || result.data || []);
     } catch (error) {
       console.error("Failed to fetch API keys:", error);
       toast({
@@ -477,7 +497,7 @@ export default function ApiKeysPage() {
                           className="rounded"
                         />
                         <Label htmlFor={`model-${model.id}`} className="text-sm">
-                          {model.name}
+                          {model.id}
                         </Label>
                       </div>
                     ))}

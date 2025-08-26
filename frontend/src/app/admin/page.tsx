@@ -327,9 +327,9 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="flex space-x-4">
-                <Button onClick={() => window.open('/modules', '_blank')}>
+                <Button onClick={() => window.open('/settings', '_blank')}>
                   <Database className="mr-2 h-4 w-4" />
-                  Module Manager
+                  System Settings
                 </Button>
                 <Button variant="outline" onClick={() => window.open('/budgets', '_blank')}>
                   <DollarSign className="mr-2 h-4 w-4" />

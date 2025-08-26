@@ -58,8 +58,7 @@ class Settings(BaseSettings):
     # LLM Service Configuration (replaced LiteLLM)
     # LLM service configuration is now handled in app/services/llm/config.py
     
-    # LLM Service Security
-    LLM_ENCRYPTION_KEY: Optional[str] = None  # Key for encrypting LLM provider API keys
+    # LLM Service Security (removed encryption - credentials handled by proxy)
     
     # Plugin System Security
     PLUGIN_ENCRYPTION_KEY: Optional[str] = None  # Key for encrypting plugin secrets and configurations

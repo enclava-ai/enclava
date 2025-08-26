@@ -25,10 +25,15 @@ import {
   Server,
   AlertTriangle,
   CheckCircle,
-  Info
+  Info,
+  Square,
+  Clock,
+  Play
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
+import { useModules, triggerModuleRefresh } from '@/contexts/ModulesContext';
+import { Badge } from '@/components/ui/badge';
 
 interface SystemSettings {
   // Security Settings
@@ -95,16 +100,77 @@ interface SystemSettings {
   };
 }
 
+interface Module {
+  name: string;
+  status: "loaded" | "failed" | "disabled";
+  dependencies: string[];
+  config: Record<string, any>;
+  metrics?: {
+    requests_processed: number;
+    average_response_time: number;
+    error_rate: number;
+    last_activity: string;
+  };
+  health?: {
+    status: "healthy" | "warning" | "error";
+    message: string;
+    uptime: number;
+  };
+}
+
+interface ModuleStats {
+  total_modules: number;
+  loaded_modules: number;
+  failed_modules: number;
+  system_health: "healthy" | "warning" | "error";
+}
+
 function SettingsPageContent() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  
+  // Modules state
+  const { modules: contextModules, isLoading: modulesLoading, refreshModules } = useModules();
+  const [moduleStats, setModuleStats] = useState<ModuleStats | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  // Transform context modules to match existing interface
+  const modules: Module[] = contextModules.map(module => ({
+    name: module.name,
+    status: module.initialized && module.enabled ? "loaded" : 
+            !module.enabled ? "disabled" : "failed",
+    dependencies: [], // Not provided in current API
+    config: module.stats || {},
+    metrics: {
+      requests_processed: module.stats?.total_requests || 0,
+      average_response_time: module.stats?.avg_analysis_time || 0,
+      error_rate: module.stats?.errors || 0,
+      last_activity: new Date().toISOString(),
+    },
+    health: {
+      status: module.initialized && module.enabled ? "healthy" : "error",
+      message: module.initialized && module.enabled ? "Module is running" : 
+               !module.enabled ? "Module is disabled" : "Module failed to initialize",
+      uptime: module.stats?.uptime || 0,
+    }
+  }));
+
+  useEffect(() => {
+    // Calculate stats from context modules
+    setModuleStats({
+      total_modules: contextModules.length,
+      loaded_modules: contextModules.filter(m => m.initialized && m.enabled).length,
+      failed_modules: contextModules.filter(m => !m.initialized || !m.enabled).length,
+      system_health: contextModules.some(m => !m.initialized) ? "warning" : "healthy"
+    });
+  }, [contextModules]);
 
   const fetchSettings = async () => {
     try {
@@ -202,6 +268,68 @@ function SettingsPageContent() {
     }
   };
 
+  const handleModuleAction = async (moduleName: string, action: "start" | "stop" | "restart" | "reload") => {
+    try {
+      setActionLoading(`${moduleName}-${action}`);
+
+      const responseData = await apiClient.post(`/api-internal/v1/modules/${moduleName}/${action}`, {});
+
+      toast({
+        title: "Success",
+        description: `Module ${moduleName} ${action}ed successfully`,
+      });
+
+      // Refresh modules context and trigger navigation update
+      await refreshModules();
+      
+      // Trigger navigation refresh if the response indicates it's needed
+      if (responseData.refreshRequired) {
+        triggerModuleRefresh();
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} module:`, error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : `Failed to ${action} module`,
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleModuleToggle = async (moduleName: string, enabled: boolean) => {
+    await handleModuleAction(moduleName, enabled ? "start" : "stop");
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "loaded":
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case "failed":
+        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case "disabled":
+        return <Square className="h-4 w-4 text-gray-500" />;
+      default:
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      loaded: "default",
+      failed: "destructive",
+      disabled: "secondary"
+    };
+    return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
+  };
+
+  const formatUptime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -261,10 +389,11 @@ function SettingsPageContent() {
       )}
 
       <Tabs defaultValue="security" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="api">API</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="modules">Modules</TabsTrigger>
         </TabsList>
 
         <TabsContent value="security" className="space-y-6">
@@ -849,6 +978,135 @@ function SettingsPageContent() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="modules" className="space-y-6">
+          {/* System Health Alert */}
+          {moduleStats && moduleStats.system_health !== "healthy" && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                System health: {moduleStats.system_health}. Some modules may not be functioning properly.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Modules</CardTitle>
+                <Database className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{moduleStats?.total_modules || 0}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Loaded</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{moduleStats?.loaded_modules || 0}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Failed</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{moduleStats?.failed_modules || 0}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">System Health</CardTitle>
+                {getStatusIcon(moduleStats?.system_health || "unknown")}
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold capitalize">{moduleStats?.system_health || "Unknown"}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Modules List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Module Overview</h3>
+              <div className="flex space-x-2">
+                <Button onClick={refreshModules} variant="outline" size="sm">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+
+            {modules.map((module) => (
+              <Card key={module.name}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      {getStatusIcon(module.status)}
+                      <div>
+                        <CardTitle className="text-lg">{module.name}</CardTitle>
+                        <CardDescription>
+                          Dependencies: {module.dependencies.length > 0 ? module.dependencies.join(", ") : "None"}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      {getStatusBadge(module.status)}
+                      <Switch
+                        checked={module.status === "loaded"}
+                        onCheckedChange={(checked) => handleModuleToggle(module.name, checked)}
+                        disabled={actionLoading?.startsWith(module.name)}
+                      />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleModuleAction(module.name, "restart")}
+                      disabled={actionLoading === `${module.name}-restart`}
+                    >
+                      <RefreshCw className="mr-2 h-3 w-3" />
+                      Restart
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleModuleAction(module.name, "reload")}
+                      disabled={actionLoading === `${module.name}-reload`}
+                    >
+                      <Database className="mr-2 h-3 w-3" />
+                      Reload
+                    </Button>
+                  </div>
+
+                  {module.health && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Health:</span> {module.health.status}
+                      </div>
+                      <div>
+                        <span className="font-medium">Uptime:</span> {formatUptime(module.health.uptime)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Message:</span> {module.health.message}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
 
       </Tabs>
     </div>

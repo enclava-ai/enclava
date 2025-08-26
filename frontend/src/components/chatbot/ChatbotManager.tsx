@@ -19,7 +19,6 @@ import {
   Plus, 
   Settings, 
   Trash2, 
-  Copy, 
   Play,
   Bot,
   Brain,
@@ -27,7 +26,9 @@ import {
   BookOpen,
   Palette,
   Key,
-  Globe
+  Globe,
+  Copy,
+  Link
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ChatInterface } from "./ChatInterface"
@@ -684,11 +685,12 @@ export function ChatbotManager() {
             </DialogHeader>
             
             <Tabs defaultValue="basic" className="mt-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="basic">Basic</TabsTrigger>
                 <TabsTrigger value="personality">Personality</TabsTrigger>
                 <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
                 <TabsTrigger value="advanced">Advanced</TabsTrigger>
+                <TabsTrigger value="integration">Integration</TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="space-y-4 mt-6">
@@ -925,6 +927,115 @@ export function ChatbotManager() {
                   />
                 </div>
               </TabsContent>
+
+              <TabsContent value="integration" className="space-y-6 mt-6">
+                {editingChatbot && (
+                  <div className="space-y-6">
+                    <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg">
+                      <Link className="h-5 w-5 text-primary" />
+                      <div>
+                        <h3 className="font-medium">API Integration</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Use this OpenAI-compatible endpoint to integrate your chatbot into external applications
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium">OpenAI-Compatible Endpoint</Label>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Standard OpenAI API interface for seamless integration with existing tools and libraries
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            value={`${window.location.origin}/api/v1/chatbot/external/${editingChatbot.id}/chat/completions`}
+                            readOnly
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/api/v1/chatbot/external/${editingChatbot.id}/chat/completions`)
+                              toast({
+                                title: "Copied!",
+                                description: "OpenAI endpoint copied to clipboard"
+                              })
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-start space-x-2">
+                          <div className="text-blue-600 dark:text-blue-400">
+                            <Globe className="h-4 w-4 mt-0.5" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                              Authentication Required
+                            </p>
+                            <p className="text-xs text-blue-700 dark:text-blue-200 mt-1">
+                              These endpoints require API key authentication. Create and manage API keys from the{" "}
+                              <button
+                                className="underline hover:no-underline"
+                                onClick={() => handleManageApiKeys(editingChatbot)}
+                              >
+                                API Keys page
+                              </button>
+                              .
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium">Example Usage</h4>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">cURL Example</Label>
+                          <div className="relative">
+                            <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto">
+                              <code>{`curl -X POST "${window.location.origin}/api/v1/chatbot/external/${editingChatbot.id}/chat/completions" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "max_tokens": 150,
+    "temperature": 0.7
+  }'`}</code>
+                            </pre>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="absolute top-2 right-2"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`curl -X POST "${window.location.origin}/api/v1/chatbot/external/${editingChatbot.id}/chat/completions" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "max_tokens": 150,
+    "temperature": 0.7
+  }'`)
+                                toast({
+                                  title: "Copied!",
+                                  description: "cURL example copied to clipboard"
+                                })
+                              }}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
 
             <div className="flex justify-end space-x-2 mt-6 pt-6 border-t">
@@ -985,23 +1096,50 @@ export function ChatbotManager() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 mt-4 pt-4 border-t">
-                  <Button size="sm" className="flex-1" onClick={() => handleTestChat(chatbot)}>
-                    <Play className="h-4 w-4 mr-2" />
-                    Test Chat
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleEditChat(chatbot)}>
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleManageApiKeys(chatbot)}>
-                    <Key className="h-4 w-4" />
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleDeleteChat(chatbot)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div className="space-y-3 mt-4 pt-4 border-t">
+                  <div className="flex items-center space-x-2">
+                    <Button size="sm" className="flex-1" onClick={() => handleTestChat(chatbot)}>
+                      <Play className="h-4 w-4 mr-2" />
+                      Test Chat
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleEditChat(chatbot)}>
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleManageApiKeys(chatbot)}>
+                      <Key className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleDeleteChat(chatbot)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground flex items-center">
+                      <Link className="h-3 w-3 mr-1" />
+                      Integration URL
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        value={`${window.location.origin}/api/v1/chatbot/external/${chatbot.id}/chat/completions`}
+                        readOnly
+                        className="font-mono text-xs h-8"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/api/v1/chatbot/external/${chatbot.id}/chat/completions`)
+                          toast({
+                            title: "Copied!",
+                            description: "Integration URL copied to clipboard"
+                          })
+                        }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

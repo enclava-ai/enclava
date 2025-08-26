@@ -1,7 +1,7 @@
 """
 LLM Security Manager
 
-Handles API key encryption, prompt injection detection, and audit logging.
+Handles prompt injection detection and audit logging.
 Provides comprehensive security for LLM interactions.
 """
 
@@ -12,10 +12,6 @@ import logging
 import hashlib
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import base64
 
 from app.core.config import settings
 
@@ -26,51 +22,8 @@ class SecurityManager:
     """Manages security for LLM operations"""
     
     def __init__(self):
-        self._fernet = None
-        self._setup_encryption()
         self._setup_prompt_injection_patterns()
     
-    def _setup_encryption(self):
-        """Setup Fernet encryption for API keys"""
-        try:
-            # Get encryption key from environment or generate one
-            encryption_key = os.getenv("LLM_ENCRYPTION_KEY")
-            
-            if not encryption_key:
-                # Generate a key if none exists (for development)
-                # In production, this should be set as an environment variable
-                logger.warning("LLM_ENCRYPTION_KEY not set, generating temporary key")
-                key = Fernet.generate_key()
-                encryption_key = key.decode()
-                logger.info(f"Generated temporary encryption key: {encryption_key}")
-            else:
-                # Validate the key format
-                try:
-                    key = encryption_key.encode()
-                    Fernet(key)  # Test if key is valid
-                except Exception:
-                    # Key might be a password, derive Fernet key from it
-                    key = self._derive_key_from_password(encryption_key)
-            
-            self._fernet = Fernet(key if isinstance(key, bytes) else key.encode())
-            logger.info("Encryption system initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Failed to setup encryption: {e}")
-            raise RuntimeError("Encryption setup failed")
-    
-    def _derive_key_from_password(self, password: str) -> bytes:
-        """Derive Fernet key from password using PBKDF2"""
-        # Use a fixed salt for consistency (in production, store this securely)
-        salt = b"enclava_llm_salt"
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,
-        )
-        key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
-        return key
     
     def _setup_prompt_injection_patterns(self):
         """Setup patterns for prompt injection detection"""
@@ -131,30 +84,6 @@ class SecurityManager:
         self.compiled_patterns = [re.compile(pattern) for pattern in self.injection_patterns]
         logger.info(f"Initialized {len(self.injection_patterns)} prompt injection patterns")
     
-    def encrypt_api_key(self, api_key: str) -> str:
-        """Encrypt an API key for secure storage"""
-        try:
-            if not api_key:
-                raise ValueError("API key cannot be empty")
-            
-            encrypted = self._fernet.encrypt(api_key.encode())
-            return base64.urlsafe_b64encode(encrypted).decode()
-        except Exception as e:
-            logger.error(f"Failed to encrypt API key: {e}")
-            raise SecurityError("API key encryption failed")
-    
-    def decrypt_api_key(self, encrypted_key: str) -> str:
-        """Decrypt an API key for use"""
-        try:
-            if not encrypted_key:
-                raise ValueError("Encrypted key cannot be empty")
-            
-            decoded = base64.urlsafe_b64decode(encrypted_key.encode())
-            decrypted = self._fernet.decrypt(decoded)
-            return decrypted.decode()
-        except Exception as e:
-            logger.error(f"Failed to decrypt API key: {e}")
-            raise SecurityError("API key decryption failed")
     
     def validate_prompt_security(self, messages: List[Dict[str, str]]) -> Tuple[bool, float, List[str]]:
         """

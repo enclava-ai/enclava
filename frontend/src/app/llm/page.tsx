@@ -53,8 +53,18 @@ interface APIKey {
 
 interface Model {
   id: string
-  name: string
-  provider: string
+  object: string
+  created?: number
+  owned_by?: string
+  permission?: any[]
+  root?: string
+  parent?: string
+  provider?: string
+  capabilities?: string[]
+  context_window?: number
+  max_output_tokens?: number
+  supports_streaming?: boolean
+  supports_function_calling?: boolean
 }
 
 export default function LLMPage() {
@@ -108,12 +118,9 @@ function LLMPageContent() {
         })
       ])
 
-      console.log('API keys data:', keysData)
       setApiKeys(keysData.api_keys || [])
-      console.log('API keys state updated, count:', keysData.api_keys?.length || 0)
       setModels(modelsData.data || [])
       
-      console.log('Data fetch completed successfully')
     } catch (error) {
       console.error('Error fetching data:', error)
       toast({
@@ -315,7 +322,7 @@ function LLMPageContent() {
                   <Key className="h-5 w-5" />
                   API Keys
                 </CardTitle>
-                <Button onClick={() => router.push('/api-keys')}>
+                <Button onClick={() => router.push('/api-keys?create=true')}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create API Key
                 </Button>
@@ -440,15 +447,53 @@ function LLMPageContent() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {models.map((model) => (
-                  <div key={model.id} className="border rounded-lg p-4">
-                    <h3 className="font-medium">{model.id}</h3>
-                    <p className="text-sm text-muted-foreground">Provider: {model.owned_by}</p>
-                    <Badge variant="outline" className="mt-2">
-                      {model.object}
-                    </Badge>
-                  </div>
-                ))}
+                {models.map((model) => {
+                  // Helper function to get provider from model ID
+                  const getProviderFromModel = (modelId: string): string => {
+                    if (modelId.startsWith('privatemode-')) return 'PrivateMode.ai'
+                    if (modelId.startsWith('gpt-') || modelId.includes('openai')) return 'OpenAI'
+                    if (modelId.startsWith('claude-') || modelId.includes('anthropic')) return 'Anthropic'
+                    if (modelId.startsWith('gemini-') || modelId.includes('google')) return 'Google'
+                    if (modelId.includes('cohere')) return 'Cohere'
+                    if (modelId.includes('mistral')) return 'Mistral'
+                    if (modelId.includes('llama') && !modelId.startsWith('privatemode-')) return 'Meta'
+                    return model.owned_by || 'Unknown'
+                  }
+                  
+                  return (
+                    <div key={model.id} className="border rounded-lg p-4">
+                      <h3 className="font-medium">{model.id}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Provider: {getProviderFromModel(model.id)}
+                      </p>
+                      <div className="flex gap-2 mt-2">
+                        <Badge variant="outline">
+                          {model.object || 'model'}
+                        </Badge>
+                        {model.supports_streaming && (
+                          <Badge variant="secondary" className="text-xs">
+                            Streaming
+                          </Badge>
+                        )}
+                        {model.supports_function_calling && (
+                          <Badge variant="secondary" className="text-xs">
+                            Functions
+                          </Badge>
+                        )}
+                        {model.capabilities?.includes('tee') && (
+                          <Badge variant="outline" className="text-xs border-green-500 text-green-700">
+                            TEE
+                          </Badge>
+                        )}
+                      </div>
+                      {model.context_window && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Context: {model.context_window.toLocaleString()} tokens
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
                 {models.length === 0 && (
                   <div className="col-span-full text-center py-8 text-muted-foreground">
                     No models available. Check your LLM platform configuration.

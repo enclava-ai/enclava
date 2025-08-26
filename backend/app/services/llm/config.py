@@ -126,9 +126,6 @@ def create_default_config() -> LLMServiceConfig:
 class EnvironmentVariables:
     """Environment variables used by LLM service"""
     
-    # Encryption
-    LLM_ENCRYPTION_KEY: Optional[str] = None
-    
     # Provider API keys
     PRIVATEMODE_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
@@ -140,7 +137,6 @@ class EnvironmentVariables:
     
     def __post_init__(self):
         """Load values from environment"""
-        self.LLM_ENCRYPTION_KEY = os.getenv("LLM_ENCRYPTION_KEY")
         self.PRIVATEMODE_API_KEY = os.getenv("PRIVATEMODE_API_KEY")
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") 
         self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -204,15 +200,9 @@ class ConfigurationManager:
         config = self.get_config()
         return [name for name, provider in config.providers.items() if provider.enabled]
     
-    def get_api_key(self, provider_name: str, encrypted: bool = False) -> Optional[str]:
+    def get_api_key(self, provider_name: str) -> Optional[str]:
         """Get API key for provider"""
-        api_key = self._env_vars.get_api_key(provider_name)
-        
-        if api_key and encrypted:
-            from .security import security_manager
-            return security_manager.encrypt_api_key(api_key)
-        
-        return api_key
+        return self._env_vars.get_api_key(provider_name)
     
     def _validate_configuration(self):
         """Validate current configuration"""
