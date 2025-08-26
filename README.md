@@ -1,8 +1,8 @@
 # Enclava
 
-**Secure AI Platform with Privacy-First LLM Services**
+**Confidential AI Platform for businesses**
 
-Enclava is a comprehensive AI platform that provides secure chatbot services, document retrieval (RAG), and LLM integrations with Trusted Execution Environment (TEE) support via privateMode.ai.
+Enclava is a comprehensive AI platform that makes privacy practical. It provides easy to create openai compatible chatbots and API endpoints with knowledge base access (RAG). All in a completely confidential way through [privatemode.ai](https://privatemode.ai)
 
 ## Key Features
 
