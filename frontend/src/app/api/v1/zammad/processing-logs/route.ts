@@ -42,7 +42,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching Zammad processing logs:', error)
     return NextResponse.json(
       { error: 'Failed to fetch Zammad processing logs' },
       { status: 500 }

@@ -32,7 +32,6 @@ export async function POST(
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error regenerating API key:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

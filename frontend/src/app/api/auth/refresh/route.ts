@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in auth refresh:', error)
     return NextResponse.json(
       { error: 'Failed to refresh token' },
       { status: 500 }

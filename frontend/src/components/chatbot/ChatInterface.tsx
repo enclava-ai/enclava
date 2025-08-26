@@ -100,7 +100,6 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
 
     } catch (error) {
       const appError = error as AppError
-      console.error('Error sending message:', appError)
       
       // More specific error handling
       if (appError.code === 'UNAUTHORIZED') {
@@ -127,7 +126,6 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       await navigator.clipboard.writeText(content)
       toast.success("Copied", "Message copied to clipboard")
     } catch (error) {
-      console.error('Failed to copy message:', error)
       toast.error("Copy Failed", "Unable to copy message to clipboard")
     }
   }, [toast])

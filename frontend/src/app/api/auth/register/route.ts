@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in auth register:', error)
     return NextResponse.json(
       { error: 'Failed to process registration' },
       { status: 500 }

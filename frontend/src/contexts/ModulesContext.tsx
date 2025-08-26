@@ -57,7 +57,6 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
       setLastUpdated(new Date())
       
     } catch (err) {
-      console.error("Error fetching modules:", err)
       setError(err instanceof Error ? err.message : "Failed to load modules")
     } finally {
       setIsLoading(false)

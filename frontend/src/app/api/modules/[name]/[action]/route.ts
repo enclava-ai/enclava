@@ -26,7 +26,6 @@ export async function POST(
       refreshRequired: true
     })
   } catch (error) {
-    console.error(`Error performing ${params.action} on module ${params.name}:`, error)
     return NextResponse.json(
       { error: `Failed to ${params.action} module` },
       { status: 500 }

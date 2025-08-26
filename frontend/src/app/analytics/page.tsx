@@ -68,7 +68,6 @@ function AnalyticsPageContent() {
       setData(analyticsData);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Failed to fetch analytics:', error);
       // Set empty data structure on error
       setData({
         overview: {

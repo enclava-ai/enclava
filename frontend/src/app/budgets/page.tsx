@@ -119,7 +119,6 @@ export default function BudgetsPage() {
         setStats(statsData.value);
       }
     } catch (error) {
-      console.error("Failed to fetch budget data:", error);
       toast({
         title: "Error",
         description: "Failed to fetch budget data",
@@ -155,7 +154,6 @@ export default function BudgetsPage() {
 
       await fetchBudgetData();
     } catch (error) {
-      console.error("Failed to create budget:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create budget",
@@ -180,7 +178,6 @@ export default function BudgetsPage() {
       setEditingBudget(null);
       await fetchBudgetData();
     } catch (error) {
-      console.error("Failed to update budget:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update budget",
@@ -212,7 +209,6 @@ export default function BudgetsPage() {
 
       await fetchBudgetData();
     } catch (error) {
-      console.error("Failed to delete budget:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete budget",

@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching installed plugins:', error)
     return NextResponse.json(
       { error: 'Failed to fetch installed plugins' },
       { status: 500 }

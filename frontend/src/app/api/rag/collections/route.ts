@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
     const data = await backendResponse.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching collections:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to fetch collections' },
       { status: 500 }
@@ -69,7 +68,6 @@ export async function POST(request: NextRequest) {
     const data = await backendResponse.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error creating collection:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to create collection' },
       { status: 500 }

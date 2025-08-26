@@ -36,7 +36,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error updating Zammad configuration:', error)
     return NextResponse.json(
       { error: 'Failed to update Zammad configuration' },
       { status: 500 }
@@ -78,7 +77,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error deleting Zammad configuration:', error)
     return NextResponse.json(
       { error: 'Failed to delete Zammad configuration' },
       { status: 500 }

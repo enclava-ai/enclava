@@ -141,7 +141,6 @@ export async function POST(request: NextRequest) {
       message_id: messageId
     })
   } catch (error) {
-    console.error('Error in chat API route:', error)
     return NextResponse.json(
       { 
         error: 'Internal Server Error',

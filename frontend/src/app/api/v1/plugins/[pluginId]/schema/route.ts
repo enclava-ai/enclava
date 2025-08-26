@@ -47,7 +47,6 @@ export async function GET(
     
     return nextResponse
   } catch (error) {
-    console.error('Error getting plugin schema:', error)
     return NextResponse.json(
       { error: 'Failed to get plugin schema' },
       { status: 500 }

@@ -63,7 +63,6 @@ export function useChatbotForm() {
       setChatbots(data)
     } catch (error) {
       const appError = error as AppError
-      console.error('Error loading chatbots:', appError)
       toast.error("Loading Failed", "Failed to load chatbots")
     } finally {
       setIsLoading(false)
@@ -80,7 +79,6 @@ export function useChatbotForm() {
       return newChatbot
     } catch (error) {
       const appError = error as AppError
-      console.error('Error creating chatbot:', appError)
       
       if (appError.code === 'VALIDATION_ERROR') {
         toast.error("Validation Error", appError.details || "Please check your input")
@@ -103,7 +101,6 @@ export function useChatbotForm() {
       return updatedChatbot
     } catch (error) {
       const appError = error as AppError
-      console.error('Error updating chatbot:', appError)
       toast.error("Update Failed", "Failed to update chatbot")
       throw error
     } finally {
@@ -120,7 +117,6 @@ export function useChatbotForm() {
       toast.success("Success", "Chatbot deleted successfully")
     } catch (error) {
       const appError = error as AppError
-      console.error('Error deleting chatbot:', appError)
       toast.error("Deletion Failed", "Failed to delete chatbot")
       throw error
     } finally {

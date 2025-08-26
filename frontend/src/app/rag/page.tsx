@@ -77,7 +77,6 @@ function RAGPageContent() {
       const data = await apiClient.get('/api-internal/v1/rag/collections')
       setCollections(data.collections || [])
     } catch (error) {
-      console.error('Failed to load collections:', error)
     } finally {
       setLoading(false)
     }
@@ -88,7 +87,6 @@ function RAGPageContent() {
       const data = await apiClient.get('/api-internal/v1/rag/stats')
       setStats(data.stats)
     } catch (error) {
-      console.error('Failed to load stats:', error)
     }
   }
 

@@ -113,7 +113,6 @@ export default function AuditPage() {
       setTotalPages(Math.ceil((logsData.total || 0) / pageSize));
       setStats(statsData);
     } catch (error) {
-      console.error("Failed to fetch audit data:", error);
       toast({
         title: "Error",
         description: "Failed to fetch audit logs",
@@ -165,7 +164,6 @@ export default function AuditPage() {
         description: "Audit logs have been exported successfully",
       });
     } catch (error) {
-      console.error("Failed to export audit logs:", error);
       toast({
         title: "Export Failed",
         description: error instanceof Error ? error.message : "Failed to export audit logs",
@@ -492,7 +490,6 @@ export default function AuditPage() {
                               metadata: JSON.stringify(log.metadata, null, 2)
                             };
                             // Would open a detail modal in a real implementation
-                            console.log("Audit log details:", details);
                           }}
                         >
                           <Eye className="mr-2 h-3 w-3" />

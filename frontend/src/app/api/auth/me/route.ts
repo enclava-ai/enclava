@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in auth me:', error)
     return NextResponse.json(
       { error: 'Failed to get user info' },
       { status: 500 }

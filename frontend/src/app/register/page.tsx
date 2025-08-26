@@ -121,7 +121,6 @@ export default function RegisterPage() {
       // Redirect to login page
       router.push("/login?message=registration-success");
     } catch (error) {
-      console.error("Registration error:", error);
       toast({
         title: "Registration failed",
         description: error instanceof Error ? error.message : "An unexpected error occurred",

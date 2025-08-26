@@ -62,7 +62,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('token', previousToken)
       }
     } catch (error) {
-      console.error("Token validation failed:", error)
       localStorage.removeItem("access_token")
       localStorage.removeItem("refresh_token")
     } finally {

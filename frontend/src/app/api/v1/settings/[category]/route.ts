@@ -77,7 +77,6 @@ export async function PUT(
     }
     
   } catch (error) {
-    console.error(`Error updating ${params.category} settings:`, error)
     return NextResponse.json(
       { error: 'Failed to update category settings' },
       { status: 500 }
@@ -122,7 +121,6 @@ export async function GET(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error(`Error fetching ${params.category} settings:`, error)
     return NextResponse.json(
       { error: 'Failed to fetch category settings' },
       { status: 500 }

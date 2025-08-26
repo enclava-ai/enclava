@@ -49,7 +49,6 @@ export async function GET(
 
     return new NextResponse(backendResponse.body, { headers })
   } catch (error) {
-    console.error('Error downloading document:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to download document' },
       { status: 500 }

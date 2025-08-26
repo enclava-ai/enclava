@@ -17,7 +17,6 @@ export async function GET(
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error(`Error fetching config for module ${params.name}:`, error)
     return NextResponse.json(
       { error: 'Failed to fetch module configuration' },
       { status: 500 }
@@ -54,7 +53,6 @@ export async function POST(
       refreshRequired: true
     })
   } catch (error) {
-    console.error(`Error updating config for module ${params.name}:`, error)
     return NextResponse.json(
       { error: 'Failed to update module configuration' },
       { status: 500 }

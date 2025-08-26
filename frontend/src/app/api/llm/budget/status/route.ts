@@ -7,7 +7,6 @@ export async function GET() {
     const data = await handleProxyResponse(response, 'Failed to fetch budget status')
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching budget status:', error)
     return NextResponse.json(
       { error: 'Failed to fetch budget status' },
       { status: 500 }

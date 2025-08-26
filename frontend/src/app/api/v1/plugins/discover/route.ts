@@ -46,7 +46,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error discovering plugins:', error)
     return NextResponse.json(
       { error: 'Failed to discover plugins' },
       { status: 500 }

@@ -283,7 +283,6 @@ export const PluginManager: React.FC = () => {
           break;
       }
     } catch (err) {
-      console.error(`Failed to ${action} plugin:`, err);
     }
   };
 
@@ -291,7 +290,6 @@ export const PluginManager: React.FC = () => {
     try {
       await installPlugin(plugin.id, plugin.version);
     } catch (err) {
-      console.error('Failed to install plugin:', err);
     }
   };
 

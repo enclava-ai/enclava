@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error improving prompt with AI:', error)
     return NextResponse.json(
       { error: 'Failed to improve prompt' },
       { status: 500 }

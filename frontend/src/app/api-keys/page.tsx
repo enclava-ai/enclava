@@ -157,7 +157,6 @@ export default function ApiKeysPage() {
       const result = await apiClient.get("/api-internal/v1/api-keys") as any;
       setApiKeys(result.api_keys || result.data || []);
     } catch (error) {
-      console.error("Failed to fetch API keys:", error);
       toast({
         title: "Error",
         description: "Failed to fetch API keys",
@@ -173,7 +172,6 @@ export default function ApiKeysPage() {
       const result = await apiClient.get("/api-internal/v1/llm/models") as any;
       setAvailableModels(result.data || []);
     } catch (error) {
-      console.error("Failed to fetch models:", error);
       setAvailableModels([]);
     }
   };
@@ -183,7 +181,6 @@ export default function ApiKeysPage() {
       const result = await apiClient.get("/api-internal/v1/chatbot/list") as any;
       setAvailableChatbots(result || []);
     } catch (error) {
-      console.error("Failed to fetch chatbots:", error);
       setAvailableChatbots([]);
     }
   };
@@ -214,7 +211,6 @@ export default function ApiKeysPage() {
 
       await fetchApiKeys();
     } catch (error) {
-      console.error("Failed to create API key:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create API key",
@@ -237,7 +233,6 @@ export default function ApiKeysPage() {
 
       await fetchApiKeys();
     } catch (error) {
-      console.error("Failed to toggle API key:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update API key",
@@ -262,7 +257,6 @@ export default function ApiKeysPage() {
       setShowRegenerateDialog(null);
       await fetchApiKeys();
     } catch (error) {
-      console.error("Failed to regenerate API key:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to regenerate API key",
@@ -289,7 +283,6 @@ export default function ApiKeysPage() {
 
       await fetchApiKeys();
     } catch (error) {
-      console.error("Failed to delete API key:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete API key",
@@ -321,7 +314,6 @@ export default function ApiKeysPage() {
       setEditKeyData({});
       await fetchApiKeys();
     } catch (error) {
-      console.error("Failed to update API key:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update API key",

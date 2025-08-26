@@ -37,7 +37,6 @@ export async function POST(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error disabling plugin:', error)
     return NextResponse.json(
       { error: 'Failed to disable plugin' },
       { status: 500 }

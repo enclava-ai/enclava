@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error installing plugin:', error)
     return NextResponse.json(
       { error: 'Failed to install plugin' },
       { status: 500 }

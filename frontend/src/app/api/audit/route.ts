@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
     const data = await handleProxyResponse(response, 'Failed to fetch audit logs')
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching audit logs:', error)
     return NextResponse.json(
       { error: 'Failed to fetch audit logs' },
       { status: 500 }

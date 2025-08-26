@@ -37,7 +37,6 @@ export async function GET(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error getting plugin config:', error)
     return NextResponse.json(
       { error: 'Failed to get plugin config' },
       { status: 500 }
@@ -84,7 +83,6 @@ export async function POST(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error saving plugin config:', error)
     return NextResponse.json(
       { error: 'Failed to save plugin config' },
       { status: 500 }

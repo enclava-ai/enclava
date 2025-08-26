@@ -32,7 +32,6 @@ export async function DELETE(
     const data = await backendResponse.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error deleting document:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to delete document' },
       { status: 500 }
@@ -70,7 +69,6 @@ export async function GET(
     const data = await backendResponse.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching document:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to fetch document' },
       { status: 500 }

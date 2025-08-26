@@ -37,7 +37,6 @@ export async function POST(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error loading plugin:', error)
     return NextResponse.json(
       { error: 'Failed to load plugin' },
       { status: 500 }

@@ -32,7 +32,6 @@ export async function DELETE(
     const data = await backendResponse.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error deleting collection:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to delete collection' },
       { status: 500 }
@@ -70,7 +69,6 @@ export async function GET(
     const data = await backendResponse.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching collection:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to fetch collection' },
       { status: 500 }

@@ -37,7 +37,6 @@ export async function POST(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error enabling plugin:', error)
     return NextResponse.json(
       { error: 'Failed to enable plugin' },
       { status: 500 }

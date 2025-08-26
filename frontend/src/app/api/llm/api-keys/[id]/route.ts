@@ -31,7 +31,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting API key:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -72,7 +71,6 @@ export async function PUT(
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error updating API key:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

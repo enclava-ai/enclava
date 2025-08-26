@@ -216,7 +216,6 @@ export function ChatbotManager() {
       const data = await apiClient.get('/api-internal/v1/chatbot/list')
       setChatbots(data)
     } catch (error) {
-      console.error('Failed to load chatbots:', error)
       toast({
         title: "Error",
         description: "Failed to load chatbots",
@@ -232,7 +231,6 @@ export function ChatbotManager() {
       const data = await apiClient.get('/api-internal/v1/rag/collections')
       setRagCollections(data.collections || [])
     } catch (error) {
-      console.error('Failed to load RAG collections:', error)
     }
   }
 
@@ -241,7 +239,6 @@ export function ChatbotManager() {
       const templates = await apiClient.get('/api-internal/v1/prompt-templates/templates')
       setPromptTemplates(templates)
     } catch (error) {
-      console.error('Failed to load prompt templates:', error)
     }
   }
 
@@ -345,7 +342,6 @@ export function ChatbotManager() {
         description: `${deletingChatbot.name} has been deleted`
       })
     } catch (error) {
-      console.error('Failed to delete chatbot:', error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete chatbot",

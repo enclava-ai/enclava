@@ -53,7 +53,6 @@ const PluginIframe: React.FC<PluginIframeProps> = ({
       ].filter(Boolean);
       
       if (!allowedOrigins.some(origin => event.origin.startsWith(origin))) {
-        console.warn('Rejected message from unauthorized origin:', event.origin);
         return;
       }
       
@@ -84,7 +83,6 @@ const PluginIframe: React.FC<PluginIframeProps> = ({
             break;
         }
       } catch (err) {
-        console.error('Error processing plugin message:', err);
       }
     };
     

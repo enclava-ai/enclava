@@ -88,7 +88,6 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
       const data = await apiClient.get(url)
       setDocuments(data.documents || [])
     } catch (error) {
-      console.error('Failed to load documents:', error)
     } finally {
       setLoading(false)
     }

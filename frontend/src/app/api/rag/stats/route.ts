@@ -27,7 +27,6 @@ export async function GET(request: NextRequest) {
     const data = await backendResponse.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching RAG stats:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to fetch RAG stats' },
       { status: 500 }

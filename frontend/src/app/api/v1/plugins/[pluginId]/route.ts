@@ -39,7 +39,6 @@ export async function DELETE(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error uninstalling plugin:', error)
     return NextResponse.json(
       { error: 'Failed to uninstall plugin' },
       { status: 500 }

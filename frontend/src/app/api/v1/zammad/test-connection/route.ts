@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error testing Zammad connection:', error)
     return NextResponse.json(
       { error: 'Failed to test Zammad connection' },
       { status: 500 }

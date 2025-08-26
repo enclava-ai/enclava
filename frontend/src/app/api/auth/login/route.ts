@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in auth login:', error)
     return NextResponse.json(
       { error: 'Failed to process login' },
       { status: 500 }

@@ -37,7 +37,6 @@ export async function POST(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error unloading plugin:', error)
     return NextResponse.json(
       { error: 'Failed to unload plugin' },
       { status: 500 }

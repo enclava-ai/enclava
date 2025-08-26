@@ -99,7 +99,6 @@ function LLMPageContent() {
 
   const fetchData = async () => {
     try {
-      console.log('Fetching data...')
       setLoading(true)
       const token = localStorage.getItem('token')
       if (!token) {
@@ -109,11 +108,9 @@ function LLMPageContent() {
       // Fetch API keys and models using API client
       const [keysData, modelsData] = await Promise.all([
         apiClient.get('/api-internal/v1/api-keys').catch(e => {
-          console.error('Failed to fetch API keys:', e)
           return { data: [] }
         }),
         apiClient.get('/api-internal/v1/llm/models').catch(e => {
-          console.error('Failed to fetch models:', e)
           return { data: [] }
         })
       ])
@@ -122,7 +119,6 @@ function LLMPageContent() {
       setModels(modelsData.data || [])
       
     } catch (error) {
-      console.error('Error fetching data:', error)
       toast({
         title: "Error",
         description: "Failed to load data",
@@ -169,11 +165,9 @@ function LLMPageContent() {
 
   const deleteAPIKey = async (keyId: number) => {
     try {
-      console.log('Deleting API key with ID:', keyId)
       setLoading(true)
       
       const responseData = await apiClient.delete(`/api-internal/v1/api-keys/${keyId}`)
-      console.log('Delete response data:', responseData)
         
       toast({
         title: "Success",
@@ -182,9 +176,7 @@ function LLMPageContent() {
       
       // Force refresh data and wait for it to complete
       await fetchData()
-      console.log('Data refreshed after deletion')
     } catch (error) {
-      console.error('Error deleting API key:', error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete API key",

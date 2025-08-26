@@ -58,7 +58,6 @@ export default function AdminPage() {
         const statsData = await apiClient.get<SystemStats>("/api-internal/v1/settings/system-info");
         setStats(statsData);
       } catch (error) {
-        console.error("Failed to fetch system stats:", error);
       }
 
       // Fetch recent activity
@@ -66,10 +65,8 @@ export default function AdminPage() {
         const activityData = await apiClient.get("/api-internal/v1/audit?page=1&size=10") as any;
         setRecentActivity(activityData.logs || []);
       } catch (error) {
-        console.error("Failed to fetch recent activity:", error);
       }
     } catch (error) {
-      console.error("Failed to fetch admin data:", error);
     } finally {
       setLoading(false);
     }

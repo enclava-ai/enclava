@@ -29,7 +29,6 @@ export async function DELETE(
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error deleting chatbot:', error)
     return NextResponse.json(
       { error: 'Failed to delete chatbot' },
       { status: 500 }

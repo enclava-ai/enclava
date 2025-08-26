@@ -152,7 +152,6 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
             }));
           }
         } catch (e) {
-          console.warn(`Failed to load config for plugin ${plugin.id}:`, e);
         }
       }
       
@@ -325,7 +324,6 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       const data = await apiRequest(`/${pluginId}/config`);
       return data;
     } catch (err) {
-      console.error(`Failed to get configuration for plugin ${pluginId}:`, err);
       return null;
     }
   };
@@ -380,7 +378,6 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
             }));
           }
         } catch (chatbotError) {
-          console.warn('Failed to load chatbots for Zammad configuration:', chatbotError);
         }
 
         // Populate model options for AI settings
@@ -405,7 +402,6 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
             schema.properties.draft_settings.properties.model.options = modelOptions;
           }
         } catch (modelError) {
-          console.warn('Failed to load models for Zammad configuration:', modelError);
         }
       }
       
@@ -422,13 +418,11 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
             }));
           }
         } catch (modelError) {
-          console.warn('Failed to load models for Signal configuration:', modelError);
         }
       }
       
       return schema;
     } catch (err) {
-      console.error(`Failed to get schema for plugin ${pluginId}:`, err);
       return null;
     }
   };
@@ -460,7 +454,6 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       }));
       
     } catch (err) {
-      console.error(`Failed to load components for plugin ${pluginId}:`, err);
     }
   };
   

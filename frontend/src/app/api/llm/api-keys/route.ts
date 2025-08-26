@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
     const data = await response.json()
     return NextResponse.json({ data: data.api_keys })
   } catch (error) {
-    console.error('Error fetching API keys:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -77,7 +76,6 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error creating API key:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

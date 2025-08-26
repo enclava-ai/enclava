@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching Zammad configurations:', error)
     return NextResponse.json(
       { error: 'Failed to fetch Zammad configurations' },
       { status: 500 }
@@ -75,7 +74,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error creating Zammad configuration:', error)
     return NextResponse.json(
       { error: 'Failed to create Zammad configuration' },
       { status: 500 }

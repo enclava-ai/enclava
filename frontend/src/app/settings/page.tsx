@@ -198,7 +198,6 @@ function SettingsPageContent() {
       setSettings(transformedSettings);
       setIsDirty(false);
     } catch (error) {
-      console.error("Failed to fetch settings:", error);
       toast({
         title: "Error",
         description: "Failed to fetch system settings",
@@ -239,7 +238,6 @@ function SettingsPageContent() {
 
       setIsDirty(false);
     } catch (error) {
-      console.error("Failed to save settings:", error);
       toast({
         title: "Save Failed",
         description: error instanceof Error ? error.message : "Failed to save settings",
@@ -259,7 +257,6 @@ function SettingsPageContent() {
         description: `${type.toUpperCase()} connection is working properly`,
       });
     } catch (error) {
-      console.error(`Failed to test ${type} connection:`, error);
       toast({
         title: "Connection Test Failed",
         description: error instanceof Error ? error.message : `Failed to test ${type} connection`,
@@ -287,7 +284,6 @@ function SettingsPageContent() {
         triggerModuleRefresh();
       }
     } catch (error) {
-      console.error(`Failed to ${action} module:`, error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : `Failed to ${action} module`,

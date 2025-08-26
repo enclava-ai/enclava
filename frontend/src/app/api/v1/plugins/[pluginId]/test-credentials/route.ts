@@ -39,7 +39,6 @@ export async function POST(
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error testing plugin credentials:', error)
     return NextResponse.json(
       { error: 'Failed to test plugin credentials' },
       { status: 500 }

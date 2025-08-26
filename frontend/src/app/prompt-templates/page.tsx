@@ -120,7 +120,6 @@ export default function PromptTemplatesPage() {
       setTemplates(templatesResult.value)
       setVariables(variablesResult.value)
     } catch (error) {
-      console.error('Error loading data:', error)
       toast.error('Failed to load prompt templates')
     } finally {
       setLoading(false)
@@ -162,7 +161,6 @@ export default function PromptTemplatesPage() {
       setEditingTemplate(null)
       
     } catch (error) {
-      console.error('Error saving template:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to save template')
     } finally {
       setSaving(false)
@@ -178,7 +176,6 @@ export default function PromptTemplatesPage() {
       await loadData()
       
     } catch (error) {
-      console.error('Error resetting template:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to reset template')
     }
   }
@@ -228,7 +225,6 @@ export default function PromptTemplatesPage() {
       setUseCustomType(false)
       
     } catch (error) {
-      console.error('Error creating template:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to create template')
     } finally {
       setSaving(false)
@@ -261,7 +257,6 @@ export default function PromptTemplatesPage() {
       toast.success('Prompt improved with AI successfully')
       
     } catch (error) {
-      console.error('Error improving prompt with AI:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to improve prompt')
     } finally {
       setImprovingWithAI(false)

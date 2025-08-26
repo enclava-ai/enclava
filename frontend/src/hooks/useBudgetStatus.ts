@@ -47,7 +47,6 @@ export function useBudgetStatus(autoRefresh = true, refreshInterval = 30000) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       setError(errorMessage)
-      console.error('Budget status fetch error:', err)
     } finally {
       setLoading(false)
     }

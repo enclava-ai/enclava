@@ -136,7 +136,6 @@ export function ZammadConfig() {
         fetchModuleStatus()
       ])
     } catch (error) {
-      console.error("Error fetching Zammad data:", error)
       toast({
         title: "Error",
         description: "Failed to load Zammad configuration",
@@ -152,7 +151,7 @@ export function ZammadConfig() {
       const data = await apiClient.get("/api-internal/v1/zammad/configurations")
       setConfigurations(data.configurations || [])
     } catch (error) {
-      console.error("Error fetching configurations:", error)
+      // Silent failure for configuration fetching
     }
   }
 
@@ -161,7 +160,7 @@ export function ZammadConfig() {
       const data = await apiClient.get("/api-internal/v1/zammad/chatbots")
       setChatbots(data.chatbots || [])
     } catch (error) {
-      console.error("Error fetching chatbots:", error)
+      // Silent failure for chatbot fetching
     }
   }
 
@@ -170,7 +169,7 @@ export function ZammadConfig() {
       const data = await apiClient.get("/api-internal/v1/zammad/processing-logs?limit=5")
       setProcessingLogs(data.logs || [])
     } catch (error) {
-      console.error("Error fetching processing logs:", error)
+      // Silent failure for processing logs fetching
     }
   }
 
@@ -179,7 +178,7 @@ export function ZammadConfig() {
       const data = await apiClient.get("/api-internal/v1/zammad/status")
       setModuleStatus(data)
     } catch (error) {
-      console.error("Error fetching module status:", error)
+      // Silent failure for module status fetching
     }
   }
 
@@ -225,7 +224,6 @@ export function ZammadConfig() {
       
       await fetchConfigurations()
     } catch (error) {
-      console.error("Error saving configuration:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save configuration",
@@ -253,8 +251,6 @@ export function ZammadConfig() {
         zammad_url: newConfig.zammad_url,
         api_token: newConfig.api_token
       })
-      console.log("Test connection response:", data)
-
       if (data.status === "success") {
         toast({
           title: "✅ Connection Successful",
@@ -270,7 +266,6 @@ export function ZammadConfig() {
         })
       }
     } catch (error) {
-      console.error("Error testing connection:", error)
       toast({
         title: "⚠️ Connection Test Error",
         description: `Failed to test connection: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -302,7 +297,6 @@ export function ZammadConfig() {
         fetchModuleStatus()
       }, 2000)
     } catch (error) {
-      console.error("Error processing tickets:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to process tickets",
@@ -324,7 +318,6 @@ export function ZammadConfig() {
 
       await fetchConfigurations()
     } catch (error) {
-      console.error("Error deleting configuration:", error)
       toast({
         title: "Error",
         description: "Failed to delete configuration",

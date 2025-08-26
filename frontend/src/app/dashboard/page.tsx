@@ -129,7 +129,6 @@ function DashboardContent() {
       setRecentActivity([])
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error)
       // Set empty states on error
       setStats({
         activeModules: 0,

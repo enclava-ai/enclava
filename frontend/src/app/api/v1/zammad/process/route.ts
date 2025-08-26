@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error processing Zammad tickets:', error)
     return NextResponse.json(
       { error: 'Failed to process Zammad tickets' },
       { status: 500 }
