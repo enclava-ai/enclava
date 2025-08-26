@@ -3,9 +3,10 @@ Chatbot API endpoints
 """
 
 import asyncio
+import time
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from datetime import datetime
@@ -40,6 +41,44 @@ class ChatbotCreateRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
+
+
+# OpenAI-compatible models
+class ChatMessage(BaseModel):
+    role: str = Field(..., description="Message role (system, user, assistant)")
+    content: str = Field(..., description="Message content")
+
+
+class ChatbotChatCompletionRequest(BaseModel):
+    messages: List[ChatMessage] = Field(..., description="List of messages")
+    max_tokens: Optional[int] = Field(None, description="Maximum tokens to generate")
+    temperature: Optional[float] = Field(None, description="Temperature for sampling")
+    top_p: Optional[float] = Field(None, description="Top-p sampling parameter")
+    frequency_penalty: Optional[float] = Field(None, description="Frequency penalty")
+    presence_penalty: Optional[float] = Field(None, description="Presence penalty")
+    stop: Optional[List[str]] = Field(None, description="Stop sequences")
+    stream: Optional[bool] = Field(False, description="Stream response")
+
+
+class ChatChoice(BaseModel):
+    index: int
+    message: ChatMessage
+    finish_reason: str
+
+
+class ChatUsage(BaseModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
+class ChatbotChatCompletionResponse(BaseModel):
+    id: str
+    object: str = "chat.completion"
+    created: int
+    model: str
+    choices: List[ChatChoice]
+    usage: ChatUsage
 
 
 @router.get("/list")
@@ -330,6 +369,151 @@ async def chat_with_chatbot(
         raise HTTPException(status_code=500, detail=f"Failed to process chat: {str(e)}")
 
 
+@router.post("/{chatbot_id}/chat/completions", response_model=ChatbotChatCompletionResponse)
+async def chatbot_chat_completions(
+    chatbot_id: str,
+    request: ChatbotChatCompletionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """OpenAI-compatible chat completions endpoint for chatbot"""
+    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    log_api_request("chatbot_chat_completions", {
+        "user_id": user_id,
+        "chatbot_id": chatbot_id,
+        "messages_count": len(request.messages)
+    })
+    
+    try:
+        # Get the chatbot instance
+        result = await db.execute(
+            select(ChatbotInstance)
+            .where(ChatbotInstance.id == chatbot_id)
+            .where(ChatbotInstance.created_by == str(user_id))
+        )
+        chatbot = result.scalar_one_or_none()
+        
+        if not chatbot:
+            raise HTTPException(status_code=404, detail="Chatbot not found")
+        
+        if not chatbot.is_active:
+            raise HTTPException(status_code=400, detail="Chatbot is not active")
+        
+        # Find the last user message to extract conversation context
+        user_messages = [msg for msg in request.messages if msg.role == "user"]
+        if not user_messages:
+            raise HTTPException(status_code=400, detail="No user message found in conversation")
+        
+        last_user_message = user_messages[-1].content
+        
+        # Initialize conversation service
+        conversation_service = ConversationService(db)
+        
+        # For OpenAI format, we'll try to find an existing conversation or create a new one
+        # We'll use a simple hash of the conversation messages as the conversation identifier
+        import hashlib
+        conv_hash = hashlib.md5(str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()).hexdigest()[:16]
+        
+        # Get or create conversation
+        conversation = await conversation_service.get_or_create_conversation(
+            chatbot_id=chatbot_id,
+            user_id=str(user_id),
+            conversation_id=conv_hash
+        )
+        
+        # Build conversation history from the request messages (excluding system messages for now)
+        conversation_history = []
+        for msg in request.messages:
+            if msg.role in ["user", "assistant"]:
+                conversation_history.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+        
+        # Get chatbot module and generate response
+        try:
+            chatbot_module = module_manager.modules.get("chatbot")
+            if not chatbot_module:
+                raise HTTPException(status_code=500, detail="Chatbot module not available")
+            
+            # Merge chatbot config with request parameters
+            effective_config = dict(chatbot.config)
+            if request.temperature is not None:
+                effective_config["temperature"] = request.temperature
+            if request.max_tokens is not None:
+                effective_config["max_tokens"] = request.max_tokens
+            
+            # Use the chatbot module to generate a response
+            response_data = await chatbot_module.chat(
+                chatbot_config=effective_config,
+                message=last_user_message,
+                conversation_history=conversation_history,
+                user_id=str(user_id)
+            )
+            
+            response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
+            
+        except Exception as e:
+            # Use fallback response
+            fallback_responses = chatbot.config.get("fallback_responses", [
+                "I'm sorry, I'm having trouble processing your request right now."
+            ])
+            response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
+        
+        # Save the conversation messages
+        for msg in request.messages:
+            if msg.role == "user":  # Only save the new user message
+                await conversation_service.add_message(
+                    conversation_id=conversation.id,
+                    role=msg.role,
+                    content=msg.content,
+                    metadata={}
+                )
+        
+        # Save assistant message
+        assistant_message = await conversation_service.add_message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=response_content,
+            metadata={},
+            sources=response_data.get("sources")
+        )
+        
+        # Calculate usage (simple approximation)
+        prompt_tokens = sum(len(msg.content.split()) for msg in request.messages)
+        completion_tokens = len(response_content.split())
+        total_tokens = prompt_tokens + completion_tokens
+        
+        # Create OpenAI-compatible response
+        response_id = f"chatbot-{chatbot_id}-{int(time.time())}"
+        
+        return ChatbotChatCompletionResponse(
+            id=response_id,
+            object="chat.completion",
+            created=int(time.time()),
+            model=chatbot.config.get("model", "unknown"),
+            choices=[
+                ChatChoice(
+                    index=0,
+                    message=ChatMessage(role="assistant", content=response_content),
+                    finish_reason="stop"
+                )
+            ],
+            usage=ChatUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens
+            )
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        log_api_request("chatbot_chat_completions_error", {"error": str(e), "user_id": user_id})
+        raise HTTPException(status_code=500, detail=f"Failed to process chat completions: {str(e)}")
+
+
 @router.get("/conversations/{chatbot_id}")
 async def get_chatbot_conversations(
     chatbot_id: str,
@@ -617,6 +801,164 @@ async def external_chat_with_chatbot(
         raise HTTPException(status_code=500, detail=f"Failed to process chat: {str(e)}")
 
 
+@router.post("/external/{chatbot_id}/chat/completions", response_model=ChatbotChatCompletionResponse)
+async def external_chatbot_chat_completions(
+    chatbot_id: str,
+    request: ChatbotChatCompletionRequest,
+    api_key: APIKey = Depends(get_api_key_auth),
+    db: AsyncSession = Depends(get_db)
+):
+    """External OpenAI-compatible chat completions endpoint for chatbot with API key authentication"""
+    log_api_request("external_chatbot_chat_completions", {
+        "chatbot_id": chatbot_id,
+        "api_key_id": api_key.id,
+        "messages_count": len(request.messages)
+    })
+    
+    try:
+        # Check if API key can access this chatbot
+        if not api_key.can_access_chatbot(chatbot_id):
+            raise HTTPException(status_code=403, detail="API key not authorized for this chatbot")
+        
+        # Get the chatbot instance
+        result = await db.execute(
+            select(ChatbotInstance)
+            .where(ChatbotInstance.id == chatbot_id)
+        )
+        chatbot = result.scalar_one_or_none()
+        
+        if not chatbot:
+            raise HTTPException(status_code=404, detail="Chatbot not found")
+        
+        if not chatbot.is_active:
+            raise HTTPException(status_code=400, detail="Chatbot is not active")
+        
+        # Find the last user message to extract conversation context
+        user_messages = [msg for msg in request.messages if msg.role == "user"]
+        if not user_messages:
+            raise HTTPException(status_code=400, detail="No user message found in conversation")
+        
+        last_user_message = user_messages[-1].content
+        
+        # Initialize conversation service
+        conversation_service = ConversationService(db)
+        
+        # For OpenAI format, we'll try to find an existing conversation or create a new one
+        # We'll use a simple hash of the conversation messages as the conversation identifier
+        import hashlib
+        conv_hash = hashlib.md5(str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()).hexdigest()[:16]
+        
+        # Get or create conversation with API key context
+        conversation = await conversation_service.get_or_create_conversation(
+            chatbot_id=chatbot_id,
+            user_id=f"api_key_{api_key.id}",
+            conversation_id=conv_hash,
+            title=f"API Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+        )
+        
+        # Add API key metadata to conversation context if new
+        if not conversation.context_data.get("api_key_id"):
+            conversation.context_data = {"api_key_id": api_key.id}
+            await db.commit()
+        
+        # Build conversation history from the request messages
+        conversation_history = []
+        for msg in request.messages:
+            if msg.role in ["user", "assistant"]:
+                conversation_history.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+        
+        # Get chatbot module and generate response
+        try:
+            chatbot_module = module_manager.modules.get("chatbot")
+            if not chatbot_module:
+                raise HTTPException(status_code=500, detail="Chatbot module not available")
+            
+            # Merge chatbot config with request parameters
+            effective_config = dict(chatbot.config)
+            if request.temperature is not None:
+                effective_config["temperature"] = request.temperature
+            if request.max_tokens is not None:
+                effective_config["max_tokens"] = request.max_tokens
+            
+            # Use the chatbot module to generate a response
+            response_data = await chatbot_module.chat(
+                chatbot_config=effective_config,
+                message=last_user_message,
+                conversation_history=conversation_history,
+                user_id=f"api_key_{api_key.id}"
+            )
+            
+            response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
+            sources = response_data.get("sources")
+            
+        except Exception as e:
+            # Use fallback response
+            fallback_responses = chatbot.config.get("fallback_responses", [
+                "I'm sorry, I'm having trouble processing your request right now."
+            ])
+            response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
+            sources = None
+        
+        # Save the conversation messages
+        for msg in request.messages:
+            if msg.role == "user":  # Only save the new user message
+                await conversation_service.add_message(
+                    conversation_id=conversation.id,
+                    role=msg.role,
+                    content=msg.content,
+                    metadata={"api_key_id": api_key.id}
+                )
+        
+        # Save assistant message using conversation service
+        assistant_message = await conversation_service.add_message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=response_content,
+            metadata={"api_key_id": api_key.id},
+            sources=sources
+        )
+        
+        # Update API key usage stats
+        prompt_tokens = sum(len(msg.content.split()) for msg in request.messages)
+        completion_tokens = len(response_content.split())
+        total_tokens = prompt_tokens + completion_tokens
+        
+        api_key.update_usage(tokens_used=total_tokens, cost_cents=0)
+        await db.commit()
+        
+        # Create OpenAI-compatible response
+        response_id = f"chatbot-{chatbot_id}-{int(time.time())}"
+        
+        return ChatbotChatCompletionResponse(
+            id=response_id,
+            object="chat.completion",
+            created=int(time.time()),
+            model=chatbot.config.get("model", "unknown"),
+            choices=[
+                ChatChoice(
+                    index=0,
+                    message=ChatMessage(role="assistant", content=response_content),
+                    finish_reason="stop"
+                )
+            ],
+            usage=ChatUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens
+            )
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        log_api_request("external_chatbot_chat_completions_error", {"error": str(e), "chatbot_id": chatbot_id})
+        raise HTTPException(status_code=500, detail=f"Failed to process chat completions: {str(e)}")
+
+
 @router.post("/{chatbot_id}/api-key")
 async def create_chatbot_api_key(
     chatbot_id: str,
@@ -668,7 +1010,7 @@ async def create_chatbot_api_key(
             "secret_key": full_key,  # Only returned on creation
             "chatbot_id": chatbot_id,
             "chatbot_name": chatbot.name,
-            "endpoint": f"/api/v1/chatbot/external/{chatbot_id}/chat",
+            "endpoint": f"/api/v1/chatbot/external/{chatbot_id}/chat/completions",
             "scopes": new_api_key.scopes,
             "rate_limit_per_minute": new_api_key.rate_limit_per_minute,
             "created_at": new_api_key.created_at.isoformat()

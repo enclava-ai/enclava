@@ -70,6 +70,8 @@ function LLMPageContent() {
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [editingKey, setEditingKey] = useState<APIKey | null>(null)
   const [showSecretKeyDialog, setShowSecretKeyDialog] = useState(false)
   const [newSecretKey, setNewSecretKey] = useState('')
   const { toast } = useToast()
@@ -80,6 +82,13 @@ function LLMPageContent() {
     model: '',
     expires_at: '',
     description: ''
+  })
+
+  // Edit API Key form state
+  const [editKey, setEditKey] = useState({
+    name: '',
+    description: '',
+    is_active: true
   })
 
   useEffect(() => {
@@ -159,6 +168,39 @@ function LLMPageContent() {
     }
   }
 
+  const openEditDialog = (apiKey: APIKey) => {
+    setEditingKey(apiKey)
+    setEditKey({
+      name: apiKey.name,
+      description: apiKey.description || '',
+      is_active: apiKey.is_active
+    })
+    setShowEditDialog(true)
+  }
+
+  const updateAPIKey = async () => {
+    if (!editingKey) return
+    
+    try {
+      await apiClient.put(`/api-internal/v1/api-keys/${editingKey.id}`, editKey)
+      
+      toast({
+        title: "Success",
+        description: "API key updated successfully"
+      })
+      
+      setShowEditDialog(false)
+      setEditingKey(null)
+      fetchData()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update API key",
+        variant: "destructive"
+      })
+    }
+  }
+
   const deleteAPIKey = async (keyId: number) => {
     try {
       console.log('Deleting API key with ID:', keyId)
@@ -219,11 +261,11 @@ function LLMPageContent() {
     if (typeof window !== 'undefined') {
       const protocol = window.location.protocol
       const hostname = window.location.hostname
-      const port = window.location.hostname === 'localhost' ? '3000' : window.location.port || (protocol === 'https:' ? '443' : '80')
+      const port = window.location.port || (protocol === 'https:' ? '443' : '80')
       const portSuffix = (protocol === 'https:' && port === '443') || (protocol === 'http:' && port === '80') ? '' : `:${port}`
-      return `${protocol}//${hostname}${portSuffix}/v1`
+      return `${protocol}//${hostname}${portSuffix}/api/v1`
     }
-    return 'http://localhost:3000/v1'
+    return 'http://localhost/api/v1'
   }
 
   const publicApiUrl = getPublicApiUrl()
@@ -464,7 +506,7 @@ function LLMPageContent() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" onClick={() => openEditDialog(apiKey)}>
                               <Settings className="h-4 w-4" />
                             </Button>
                             <AlertDialog>
@@ -535,6 +577,71 @@ function LLMPageContent() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit API Key Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit API Key</DialogTitle>
+            <DialogDescription>
+              Update the name, description, and status of your API key.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={editKey.name}
+                onChange={(e) => setEditKey(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g., Frontend Application"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editKey.description}
+                onChange={(e) => setEditKey(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Brief description of what this key is for"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="edit-active"
+                checked={editKey.is_active}
+                onChange={(e) => setEditKey(prev => ({ ...prev, is_active: e.target.checked }))}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="edit-active" className="text-sm font-medium">
+                Active (uncheck to disable this API key)
+              </Label>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-blue-700">
+                  <span className="font-medium">Note:</span> You cannot change the model restrictions or expiration date after creation. 
+                  Create a new API key if you need different settings.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={updateAPIKey} disabled={!editKey.name.trim()}>
+                Update API Key
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Secret Key Display Dialog */}
       <Dialog open={showSecretKeyDialog} onOpenChange={() => {}}>

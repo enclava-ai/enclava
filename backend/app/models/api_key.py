@@ -299,7 +299,8 @@ class APIKey(Base):
             rate_limit_per_day=144000,
             allowed_models=[],  # Will use chatbot's configured model
             allowed_endpoints=[
-                f"/api/v1/chatbot/external/{chatbot_id}/chat"
+                f"/api/v1/chatbot/external/{chatbot_id}/chat",
+                f"/api/v1/chatbot/external/{chatbot_id}/chat/completions"
             ],
             allowed_ips=[],
             allowed_chatbots=[chatbot_id],

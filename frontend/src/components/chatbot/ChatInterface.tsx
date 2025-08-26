@@ -70,10 +70,17 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
     setIsLoading(true)
 
     try {
+      // Build conversation history in OpenAI format
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+      
       const data = await chatbotApi.sendMessage(
         chatbotId,
         messageToSend,
-        conversationId || undefined
+        conversationId || undefined,
+        conversationHistory
       )
       
       // Update conversation ID if it's a new conversation
@@ -106,7 +113,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, chatbotId, conversationId, toast])
+  }, [input, isLoading, chatbotId, conversationId, messages, toast])
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

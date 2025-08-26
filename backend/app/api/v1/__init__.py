@@ -5,7 +5,6 @@ API v1 package
 from fastapi import APIRouter
 from .auth import router as auth_router
 from .llm import router as llm_router
-from .tee import router as tee_router
 from .modules import router as modules_router
 from .platform import router as platform_router
 from .users import router as users_router
@@ -28,9 +27,6 @@ api_router.include_router(auth_router, prefix="/auth", tags=["authentication"])
 
 # Include LLM proxy routes
 api_router.include_router(llm_router, prefix="/llm", tags=["llm"])
-
-# Include TEE routes
-api_router.include_router(tee_router, prefix="/tee", tags=["tee"])
 
 # Include modules routes
 api_router.include_router(modules_router, prefix="/modules", tags=["modules"])

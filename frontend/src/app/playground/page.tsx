@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Zap } from 'lucide-react'
 import ChatPlayground from '@/components/playground/ChatPlayground'
 import EmbeddingPlayground from '@/components/playground/EmbeddingPlayground'
-import TEEMonitor from '@/components/playground/TEEMonitor'
 import ModelSelector from '@/components/playground/ModelSelector'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
@@ -54,10 +53,9 @@ function PlaygroundContent() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="chat">Chat Completions</TabsTrigger>
               <TabsTrigger value="embeddings">Embeddings</TabsTrigger>
-              <TabsTrigger value="tee">TEE Monitor</TabsTrigger>
             </TabsList>
             
             <TabsContent value="chat" className="mt-6">
@@ -66,10 +64,6 @@ function PlaygroundContent() {
             
             <TabsContent value="embeddings" className="mt-6">
               <EmbeddingPlayground />
-            </TabsContent>
-            
-            <TabsContent value="tee" className="mt-6">
-              <TEEMonitor />
             </TabsContent>
           </Tabs>
         </CardContent>

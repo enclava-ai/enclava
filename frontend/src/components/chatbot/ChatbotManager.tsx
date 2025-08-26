@@ -1108,11 +1108,11 @@ export function ChatbotManager() {
             <div className="bg-muted/50 p-4 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Globe className="h-4 w-4" />
-                <span className="font-medium">API Endpoint</span>
+                <span className="font-medium">API Endpoint (Direct HTTP/curl)</span>
               </div>
               <div className="bg-background p-3 rounded border overflow-x-auto">
                 <code className="text-sm whitespace-nowrap">
-                  POST {config.getPublicApiUrl()}/chatbot/external/{apiKeyChatbot?.id}/chat
+                  POST {config.getPublicApiUrl()}/chatbot/external/{apiKeyChatbot?.id}/chat/completions
                 </code>
               </div>
               <p className="text-sm text-muted-foreground mt-2">
@@ -1245,20 +1245,31 @@ export function ChatbotManager() {
             {/* Usage Example */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <h4 className="font-medium mb-2">Usage Example</h4>
+              
               <div className="bg-background p-4 rounded border overflow-x-auto">
                 <pre className="text-sm whitespace-pre-wrap break-all">
-{`curl -X POST "${config.getPublicApiUrl()}/chatbot/external/${apiKeyChatbot?.id}/chat" \\
+{`curl -X POST "${config.getPublicApiUrl()}/chatbot/external/${apiKeyChatbot?.id}/chat/completions" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "message": "Hello, how can you help me?",
-    "conversation_id": null
+    "messages": [
+      {"role": "user", "content": "Hello, how can you help me?"}
+    ],
+    "max_tokens": 1000,
+    "temperature": 0.7
   }'`}
                 </pre>
               </div>
-              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                <p className="text-sm text-yellow-800">
-                  <strong>📌 Important:</strong> Use the unified API endpoint <code className="bg-yellow-100 px-1 rounded">{config.getAppUrl()}</code> which routes to the appropriate backend service via nginx
+              
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-sm text-blue-800">
+                  <strong>💡 OpenAI Library Usage:</strong> For OpenAI Python/JavaScript libraries, use base_url without /chat/completions:
+                </p>
+                <code className="block mt-1 text-xs bg-blue-100 p-2 rounded">
+                  base_url="{config.getPublicApiUrl()}/chatbot/external/{apiKeyChatbot?.id}"
+                </code>
+                <p className="text-xs text-blue-700 mt-1">
+                  The OpenAI client automatically appends /chat/completions to the base_url
                 </p>
               </div>
             </div>
