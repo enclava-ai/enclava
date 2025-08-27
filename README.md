@@ -72,32 +72,6 @@ docker compose up --build -d
 
 *Change default credentials immediately in production!*
 
-## Documentation
-
-For comprehensive documentation, API references, and advanced configuration:
-
-**[docs.enclava.ai](https://docs.enclava.ai)**
-
-## Architecture
-
-- **Frontend**: Next.js (React/TypeScript) with Tailwind CSS
-- **Backend**: FastAPI (Python) with async/await patterns  
-- **Database**: PostgreSQL with automatic migrations
-- **Vector DB**: Qdrant for document embeddings
-- **Cache**: Redis for sessions and performance
-- **LLM Service**: Native secure LLM service with TEE support
-
-## Services
-
-| Service | Port | Purpose |
-|---------|------|---------|
-| Nginx (Main) | 80 | Reverse proxy and main access |
-| Backend API | 58000 | FastAPI application (internal) |
-| Frontend | 3000 | Next.js application (internal) |
-| PostgreSQL | 5432 | Primary database |
-| Redis | 6379 | Caching and sessions |
-| Qdrant | 56333 | Vector database for RAG |
-
 
 ## Configuration
 
