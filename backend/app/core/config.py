@@ -35,10 +35,9 @@ class Settings(BaseSettings):
     SESSION_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
     API_KEY_PREFIX: str = "en_"
     
-    # Admin user provisioning
-    ADMIN_USER: str = "admin"
+    # Admin user provisioning (used only on first startup)
+    ADMIN_EMAIL: str = "admin@example.com" 
     ADMIN_PASSWORD: str = "admin123"
-    ADMIN_EMAIL: Optional[str] = None
     
     # Base URL for deriving CORS origins
     BASE_URL: str = "localhost"

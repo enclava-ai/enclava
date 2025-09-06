@@ -42,8 +42,8 @@ services:
       - QDRANT_HOST=enclava-qdrant
       - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-here}
       - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}
-      - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - LOG_LLM_PROMPTS=${LOG_LLM_PROMPTS:-false}
       - BASE_URL=${BASE_URL}
     depends_on:

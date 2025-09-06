@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { UserMenu } from "@/components/ui/user-menu"
 import { useAuth } from "@/contexts/AuthContext"
 import { useModules } from "@/contexts/ModulesContext"
 import { usePlugin } from "@/contexts/PluginContext"
@@ -157,19 +158,7 @@ const Navigation = () => {
             <ThemeToggle />
             
             {isClient && user ? (
-              <div className="flex items-center space-x-2">
-                <Badge variant="secondary" className="hidden sm:inline-flex">
-                  {user.email}
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={logout}
-                  className="h-8"
-                >
-                  Logout
-                </Button>
-              </div>
+              <UserMenu />
             ) : isClient ? (
               <div className="flex items-center space-x-2">
                 <Button

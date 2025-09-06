@@ -116,7 +116,7 @@ async def init_db():
 
 
 async def create_default_admin():
-    """Create default admin user if none exists"""
+    """Create default admin user if user with ADMIN_EMAIL doesn't exist"""
     from app.models.user import User
     from app.core.security import get_password_hash
     from app.core.config import settings
@@ -124,19 +124,20 @@ async def create_default_admin():
     
     try:
         async with async_session_factory() as session:
-            # Check if any admin user exists
-            stmt = select(User).where(User.role == "super_admin")
+            # Check if user with ADMIN_EMAIL exists
+            stmt = select(User).where(User.email == settings.ADMIN_EMAIL)
             result = await session.execute(stmt)
-            existing_admin = result.scalar_one_or_none()
+            existing_user = result.scalar_one_or_none()
             
-            if existing_admin:
-                logger.info("Admin user already exists")
+            if existing_user:
+                logger.info(f"User with email {settings.ADMIN_EMAIL} already exists - skipping admin creation")
                 return
             
-            # Create default admin user from environment variables
-            admin_username = settings.ADMIN_USER
+            # Create admin user from environment variables
+            admin_email = settings.ADMIN_EMAIL
             admin_password = settings.ADMIN_PASSWORD
-            admin_email = settings.ADMIN_EMAIL or f"{admin_username}@example.com"
+            # Generate username from email (part before @)
+            admin_username = admin_email.split('@')[0]
             
             admin_user = User.create_default_admin(
                 email=admin_email,
@@ -148,10 +149,10 @@ async def create_default_admin():
             await session.commit()
             
             logger.warning("=" * 60)
-            logger.warning("DEFAULT ADMIN USER CREATED")
+            logger.warning("ADMIN USER CREATED FROM ENVIRONMENT")
             logger.warning(f"Email: {admin_email}")
             logger.warning(f"Username: {admin_username}")
-            logger.warning("Password: [Set via ADMIN_PASSWORD environment variable]")
+            logger.warning("Password: [Set via ADMIN_PASSWORD - only used on first creation]")
             logger.warning("PLEASE CHANGE THE PASSWORD AFTER FIRST LOGIN")
             logger.warning("=" * 60)
             

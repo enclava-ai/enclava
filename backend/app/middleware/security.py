@@ -104,6 +104,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "/favicon.ico",
             "/api/v1/auth/register",
             "/api/v1/auth/login",
+            "/api-internal/v1/auth/register",
+            "/api-internal/v1/auth/login",
             "/",  # Root endpoint
         ]
         

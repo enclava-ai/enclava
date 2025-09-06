@@ -26,7 +26,9 @@ import {
   CheckCircle,
   Copy,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Bot,
+  Code2
 } from "lucide-react"
 
 interface DashboardStats {
@@ -55,6 +57,12 @@ interface RecentActivity {
   type: 'info' | 'success' | 'warning' | 'error'
 }
 
+interface Chatbot {
+  id: string
+  name: string
+  is_active: boolean
+}
+
 export default function DashboardPage() {
   return (
     <ProtectedRoute>
@@ -70,6 +78,7 @@ function DashboardContent() {
   const [modules, setModules] = useState<ModuleInfo[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
+  const [chatbots, setChatbots] = useState<Chatbot[]>([])
 
   // Get the public API URL from centralized config
   const getPublicApiUrl = () => {
@@ -94,8 +103,9 @@ function DashboardContent() {
       
       // Fetch real dashboard stats through API proxy
       
-      const [modulesRes] = await Promise.all([
-        apiClient.get('/api-internal/v1/modules/').catch(() => null)
+      const [modulesRes, chatbotsRes] = await Promise.all([
+        apiClient.get('/api-internal/v1/modules/').catch(() => null),
+        apiClient.get('/api-internal/v1/chatbot/instances').catch(() => null)
       ])
 
       // Set default stats since analytics endpoints removed
@@ -123,6 +133,13 @@ function DashboardContent() {
         }))
       } else {
         setModules([])
+      }
+
+      // Parse chatbots response
+      if (chatbotsRes && chatbotsRes.chatbots) {
+        setChatbots(chatbotsRes.chatbots.filter((bot: any) => bot.is_active))
+      } else {
+        setChatbots([])
       }
 
       // No activity data since audit endpoint removed
@@ -265,46 +282,104 @@ function DashboardContent() {
         </Card>
       </div>
 
-      {/* Public API URL Section */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-700">
-            <ExternalLink className="h-5 w-5" />
-            OpenAI-Compatible API Endpoint
-          </CardTitle>
-          <CardDescription className="text-blue-600">
-            Configure external tools with this endpoint URL. Use any OpenAI-compatible client.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <code className="flex-1 p-3 bg-white border border-blue-200 rounded-md text-sm font-mono">
-              {config.getPublicApiUrl()}
-            </code>
-            <Button
-              onClick={() => copyToClipboard(config.getPublicApiUrl())}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1 border-blue-300 text-blue-700 hover:bg-blue-100"
-            >
-              <Copy className="h-4 w-4" />
-              Copy
-            </Button>
-            <Button
-              onClick={() => window.open('/llm', '_blank')}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1 border-blue-300 text-blue-700 hover:bg-blue-100"
-            >
-              <Settings className="h-4 w-4" />
-              Configure
-            </Button>
-          </div>
-          <div className="mt-3 text-sm text-blue-600">
-            <span className="font-medium">Quick Setup:</span> Copy this URL and use it as the "API Base URL" in Open WebUI, Continue.dev, or any OpenAI client.
-          </div>
-        </CardContent>
-      </Card>
+      {/* API Endpoints Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* OpenAI Compatible Endpoint */}
+        <Card className="bg-empire-darker/50 border-empire-gold/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-empire-gold">
+              <Code2 className="h-5 w-5" />
+              OpenAI-Compatible API
+            </CardTitle>
+            <CardDescription className="text-empire-gold/60">
+              Use with any OpenAI-compatible client
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <code className="flex-1 p-2 bg-empire-dark/50 border border-empire-gold/10 rounded text-xs font-mono text-empire-gold/80">
+                  {config.getPublicApiUrl()}
+                </code>
+                <Button
+                  onClick={() => copyToClipboard(config.getPublicApiUrl())}
+                  variant="ghost"
+                  size="sm"
+                  className="text-empire-gold hover:bg-empire-gold/10"
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="text-xs text-empire-gold/50">
+                Use as API base URL in Open WebUI, Continue.dev, etc.
+              </div>
+              <Button
+                onClick={() => window.open('/api-keys', '_blank')}
+                variant="outline"
+                size="sm"
+                className="w-full border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+              >
+                <Settings className="h-3 w-3 mr-2" />
+                Manage API Keys
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Chatbot Endpoints */}
+        <Card className="bg-empire-darker/50 border-empire-gold/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-empire-gold">
+              <Bot className="h-5 w-5" />
+              Chatbot Endpoints
+            </CardTitle>
+            <CardDescription className="text-empire-gold/60">
+              Active chatbot instances
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {chatbots.length === 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm text-empire-gold/40">No active chatbots configured</p>
+                <Button
+                  onClick={() => window.open('/chatbot', '_blank')}
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+                >
+                  <Plus className="h-3 w-3 mr-2" />
+                  Create Chatbot
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {chatbots.slice(0, 3).map(bot => (
+                    <div key={bot.id} className="flex items-center justify-between p-2 bg-empire-dark/30 rounded">
+                      <span className="text-xs text-empire-gold/70">{bot.name}</span>
+                      <Badge variant="outline" className="border-green-500/20 text-green-400 text-xs">
+                        Active
+                      </Badge>
+                    </div>
+                  ))}
+                  {chatbots.length > 3 && (
+                    <p className="text-xs text-empire-gold/40">+{chatbots.length - 3} more</p>
+                  )}
+                </div>
+                <Button
+                  onClick={() => window.open('/chatbot', '_blank')}
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+                >
+                  <Settings className="h-3 w-3 mr-2" />
+                  Manage Chatbots
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
