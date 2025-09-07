@@ -671,7 +671,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
             <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200">
               <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
               <AlertDescription className="font-medium">
-                ✅ Configuration saved successfully! All settings have been saved and encrypted.
+                Configuration saved successfully! All settings have been saved and encrypted.
               </AlertDescription>
             </Alert>
           )}
@@ -749,7 +749,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
                             )}
                             {config.api_token && (
                               <p className="text-xs text-blue-600 dark:text-blue-400">
-                                💡 Leave empty to keep your existing saved token
+                                Leave empty to keep your existing saved token
                               </p>
                             )}
                           </div>

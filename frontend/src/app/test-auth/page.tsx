@@ -72,7 +72,7 @@ Token payload: ${JSON.stringify(payload, null, 2)}
             </pre>
             {refreshToken && (
               <p className="mt-2 text-sm text-green-600">
-                ✓ Refresh token available - auto-refresh enabled
+                Refresh token available - auto-refresh enabled
               </p>
             )}
           </CardContent>
