@@ -1,48 +1,54 @@
+# Backend Dockerfile for Enclava
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONPATH=/app
-
-# Set work directory
+# Set working directory
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
+    gcc \
+    g++ \
     postgresql-client \
     curl \
-    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-COPY tests/requirements-test.txt ./tests/
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r tests/requirements-test.txt
-
-# Optional: Download spaCy English model for NLP processing (commented out for faster builds)
-# Uncomment if you install requirements-nlp.txt and need entity extraction
-# RUN python -m spacy download en_core_web_sm
+# Copy requirements first for better caching
+# When building from docker-compose: context is ./backend
+# When building from build-images.sh: context is parent dir with enclava/backend path
+COPY requirements.txt* ./
+RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; \
+    else pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    sqlalchemy \
+    psycopg2-binary \
+    redis \
+    pydantic \
+    python-jose \
+    python-multipart \
+    httpx \
+    qdrant-client \
+    alembic; fi
 
 # Copy application code
 COPY . .
 
-# Copy and make migration script executable
-COPY scripts/migrate.sh /usr/local/bin/migrate.sh
-RUN chmod +x /usr/local/bin/migrate.sh
+# Create necessary directories
+RUN mkdir -p /app/logs /app/uploads /plugins
 
-# Create logs directory
-RUN mkdir -p logs
+# Create migration script for database migrations
+RUN echo '#!/bin/bash\n\
+echo "Running database migrations..."\n\
+if [ -f /app/alembic.ini ]; then\n\
+    alembic upgrade head\n\
+else\n\
+    echo "No migrations to run"\n\
+fi\n\
+echo "Migrations complete"' > /usr/local/bin/migrate.sh && \
+    chmod +x /usr/local/bin/migrate.sh
 
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Default command
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

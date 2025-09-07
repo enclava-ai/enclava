@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: enclava-config
+  namespace: enclava
+data:
+  # Backend configuration
+  DATABASE_URL: "postgresql://enclava_user:enclava_pass@postgres-service:5432/enclava_db"
+  REDIS_URL: "redis://redis-service:6379"
+  QDRANT_HOST: "qdrant-service"
+  LOG_LLM_PROMPTS: "false"
+  
+  # Frontend configuration  
+  BACKEND_INTERNAL_PORT: "8000"
+  FRONTEND_INTERNAL_PORT: "3000"
+  INTERNAL_API_URL: "http://backend-service:8000"
+  
+  # Nginx configuration
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        upstream backend {
+            server backend-service:8000;
+        }
+        
+        upstream frontend {
+            server frontend-service:3000;
+        }
+        
+        server {
+            listen 80;
+            server_name _;
+            
+            location /api {
+                proxy_pass http://backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_cache_bypass $http_upgrade;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location /ws {
+                proxy_pass http://backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location / {
+                proxy_pass http://frontend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_cache_bypass $http_upgrade;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+        }
+    }

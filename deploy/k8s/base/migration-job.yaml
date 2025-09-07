@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: database-migration
+  namespace: enclava
+spec:
+  template:
+    metadata:
+      labels:
+        app: migration
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-postgres
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z postgres-service 5432; do echo waiting for postgres; sleep 2; done;']
+      containers:
+      - name: migrate
+        image: ghcr.io/enclava-ai/enclava-backend:latest
+        imagePullPolicy: Always
+        command: ["/usr/local/bin/migrate.sh"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: enclava-config
+              key: DATABASE_URL
+      imagePullSecrets:
+      - name: ghcr-secret

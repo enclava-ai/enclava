@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: enclava
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: enclava
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      initContainers:
+      - name: wait-for-services
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z postgres-service 5432 && nc -z redis-service 6379 && nc -z qdrant-service 6333; do echo waiting for services; sleep 2; done;']
+      containers:
+      - name: backend
+        image: ghcr.io/enclava-ai/enclava-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: enclava-config
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: enclava-config
+              key: REDIS_URL
+        - name: QDRANT_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: enclava-config
+              key: QDRANT_HOST
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: enclava-secrets
+              key: JWT_SECRET
+        - name: PRIVATEMODE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: enclava-secrets
+              key: PRIVATEMODE_API_KEY
+              optional: true
+        - name: ADMIN_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: enclava-secrets
+              key: ADMIN_EMAIL
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: enclava-secrets
+              key: ADMIN_PASSWORD
+        - name: LOG_LLM_PROMPTS
+          valueFrom:
+            configMapKeyRef:
+              name: enclava-config
+              key: LOG_LLM_PROMPTS
+        - name: BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: enclava-secrets
+              key: BASE_URL
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: plugins
+          mountPath: /plugins
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        # livenessProbe:
+        #   httpGet:
+        #     path: /api/health
+        #     port: 8000
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      imagePullSecrets:
+      - name: ghcr-secret
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: plugins
+        emptyDir: {}

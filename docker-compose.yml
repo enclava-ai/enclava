@@ -63,9 +63,10 @@ services:
 
   # Next.js frontend
   enclava-frontend:
-    image: node:18-alpine
-    working_dir: /app
-    command: sh -c "npm install && npm run dev"
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development  # Use development stage for hot reload
     environment:
       # Required base URL (derives APP/API/WS URLs)  
       - BASE_URL=${BASE_URL}
