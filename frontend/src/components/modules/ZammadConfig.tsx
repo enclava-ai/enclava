@@ -253,13 +253,13 @@ export function ZammadConfig() {
       })
       if (data.status === "success") {
         toast({
-          title: "✅ Connection Successful",
+          title: "Connection Successful",
           description: `Connected to Zammad as ${data.user}`,
           duration: 5000
         })
       } else {
         toast({
-          title: "❌ Connection Failed",
+          title: "Connection Failed",
           description: data.message || "Unknown error occurred",
           variant: "destructive",
           duration: 8000
