@@ -1,0 +1,54 @@
+# Optional Privatemode.ai service
+# Only deploy if you have a PRIVATEMODE_API_KEY
+apiVersion: v1
+kind: Service
+metadata:
+  name: privatemode-service
+  namespace: enclava
+spec:
+  selector:
+    app: privatemode
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: privatemode-deployment
+  namespace: enclava
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: privatemode
+  template:
+    metadata:
+      labels:
+        app: privatemode
+    spec:
+      containers:
+      - name: privatemode
+        image: ghcr.io/edgelesssys/privatemode/privatemode-proxy:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PRIVATEMODE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: enclava-secrets
+              key: PRIVATEMODE_API_KEY
+              optional: true
+        - name: PRIVATEMODE_CACHE_MODE
+          value: "none"
+        command: ["/bin/privatemode-proxy"]
+        args: 
+          - "--apiKey=$(PRIVATEMODE_API_KEY)"
+          - "--port=8080"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

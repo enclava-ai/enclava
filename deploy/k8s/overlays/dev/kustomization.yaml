@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: enclava-dev
+
+resources:
+  - ../../base
+
+namePrefix: dev-
+
+labels:
+- pairs:
+    environment: dev
+
+# Development-specific patches
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: backend-deployment
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: frontend-deployment
+  - patch: |-
+      - op: replace
+        path: /spec/type
+        value: NodePort
+    target:
+      kind: Service
+      name: nginx-service
+
+# Development resource limits (lower)
+replicas:
+  - name: backend-deployment
+    count: 1
+  - name: frontend-deployment
+    count: 1
+
+configMapGenerator:
+  - name: dev-config
+    literals:
+      - LOG_LLM_PROMPTS=true
+      - BASE_URL=http://localhost:30080

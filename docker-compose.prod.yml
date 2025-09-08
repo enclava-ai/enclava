@@ -1,0 +1,360 @@
+name: enclava-production
+
+services:
+  # Nginx reverse proxy - Main application entry point
+  nginx:
+    image: nginx:alpine
+    container_name: enclava-nginx
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro  # Optional: SSL certificates
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - enclava-net
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Database migration service - runs once to apply migrations
+  migrate:
+    image: ghcr.io/enclava-ai/enclava-backend:latest
+    container_name: enclava-migrate
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-enclava_user}:${POSTGRES_PASSWORD:-enclava_pass}@postgres:5432/${POSTGRES_DB:-enclava_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["/usr/local/bin/migrate.sh"]
+    networks:
+      - enclava-net
+    restart: "no"
+
+  # Main application backend
+  backend:
+    image: ghcr.io/enclava-ai/enclava-backend:latest
+    container_name: enclava-backend
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-enclava_user}:${POSTGRES_PASSWORD:-enclava_pass}@postgres:5432/${POSTGRES_DB:-enclava_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@redis:6379
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      
+      # Security
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_EXPIRATION_MINUTES=${JWT_EXPIRATION_MINUTES:-1440}
+      
+      # Admin
+      - ADMIN_EMAIL=${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      
+      # Application
+      - BASE_URL=${BASE_URL:-http://localhost}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:3000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_LLM_PROMPTS=${LOG_LLM_PROMPTS:-false}
+      
+      # Optional services
+      - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      
+      # Performance
+      - WORKERS=${BACKEND_WORKERS:-4}
+      - MAX_CONNECTIONS=${MAX_CONNECTIONS:-100}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - backend-logs:/app/logs
+      - backend-uploads:/app/uploads
+      - plugins:/plugins
+    networks:
+      - enclava-net
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Next.js frontend
+  frontend:
+    image: ghcr.io/enclava-ai/enclava-frontend:latest
+    container_name: enclava-frontend
+    environment:
+      # API Configuration
+      - NEXT_PUBLIC_BASE_URL=${BASE_URL:-http://localhost}
+      - INTERNAL_API_URL=http://backend:8000
+      
+      # Application
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      
+      # Performance
+      - NODE_OPTIONS=--max-old-space-size=1024
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - enclava-net
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: enclava-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-enclava_db}
+      - POSTGRES_USER=${POSTGRES_USER:-enclava_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+      - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backup:/backup  # Optional: for backups
+    networks:
+      - enclava-net
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-enclava_user} -d ${POSTGRES_DB:-enclava_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis for caching and message queue
+  redis:
+    image: redis:7-alpine
+    container_name: enclava-redis
+    command: >
+      sh -c '
+      if [ -n "${REDIS_PASSWORD}" ]; then
+        redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory ${REDIS_MAX_MEMORY:-256mb} --maxmemory-policy allkeys-lru
+      else
+        redis-server --appendonly yes --maxmemory ${REDIS_MAX_MEMORY:-256mb} --maxmemory-policy allkeys-lru
+      fi
+      '
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_MAX_MEMORY=${REDIS_MAX_MEMORY:-256mb}
+    volumes:
+      - redis-data:/data
+    networks:
+      - enclava-net
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Qdrant vector database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: enclava-qdrant
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HOST=0.0.0.0
+      - QDRANT__LOG_LEVEL=${QDRANT_LOG_LEVEL:-INFO}
+      - QDRANT__STORAGE__STORAGE_PATH=/qdrant/storage
+      - QDRANT__STORAGE__SNAPSHOTS_PATH=/qdrant/snapshots
+      - QDRANT__STORAGE__ON_DISK_PAYLOAD=${QDRANT_ON_DISK:-true}
+      - QDRANT__SERVICE__MAX_REQUEST_SIZE_MB=${QDRANT_MAX_REQUEST_SIZE:-32}
+      - QDRANT__STORAGE__PERFORMANCE__INDEXING_THRESHOLD_KB=${QDRANT_INDEX_THRESHOLD:-20000}
+    volumes:
+      - qdrant-data:/qdrant/storage
+      - qdrant-snapshots:/qdrant/snapshots
+    networks:
+      - enclava-net
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Privatemode.ai service (optional - for confidential models)
+  privatemode:
+    image: ghcr.io/edgelesssys/privatemode/privatemode-proxy:latest
+    container_name: enclava-privatemode
+    environment:
+      - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}
+      - PRIVATEMODE_CACHE_MODE=${PRIVATEMODE_CACHE_MODE:-memory}
+      - PRIVATEMODE_CACHE_SALT=${PRIVATEMODE_CACHE_SALT:-}
+      - PRIVATEMODE_LOG_LEVEL=${PRIVATEMODE_LOG_LEVEL:-INFO}
+    entrypoint: ["/bin/privatemode-proxy"]
+    command: [
+      "--apiKey=${PRIVATEMODE_API_KEY}",
+      "--port=8080",
+      "--cacheMode=${PRIVATEMODE_CACHE_MODE:-memory}"
+    ]
+    networks:
+      - enclava-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    profiles:
+      - privatemode
+
+volumes:
+  postgres-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/postgres
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/redis
+  qdrant-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/qdrant
+  qdrant-snapshots:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/qdrant-snapshots
+  backend-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOG_PATH:-./logs}/backend
+  backend-uploads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${UPLOAD_PATH:-./uploads}
+  plugins:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PLUGIN_PATH:-./plugins}
+
+networks:
+  enclava-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

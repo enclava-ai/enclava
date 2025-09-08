@@ -1,0 +1,45 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: enclava
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - postgres.yaml
+  - redis.yaml
+  - qdrant.yaml
+  - privatemode.yaml
+  - migration-job.yaml
+  - backend.yaml
+  - frontend.yaml
+  - nginx.yaml
+
+# Add common labels to all resources
+labels:
+- pairs:
+    app.kubernetes.io/name: enclava
+    app.kubernetes.io/instance: enclava
+    app.kubernetes.io/managed-by: kustomize
+
+# Configure image tags (will be overridden in overlays)
+images:
+  - name: ghcr.io/enclava-ai/enclava-backend
+    newName: ghcr.io/enclava-ai/enclava-backend
+    newTag: latest
+  - name: ghcr.io/enclava-ai/enclava-frontend
+    newName: ghcr.io/enclava-ai/enclava-frontend
+    newTag: latest
+  - name: postgres
+    newName: postgres
+    newTag: "16"
+  - name: redis
+    newName: redis
+    newTag: 7-alpine
+  - name: qdrant/qdrant
+    newName: qdrant/qdrant
+    newTag: latest
+  - name: nginx
+    newName: nginx
+    newTag: alpine

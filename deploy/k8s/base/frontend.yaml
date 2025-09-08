@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: enclava
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: enclava
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      initContainers:
+      - name: wait-for-backend
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z backend-service 8000; do echo waiting for backend; sleep 2; done;']
+      containers:
+      - name: frontend
+        image: ghcr.io/enclava-ai/enclava-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+        - name: BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: enclava-secrets
+              key: BASE_URL
+        - name: NEXT_PUBLIC_BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: enclava-secrets
+              key: NEXT_PUBLIC_BASE_URL
+        - name: BACKEND_INTERNAL_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: enclava-config
+              key: BACKEND_INTERNAL_PORT
+        - name: FRONTEND_INTERNAL_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: enclava-config
+              key: FRONTEND_INTERNAL_PORT
+        - name: INTERNAL_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: enclava-config
+              key: INTERNAL_API_URL
+        volumeMounts:
+        - name: node-modules
+          mountPath: /app/node_modules
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 5
+      imagePullSecrets:
+      - name: ghcr-secret
+      volumes:
+      - name: node-modules
+        emptyDir: {}

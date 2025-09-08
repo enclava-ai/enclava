@@ -1,0 +1,54 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: enclava-prod
+
+resources:
+  - ../../base
+
+namePrefix: prod-
+
+labels:
+  environment: prod
+
+# Production-specific patches
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+    target:
+      kind: Deployment
+      name: backend-deployment
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+    target:
+      kind: Deployment
+      name: frontend-deployment
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: nginx-deployment
+
+# Production resource limits (higher)
+patchesStrategicMerge:
+  - resources-prod.yaml
+
+# Production replicas
+replicas:
+  - name: backend-deployment
+    count: 3
+  - name: frontend-deployment
+    count: 3
+  - name: nginx-deployment
+    count: 2
+
+configMapGenerator:
+  - name: prod-config
+    literals:
+      - LOG_LLM_PROMPTS=false
