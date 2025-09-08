@@ -2,39 +2,39 @@
 
 **Confidential AI Platform for Businesses**
 
-Enclava is a comprehensive AI platform that makes privacy practical. It provides easy-to-create OpenAI-compatible chatbots and API endpoints with knowledge base access (RAG), all in a completely confidential way through [privatemode.ai](https://privatemode.ai).
+Enclava is a comprehensive AI platform that makes privacy practical. It provides easy-to-create OpenAI-compatible chatbots and API endpoints with knowledge base access (RAG), all powered by confidential computing through [privatemode.ai](https://privatemode.ai).
 
-## 🚀 Key Features
+## Key Features
 
 - **AI Chatbots** - Customizable chatbots with prompt templates and RAG integration (OpenAI compatible)
 - **RAG System** - Document upload, processing, and semantic search with Qdrant vector database
-- **TEE Security** - Privacy-protected LLM inference via confidential computing
-- **OpenAI Compatible** - Standard API endpoints for seamless integration with existing tools
+- **TEE Security** - Privacy-protected LLM inference via PrivateMode.ai confidential computing
+- **OpenAI-Compatible API** - Standard API endpoints for seamless integration with existing tools
 - **Budget Management** - Built-in spend tracking and usage limits
-- **Multi-Model Support** - Integration with OpenAI, Anthropic, and PrivateMode.ai
+- **Confidential Processing** - All AI inference runs through PrivateMode.ai secure infrastructure
 - **Team Collaboration** - Multi-user support with role-based access control
 - **Document Processing** - Support for PDF, TXT, DOCX, and more file formats
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [Quick Start](#-quick-start)
-- [Architecture](#-architecture)
-- [Features](#-features)
-- [API Documentation](#-api-documentation)
-- [Deployment](#-deployment)
-- [Configuration](#-configuration)
-- [Contributing](#-contributing)
-- [Support](#-support)
-- [License](#-license)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Features](#features)
+- [API Documentation](#api-documentation)
+- [Deployment](#deployment)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
+- [Support](#support)
+- [License](#license)
 
-## 🎯 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - Docker and Docker Compose
 - Git
 - 4GB+ RAM
-- (Optional) [privatemode.ai](https://privatemode.ai) API key for confidential inference
+- [privatemode.ai](https://privatemode.ai) API key (required)
 
 ### Installation
 
@@ -58,9 +58,9 @@ open http://localhost
 - Username: `admin`
 - Password: `admin123`
 
-⚠️ **Important**: Change default credentials immediately in production!
+**Important**: Change default credentials immediately in production!
 
-## 🏗️ Architecture
+## Architecture
 
 Enclava uses a microservices architecture with the following components:
 
@@ -87,7 +87,7 @@ Enclava uses a microservices architecture with the following components:
 - **Qdrant**: Vector database for semantic search and RAG
 - **Nginx**: Reverse proxy and load balancer
 
-## ✨ Features
+## Features
 
 ### AI Capabilities
 
@@ -112,14 +112,14 @@ Enclava uses a microservices architecture with the following components:
 
 ### Integration
 
-- **OpenAI API Compatibility**: Drop-in replacement for OpenAI endpoints
+- **OpenAI-Compatible API**: Drop-in replacement for OpenAI API format (powered by PrivateMode.ai)
 - **REST API**: Full-featured RESTful API
 - **Webhooks**: Event-driven integrations
 - **SDK Support**: Python and JavaScript SDKs (coming soon)
 
-## 📚 API Documentation
+## API Documentation
 
-Enclava provides OpenAI-compatible API endpoints:
+Enclava provides OpenAI-compatible API endpoints powered by PrivateMode.ai:
 
 ### Chat Completions
 ```bash
@@ -130,6 +130,7 @@ curl -X POST http://localhost/api/v1/chat/completions \
     "model": "gpt-3.5-turbo",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
+# Processed securely through PrivateMode.ai infrastructure
 ```
 
 ### Embeddings
@@ -145,7 +146,7 @@ curl -X POST http://localhost/api/v1/embeddings \
 
 Full API documentation available at http://localhost/docs after deployment.
 
-## 🚢 Deployment
+## Deployment
 
 Enclava supports multiple deployment options:
 
@@ -162,28 +163,22 @@ kubectl apply -k deploy/k8s/base/
 ### Production Deployment
 For production deployments with SSL, monitoring, and scaling, see the [Deployment Guide](deploy/README.md).
 
-## ⚙️ Configuration
+## Configuration
 
 Key configuration options in `.env`:
 
 ```env
 # Required
+PRIVATEMODE_API_KEY=your-privatemode-api-key
 JWT_SECRET=your-secure-secret-key
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=secure-password
-
-# AI Providers (Optional)
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-PRIVATEMODE_API_KEY=pm-...
-
-# Database
 POSTGRES_PASSWORD=secure-db-password
 ```
 
 See [.env.example](.env.example) for all configuration options.
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
@@ -203,18 +198,18 @@ cd backend && pytest
 cd ../frontend && npm test
 ```
 
-## 📞 Support
+## Support
 
 - **Documentation**: [docs.enclava.ai](https://docs.enclava.ai)
 - **GitHub Issues**: [github.com/enclava-ai/enclava/issues](https://github.com/enclava-ai/enclava/issues)
 - **Discord Community**: [discord.gg/enclava](https://discord.gg/enclava)
 - **Security Issues**: security@enclava.ai
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [PrivateMode.ai](https://privatemode.ai) for confidential computing infrastructure
 - [Qdrant](https://qdrant.tech) for vector database
@@ -222,5 +217,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ by the Enclava Team**
+**Built by the Enclava Team**
 
