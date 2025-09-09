@@ -1,16 +1,8 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react"
+import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import { 
-  isTokenExpired, 
-  refreshAccessToken, 
-  storeTokens, 
-  getStoredTokens, 
-  clearTokens,
-  setupTokenRefreshTimer,
-  decodeToken
-} from "@/lib/auth-utils"
+import { tokenManager } from "@/lib/token-manager"
 
 interface User {
   id: string
@@ -21,128 +13,107 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  token: string | null
-  refreshToken: string | null
+  isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   isLoading: boolean
-  refreshTokenIfNeeded: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(null)
-  const [refreshToken, setRefreshToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Initialize auth state from localStorage
+  // Initialize auth state and listen to token manager events
   useEffect(() => {
     const initAuth = async () => {
-      if (typeof window === "undefined") return
-
-      // Don't try to refresh on auth-related pages
-      const isAuthPage = window.location.pathname === '/login' || 
-                        window.location.pathname === '/register' ||
-                        window.location.pathname === '/forgot-password'
-
-      const { accessToken, refreshToken: storedRefreshToken } = getStoredTokens()
-      
-      if (accessToken && storedRefreshToken) {
-        // Check if token is expired
-        if (isTokenExpired(accessToken)) {
-          // Only try to refresh if not on auth pages
-          if (!isAuthPage) {
-            // Try to refresh the token
-            const response = await refreshAccessToken(storedRefreshToken)
-            if (response) {
-              storeTokens(response.access_token, response.refresh_token)
-              setToken(response.access_token)
-              setRefreshToken(response.refresh_token)
-              
-              // Decode token to get user info
-              const payload = decodeToken(response.access_token)
-              if (payload) {
-                const storedUser = localStorage.getItem("user")
-                if (storedUser) {
-                  setUser(JSON.parse(storedUser))
-                }
-              }
-              
-              // Setup refresh timer
-              setupRefreshTimer(response.access_token, response.refresh_token)
-            } else {
-              // Refresh failed, clear everything
-              clearTokens()
-              setUser(null)
-              setToken(null)
-              setRefreshToken(null)
-            }
-          } else {
-            // On auth pages with expired token, just clear it
-            clearTokens()
-            setUser(null)
-            setToken(null)
-            setRefreshToken(null)
-          }
-        } else {
-          // Token is still valid
-          setToken(accessToken)
-          setRefreshToken(storedRefreshToken)
-          
-          const storedUser = localStorage.getItem("user")
-          if (storedUser) {
-            setUser(JSON.parse(storedUser))
-          }
-          
-          // Setup refresh timer
-          setupRefreshTimer(accessToken, storedRefreshToken)
-        }
+      // Check if we have valid tokens
+      if (tokenManager.isAuthenticated()) {
+        // Try to get user info
+        await fetchUserInfo()
       }
-      
       setIsLoading(false)
     }
 
+    // Set up event listeners
+    const handleTokensUpdated = () => {
+      // Tokens were updated (refreshed), update user if needed
+      if (!user) {
+        fetchUserInfo()
+      }
+    }
+
+    const handleTokensCleared = () => {
+      // Tokens were cleared, clear user
+      setUser(null)
+    }
+
+    const handleSessionExpired = (reason: string) => {
+      console.log('Session expired:', reason)
+      setUser(null)
+      // TokenManager and API client will handle redirect
+    }
+
+    const handleLogout = () => {
+      setUser(null)
+      router.push('/login')
+    }
+
+    // Register event listeners
+    tokenManager.on('tokensUpdated', handleTokensUpdated)
+    tokenManager.on('tokensCleared', handleTokensCleared)
+    tokenManager.on('sessionExpired', handleSessionExpired)
+    tokenManager.on('logout', handleLogout)
+
+    // Initialize
     initAuth()
-  }, [])
 
-  // Setup token refresh timer
-  const setupRefreshTimer = (accessToken: string, refreshTokenValue: string) => {
-    // Clear existing timer
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current)
-    }
-
-    refreshTimerRef.current = setupTokenRefreshTimer(
-      accessToken,
-      refreshTokenValue,
-      (newAccessToken) => {
-        setToken(newAccessToken)
-      },
-      () => {
-        // Refresh failed, logout user
-        logout()
-      }
-    )
-  }
-
-  // Cleanup timer on unmount
-  useEffect(() => {
+    // Cleanup
     return () => {
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current)
-      }
+      tokenManager.off('tokensUpdated', handleTokensUpdated)
+      tokenManager.off('tokensCleared', handleTokensCleared)
+      tokenManager.off('sessionExpired', handleSessionExpired)
+      tokenManager.off('logout', handleLogout)
     }
   }, [])
+
+  const fetchUserInfo = async () => {
+    try {
+      const token = await tokenManager.getAccessToken()
+      if (!token) return
+
+      const response = await fetch('/api-internal/v1/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const userData = await response.json()
+        const user = {
+          id: userData.id || userData.sub,
+          email: userData.email,
+          name: userData.name || userData.email,
+          role: userData.role || 'user',
+        }
+        setUser(user)
+        
+        // Store user info for offline access
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('user', JSON.stringify(user))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch user info:', error)
+    }
+  }
 
   const login = async (email: string, password: string) => {
     setIsLoading(true)
     
     try {
-      // Call real backend login endpoint
       const response = await fetch('/api-internal/v1/auth/login', {
         method: 'POST',
         headers: {
@@ -158,38 +129,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json()
       
-      // Store tokens
-      storeTokens(data.access_token, data.refresh_token)
+      // Store tokens in TokenManager
+      tokenManager.setTokens(
+        data.access_token,
+        data.refresh_token,
+        data.expires_in
+      )
       
-      // Decode token to get user info
-      const payload = decodeToken(data.access_token)
-      if (payload) {
-        // Fetch user details
-        const userResponse = await fetch('/api-internal/v1/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${data.access_token}`,
-          },
-        })
-        
-        if (userResponse.ok) {
-          const userData = await userResponse.json()
-          const user = {
-            id: userData.id || payload.sub,
-            email: userData.email || payload.email || email,
-            name: userData.name || userData.email || email,
-            role: userData.role || 'user',
-          }
-          
-          localStorage.setItem("user", JSON.stringify(user))
-          setUser(user)
-        }
-      }
+      // Fetch user info
+      await fetchUserInfo()
       
-      setToken(data.access_token)
-      setRefreshToken(data.refresh_token)
-      
-      // Setup refresh timer
-      setupRefreshTimer(data.access_token, data.refresh_token)
+      // Navigate to dashboard
+      router.push('/dashboard')
       
     } catch (error) {
       console.error('Login error:', error)
@@ -200,56 +151,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    // Clear refresh timer
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current)
-      refreshTimerRef.current = null
-    }
-    
-    // Clear state
-    setUser(null)
-    setToken(null)
-    setRefreshToken(null)
-    
-    // Clear localStorage
-    clearTokens()
-    
-    // Redirect to login
-    router.push("/login")
-  }
-
-  const refreshTokenIfNeeded = async (): Promise<boolean> => {
-    if (!token || !refreshToken) {
-      return false
-    }
-
-    if (isTokenExpired(token)) {
-      const response = await refreshAccessToken(refreshToken)
-      if (response) {
-        storeTokens(response.access_token, response.refresh_token)
-        setToken(response.access_token)
-        setRefreshToken(response.refresh_token)
-        setupRefreshTimer(response.access_token, response.refresh_token)
-        return true
-      } else {
-        logout()
-        return false
-      }
-    }
-
-    return true
+    tokenManager.logout()
+    // Token manager will emit 'logout' event which we handle above
   }
 
   return (
     <AuthContext.Provider 
       value={{ 
         user, 
-        token, 
-        refreshToken,
+        isAuthenticated: tokenManager.isAuthenticated(),
         login, 
         logout, 
-        isLoading,
-        refreshTokenIfNeeded
+        isLoading
       }}
     >
       {children}

@@ -104,8 +104,10 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "/favicon.ico",
             "/api/v1/auth/register",
             "/api/v1/auth/login",
+            "/api/v1/auth/refresh",  # Allow refresh endpoint
             "/api-internal/v1/auth/register",
             "/api-internal/v1/auth/login",
+            "/api-internal/v1/auth/refresh",  # Allow refresh endpoint for internal API
             "/",  # Root endpoint
         ]
         

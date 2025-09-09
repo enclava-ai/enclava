@@ -6,12 +6,13 @@ from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from app.services.module_manager import module_manager, ModuleConfig
 from app.core.logging import log_api_request
+from app.core.security import get_current_user
 
 router = APIRouter()
 
 
 @router.get("/")
-async def list_modules():
+async def list_modules(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Get list of all discovered modules with their status (enabled and disabled)"""
     log_api_request("list_modules", {})
     
@@ -70,7 +71,7 @@ async def list_modules():
 
 
 @router.get("/status")
-async def get_modules_status():
+async def get_modules_status(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Get comprehensive module status - CONSOLIDATED endpoint"""
     log_api_request("get_modules_status", {})
     
@@ -134,7 +135,7 @@ async def get_modules_status():
 
 
 @router.get("/{module_name}")
-async def get_module_info(module_name: str):
+async def get_module_info(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Get detailed information about a specific module"""
     log_api_request("get_module_info", {"module_name": module_name})
     
@@ -187,7 +188,7 @@ async def get_module_info(module_name: str):
 
 
 @router.post("/{module_name}/enable")
-async def enable_module(module_name: str):
+async def enable_module(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Enable a module"""
     log_api_request("enable_module", {"module_name": module_name})
     
@@ -212,7 +213,7 @@ async def enable_module(module_name: str):
 
 
 @router.post("/{module_name}/disable")
-async def disable_module(module_name: str):
+async def disable_module(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Disable a module"""
     log_api_request("disable_module", {"module_name": module_name})
     
@@ -237,7 +238,7 @@ async def disable_module(module_name: str):
 
 
 @router.post("/all/reload")
-async def reload_all_modules():
+async def reload_all_modules(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Reload all modules"""
     log_api_request("reload_all_modules", {})
     
@@ -271,7 +272,7 @@ async def reload_all_modules():
 
 
 @router.post("/{module_name}/reload")
-async def reload_module(module_name: str):
+async def reload_module(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Reload a specific module"""
     log_api_request("reload_module", {"module_name": module_name})
     
@@ -290,7 +291,7 @@ async def reload_module(module_name: str):
 
 
 @router.post("/{module_name}/restart")
-async def restart_module(module_name: str):
+async def restart_module(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Restart a specific module (alias for reload)"""
     log_api_request("restart_module", {"module_name": module_name})
     
@@ -309,7 +310,7 @@ async def restart_module(module_name: str):
 
 
 @router.post("/{module_name}/start")
-async def start_module(module_name: str):
+async def start_module(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Start a specific module (enable and load)"""
     log_api_request("start_module", {"module_name": module_name})
     
@@ -331,7 +332,7 @@ async def start_module(module_name: str):
 
 
 @router.post("/{module_name}/stop")
-async def stop_module(module_name: str):
+async def stop_module(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Stop a specific module (disable and unload)"""
     log_api_request("stop_module", {"module_name": module_name})
     
@@ -353,7 +354,7 @@ async def stop_module(module_name: str):
 
 
 @router.get("/{module_name}/stats")
-async def get_module_stats(module_name: str):
+async def get_module_stats(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Get module statistics"""
     log_api_request("get_module_stats", {"module_name": module_name})
     
@@ -380,7 +381,7 @@ async def get_module_stats(module_name: str):
 
 
 @router.post("/{module_name}/execute")
-async def execute_module_action(module_name: str, request_data: Dict[str, Any]):
+async def execute_module_action(module_name: str, request_data: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
     """Execute a module action through the interceptor pattern"""
     log_api_request("execute_module_action", {"module_name": module_name, "action": request_data.get("action")})
     
@@ -442,7 +443,7 @@ async def execute_module_action(module_name: str, request_data: Dict[str, Any]):
 
 
 @router.get("/{module_name}/config")
-async def get_module_config(module_name: str):
+async def get_module_config(module_name: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Get module configuration schema and current values"""
     log_api_request("get_module_config", {"module_name": module_name})
     
@@ -493,7 +494,7 @@ async def get_module_config(module_name: str):
 
 
 @router.post("/{module_name}/config")
-async def update_module_config(module_name: str, config: dict):
+async def update_module_config(module_name: str, config: dict, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Update module configuration"""
     log_api_request("update_module_config", {"module_name": module_name})
     

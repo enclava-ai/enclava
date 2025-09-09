@@ -2,7 +2,7 @@
 Plugin Security and Authentication Service
 Handles plugin tokens, permissions, and security policies
 """
-import jwt
+from jose import jwt
 import hashlib
 import secrets
 import time

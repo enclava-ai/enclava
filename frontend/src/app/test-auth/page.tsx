@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
 import { apiClient } from "@/lib/api-client"
-import { decodeToken } from "@/lib/auth-utils"
+import { tokenManager } from "@/lib/token-manager"
 
 export default function TestAuthPage() {
-  const { user, token, refreshToken, logout } = useAuth()
+  const { user, logout, isAuthenticated } = useAuth()
   const [testResult, setTestResult] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -24,19 +24,19 @@ export default function TestAuthPage() {
   }
 
   const getTokenInfo = () => {
-    if (!token) return "No token"
+    const expiry = tokenManager.getTokenExpiry()
+    const refreshExpiry = tokenManager.getRefreshTokenExpiry()
     
-    const payload = decodeToken(token)
-    if (!payload) return "Invalid token"
+    if (!expiry) return "No token"
     
-    const now = Math.floor(Date.now() / 1000)
-    const timeUntilExpiry = payload.exp - now
-    const expiryDate = new Date(payload.exp * 1000)
+    const now = new Date()
+    const timeUntilExpiry = Math.floor((expiry.getTime() - now.getTime()) / 1000)
     
     return `
 Token expires in: ${Math.floor(timeUntilExpiry / 60)} minutes ${timeUntilExpiry % 60} seconds
-Expiry time: ${expiryDate.toLocaleString()}
-Token payload: ${JSON.stringify(payload, null, 2)}
+Access token expiry: ${expiry.toLocaleString()}
+Refresh token expiry: ${refreshExpiry?.toLocaleString() || 'N/A'}
+Authenticated: ${tokenManager.isAuthenticated()}
     `
   }
 
@@ -70,9 +70,9 @@ Token payload: ${JSON.stringify(payload, null, 2)}
             <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded text-sm">
               {getTokenInfo()}
             </pre>
-            {refreshToken && (
+            {isAuthenticated && (
               <p className="mt-2 text-sm text-green-600">
-                Refresh token available - auto-refresh enabled
+                Auto-refresh enabled - tokens will refresh automatically
               </p>
             )}
           </CardContent>

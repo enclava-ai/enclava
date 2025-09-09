@@ -10,8 +10,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
+from app.services.api_key_auth import require_api_key
 from app.api.v1.llm import (
-    get_auth_context, get_cached_models, ModelsResponse, ModelInfo,
+    get_cached_models, ModelsResponse, ModelInfo,
     ChatCompletionRequest, EmbeddingRequest, create_chat_completion as llm_chat_completion,
     create_embedding as llm_create_embedding
 )
@@ -41,7 +42,7 @@ def openai_error_response(message: str, error_type: str = "invalid_request_error
 
 @router.get("/models", response_model=ModelsResponse)
 async def list_models(
-    context: Dict[str, Any] = Depends(get_auth_context),
+    context: Dict[str, Any] = Depends(require_api_key),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -84,7 +85,7 @@ async def list_models(
 async def create_chat_completion(
     request_body: Request,
     chat_request: ChatCompletionRequest,
-    context: Dict[str, Any] = Depends(get_auth_context),
+    context: Dict[str, Any] = Depends(require_api_key),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -100,7 +101,7 @@ async def create_chat_completion(
 @router.post("/embeddings")
 async def create_embedding(
     request: EmbeddingRequest,
-    context: Dict[str, Any] = Depends(get_auth_context),
+    context: Dict[str, Any] = Depends(require_api_key),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -116,7 +117,7 @@ async def create_embedding(
 @router.get("/models/{model_id}")
 async def retrieve_model(
     model_id: str,
-    context: Dict[str, Any] = Depends(get_auth_context),
+    context: Dict[str, Any] = Depends(require_api_key),
     db: AsyncSession = Depends(get_db)
 ):
     """

@@ -126,62 +126,13 @@ class ModelsResponse(BaseModel):
     data: List[ModelInfo]
 
 
-# Hybrid authentication function
-async def get_auth_context(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get authentication context from either API key or JWT token"""
-    # Try API key authentication first
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-        
-        # Check if it's an API key (starts with ce_ prefix)
-        if token.startswith(settings.API_KEY_PREFIX):
-            try:
-                context = await get_api_key_context(request, db)
-                if context:
-                    return context
-            except Exception as e:
-                logger.warning(f"API key authentication failed: {e}")
-        else:
-            # Try JWT token authentication
-            try:
-                from app.core.security import get_current_user
-                # Create a fake credentials object for JWT validation
-                from fastapi.security import HTTPAuthorizationCredentials
-                credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
-                user = await get_current_user(credentials, db)
-                if user:
-                    return {
-                        "user": user,
-                        "auth_type": "jwt",
-                        "api_key": None
-                    }
-            except Exception as e:
-                logger.warning(f"JWT authentication failed: {e}")
-    
-    # Try X-API-Key header
-    api_key = request.headers.get("X-API-Key")
-    if api_key:
-        try:
-            context = await get_api_key_context(request, db)
-            if context:
-                return context
-        except Exception as e:
-            logger.warning(f"X-API-Key authentication failed: {e}")
-    
-    # No valid authentication found
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Valid API key or authentication token required"
-    )
+# Authentication: Public API endpoints should use require_api_key
+# Internal API endpoints should use get_current_user from core.security
 
 # Endpoints
 @router.get("/models", response_model=ModelsResponse)
 async def list_models(
-    context: Dict[str, Any] = Depends(get_auth_context),
+    context: Dict[str, Any] = Depends(require_api_key),
     db: AsyncSession = Depends(get_db)
 ):
     """List available models"""
@@ -220,7 +171,7 @@ async def list_models(
 
 @router.post("/models/invalidate-cache")
 async def invalidate_models_cache_endpoint(
-    context: Dict[str, Any] = Depends(get_auth_context),
+    context: Dict[str, Any] = Depends(require_api_key),
     db: AsyncSession = Depends(get_db)
 ):
     """Invalidate models cache (admin only)"""
@@ -249,7 +200,7 @@ async def invalidate_models_cache_endpoint(
 async def create_chat_completion(
     request_body: Request,
     chat_request: ChatCompletionRequest,
-    context: Dict[str, Any] = Depends(get_auth_context),
+    context: Dict[str, Any] = Depends(require_api_key),
     db: AsyncSession = Depends(get_db)
 ):
     """Create chat completion with budget enforcement"""
@@ -604,7 +555,7 @@ async def create_embedding(
 
 @router.get("/health")
 async def llm_health_check(
-    context: Dict[str, Any] = Depends(get_auth_context)
+    context: Dict[str, Any] = Depends(require_api_key)
 ):
     """Health check for LLM service"""
     try:
@@ -686,7 +637,7 @@ async def get_usage_stats(
 @router.get("/budget/status")
 async def get_budget_status(
     request: Request,
-    context: Dict[str, Any] = Depends(get_auth_context),
+    context: Dict[str, Any] = Depends(require_api_key),
     db: AsyncSession = Depends(get_db)
 ):
     """Get current budget status and usage analytics"""

@@ -4,7 +4,7 @@ Handles authentication, routing, and security for plugin APIs
 """
 import asyncio
 import time
-import jwt
+from jose import jwt
 from typing import Dict, Any, List, Optional, Tuple
 from fastapi import FastAPI, Request, Response, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials

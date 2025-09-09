@@ -97,7 +97,7 @@ interface PluginProviderProps {
 }
 
 export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
-  const { user, token } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [installedPlugins, setInstalledPlugins] = useState<PluginInfo[]>([]);
   const [availablePlugins, setAvailablePlugins] = useState<AvailablePlugin[]>([]);
   const [pluginConfigurations, setPluginConfigurations] = useState<Record<string, PluginConfiguration>>({});
@@ -108,7 +108,7 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
   const [pluginComponents, setPluginComponents] = useState<Record<string, Record<string, React.ComponentType>>>({});
   
   const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
-    if (!token) {
+    if (!isAuthenticated) {
       throw new Error('Authentication required');
     }
     
@@ -129,7 +129,7 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
   };
   
   const refreshInstalledPlugins = useCallback(async () => {
-    if (!user || !token) {
+    if (!user || !isAuthenticated) {
       setError('Authentication required');
       return;
     }
@@ -160,10 +160,10 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [user, token]);
+  }, [user, isAuthenticated]);
   
   const searchAvailablePlugins = useCallback(async (query = '', tags: string[] = [], category = '') => {
-    if (!user || !token) {
+    if (!user || !isAuthenticated) {
       setError('Authentication required');
       return;
     }
@@ -185,7 +185,7 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [user, token]);
+  }, [user, isAuthenticated]);
   
   const installPlugin = useCallback(async (pluginId: string, version: string): Promise<boolean> => {
     try {
@@ -487,7 +487,7 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
   
   // Load installed plugins on mount, but only when authenticated
   useEffect(() => {
-    if (user && token) {
+    if (user && isAuthenticated) {
       refreshInstalledPlugins();
     } else {
       // Clear plugin data when not authenticated
@@ -496,7 +496,7 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       setPluginConfigurations({});
       setError(null);
     }
-  }, [user, token, refreshInstalledPlugins]);
+  }, [user, isAuthenticated, refreshInstalledPlugins]);
   
   const value: PluginContextType = {
     // State

@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react"
 import { apiClient } from "@/lib/api-client"
+import { tokenManager } from "@/lib/token-manager"
+import { usePathname } from "next/navigation"
 
 interface Module {
   name: string
@@ -34,11 +36,21 @@ const ModulesContext = createContext<ModulesContextType | undefined>(undefined)
 export function ModulesProvider({ children }: { children: ReactNode }) {
   const [modules, setModules] = useState<Module[]>([])
   const [enabledModules, setEnabledModules] = useState<Set<string>>(new Set())
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const pathname = usePathname()
+
+  // Check if we're on an auth page
+  const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password'
 
   const fetchModules = useCallback(async () => {
+    // Don't fetch if we're on an auth page or not authenticated
+    if (isAuthPage || !tokenManager.isAuthenticated()) {
+      setIsLoading(false)
+      return
+    }
+
     try {
       setIsLoading(true)
       setError(null)
@@ -57,11 +69,14 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
       setLastUpdated(new Date())
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load modules")
+      // Only set error if we're authenticated (to avoid noise on auth pages)
+      if (tokenManager.isAuthenticated()) {
+        setError(err instanceof Error ? err.message : "Failed to load modules")
+      }
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isAuthPage])
 
   const refreshModules = useCallback(async () => {
     await fetchModules()
@@ -72,13 +87,22 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
   }, [enabledModules])
 
   useEffect(() => {
-    fetchModules()
+    // Only fetch if authenticated and not on auth page
+    if (!isAuthPage && tokenManager.isAuthenticated()) {
+      fetchModules()
+    }
     
     // Set up periodic refresh every 30 seconds to catch module state changes
-    const interval = setInterval(fetchModules, 30000)
+    // But only if authenticated
+    let interval: NodeJS.Timeout | null = null
+    if (!isAuthPage && tokenManager.isAuthenticated()) {
+      interval = setInterval(fetchModules, 30000)
+    }
     
-    return () => clearInterval(interval)
-  }, [fetchModules])
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [fetchModules, isAuthPage])
 
   // Listen for custom events that indicate module state changes
   useEffect(() => {
@@ -92,6 +116,34 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("moduleStateChanged", handleModuleStateChange)
     }
   }, [refreshModules])
+
+  // Listen for authentication changes
+  useEffect(() => {
+    const handleTokensUpdated = () => {
+      // When tokens are updated (user logs in), fetch modules
+      if (!isAuthPage) {
+        fetchModules()
+      }
+    }
+
+    const handleTokensCleared = () => {
+      // When tokens are cleared (user logs out), clear modules
+      setModules([])
+      setEnabledModules(new Set())
+      setError(null)
+      setLastUpdated(null)
+    }
+
+    tokenManager.on('tokensUpdated', handleTokensUpdated)
+    tokenManager.on('tokensCleared', handleTokensCleared)
+    tokenManager.on('logout', handleTokensCleared)
+
+    return () => {
+      tokenManager.off('tokensUpdated', handleTokensUpdated)
+      tokenManager.off('tokensCleared', handleTokensCleared)
+      tokenManager.off('logout', handleTokensCleared)
+    }
+  }, [fetchModules, isAuthPage])
 
   return (
     <ModulesContext.Provider

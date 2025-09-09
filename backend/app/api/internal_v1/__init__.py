@@ -16,7 +16,7 @@ from ..v1.prompt_templates import router as prompt_templates_router
 from ..v1.security import router as security_router
 from ..v1.plugin_registry import router as plugin_registry_router
 from ..v1.platform import router as platform_router
-from ..v1.llm import router as llm_router
+from ..v1.llm_internal import router as llm_internal_router
 from ..v1.chatbot import router as chatbot_router
 
 # Create internal API router
@@ -61,8 +61,8 @@ internal_api_router.include_router(security_router, prefix="/security", tags=["i
 # Include plugin registry routes (frontend plugin management)
 internal_api_router.include_router(plugin_registry_router, prefix="/plugins", tags=["internal-plugins"])
 
-# Include LLM routes (frontend LLM service access)
-internal_api_router.include_router(llm_router, prefix="/llm", tags=["internal-llm"])
+# Include internal LLM routes (frontend LLM service access with JWT auth)
+internal_api_router.include_router(llm_internal_router, prefix="/llm", tags=["internal-llm"])
 
 # Include chatbot routes (frontend chatbot management)
 internal_api_router.include_router(chatbot_router, prefix="/chatbot", tags=["internal-chatbot"])

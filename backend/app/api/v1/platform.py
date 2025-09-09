@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.services.permission_manager import permission_registry, Permission, PermissionScope
 from app.core.logging import get_logger
+from app.core.security import get_current_user
 
 logger = get_logger(__name__)
 
@@ -85,7 +86,7 @@ async def get_available_permissions(namespace: Optional[str] = None):
                     resource=perm.resource,
                     action=perm.action,
                     description=perm.description,
-                    conditions=perm.conditions
+                    conditions=getattr(perm, 'conditions', None)
                 )
                 for perm in perms
             ]
@@ -131,7 +132,10 @@ async def validate_permissions(request: PermissionValidationRequest):
 
 
 @router.post("/permissions/check", response_model=PermissionCheckResponse)
-async def check_permission(request: PermissionCheckRequest):
+async def check_permission(
+    request: PermissionCheckRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Check if user has a specific permission"""
     try:
         has_permission = permission_registry.check_permission(
@@ -168,7 +172,7 @@ async def get_module_permissions(module_id: str):
                 resource=perm.resource,
                 action=perm.action,
                 description=perm.description,
-                conditions=perm.conditions
+                conditions=getattr(perm, 'conditions', None)
             )
             for perm in permissions
         ]
