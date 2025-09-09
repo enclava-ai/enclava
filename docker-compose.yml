@@ -113,28 +113,6 @@ services:
       - enclava-net
     restart: unless-stopped
 
-  # Ollama Free Model Proxy
-  #enclava-ollama-proxy:
-  #  build: 
-  #    context: /home/lio/cloud/code/ollama-free-model-proxy
-  #    dockerfile: Dockerfile
-  #  environment:
-  #    - OPENAI_API_KEY=${SOME_API_KEY}
-  #    - FREE_MODE=true
-  #    - TOOL_USE_ONLY=false
-  #  volumes:
-  #    - enclava-ollama-data:/data
-  #  working_dir: /data
-  #  networks:
-  #    - enclava-net
-  #  restart: unless-stopped
-    #healthcheck:
-    #  test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:11434/"]
-    #  interval: 30s
-    #  timeout: 10s
-    #  retries: 3
-    #  start_period: 40s
-
   # Qdrant vector database
   enclava-qdrant:
     image: qdrant/qdrant:latest
