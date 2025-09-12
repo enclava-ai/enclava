@@ -1,0 +1,118 @@
+/* Dark mode improvements for chat interface */
+.dark .chat-message-assistant {
+  background-color: rgb(51 65 85); /* slate-700 */
+  color: white !important;
+}
+
+.dark .chat-message-assistant * {
+  color: white !important;
+}
+
+.dark .chat-message-user {
+  /* User messages keep their primary color */
+}
+
+.dark .chat-input {
+  background-color: rgb(30 41 59); /* slate-800 */
+  color: white !important;
+  border-color: rgb(71 85 105); /* slate-600 */
+}
+
+.dark .chat-input::placeholder {
+  color: rgb(148 163 184); /* slate-400 */
+}
+
+.dark .chat-timestamp {
+  color: rgb(148 163 184); /* slate-400 */
+}
+
+.dark .chat-thinking {
+  background-color: rgb(51 65 85); /* slate-700 */
+  color: white !important;
+}
+
+.dark .chat-thinking * {
+  color: white !important;
+}
+
+/* Ensure ALL text in markdown content is white in dark mode */
+.dark .markdown-content,
+.dark .markdown-content * {
+  color: white !important;
+}
+
+.dark .markdown-content p,
+.dark .markdown-content span,
+.dark .markdown-content div,
+.dark .markdown-content li,
+.dark .markdown-content h1,
+.dark .markdown-content h2,
+.dark .markdown-content h3,
+.dark .markdown-content h4,
+.dark .markdown-content h5,
+.dark .markdown-content h6,
+.dark .markdown-content strong,
+.dark .markdown-content b,
+.dark .markdown-content em,
+.dark .markdown-content i,
+.dark .markdown-content a,
+.dark .markdown-content blockquote {
+  color: white !important;
+}
+
+.dark .markdown-content code {
+  background-color: rgb(30 41 59); /* slate-800 */
+  color: white !important;
+  border-color: rgb(71 85 105); /* slate-600 */
+}
+
+.dark .markdown-content pre,
+.dark .markdown-content pre * {
+  background-color: rgb(30 41 59); /* slate-800 */
+  color: white !important;
+  border-color: rgb(71 85 105); /* slate-600 */
+}
+
+/* Make sure bold text is white */
+.dark strong,
+.dark b {
+  color: white !important;
+  font-weight: bold;
+}
+
+/* Prose styles override for dark mode */
+.dark .prose,
+.dark .prose-sm {
+  color: white !important;
+}
+
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6,
+.dark .prose-sm h1,
+.dark .prose-sm h2,
+.dark .prose-sm h3,
+.dark .prose-sm h4,
+.dark .prose-sm h5,
+.dark .prose-sm h6 {
+  color: white !important;
+  font-weight: bold;
+}
+
+.dark .prose strong,
+.dark .prose-sm strong,
+.dark .prose b,
+.dark .prose-sm b {
+  color: white !important;
+  font-weight: bold;
+}
+
+.dark .prose em,
+.dark .prose-sm em,
+.dark .prose i,
+.dark .prose-sm i {
+  color: white !important;
+}
