@@ -217,7 +217,7 @@ const AvailablePluginCard: React.FC<AvailablePluginCardProps> = ({ plugin, onIns
 };
 
 export const PluginManager: React.FC = () => {
-  const { user, token } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const {
     installedPlugins,
     availablePlugins,
@@ -246,17 +246,17 @@ export const PluginManager: React.FC = () => {
 
   // Load initial data only when authenticated
   useEffect(() => {
-    if (user && token) {
+    if (isAuthenticated && user) {
       refreshInstalledPlugins();
     }
-  }, [user, token, refreshInstalledPlugins]);
+  }, [isAuthenticated, user, refreshInstalledPlugins]);
 
   // Load available plugins when switching to discover tab and authenticated
   useEffect(() => {
-    if (activeTab === 'discover' && user && token) {
+    if (activeTab === 'discover' && isAuthenticated && user) {
       searchAvailablePlugins();
     }
-  }, [activeTab, user, token, searchAvailablePlugins]);
+  }, [activeTab, isAuthenticated, user, searchAvailablePlugins]);
 
   const handlePluginAction = async (action: string, plugin: PluginInfo) => {
     try {
@@ -306,7 +306,7 @@ export const PluginManager: React.FC = () => {
   const categories = Array.from(new Set(availablePlugins.map(p => p.category)));
 
   // Show authentication required message if not authenticated (client-side only)
-  if (isClient && (!user || !token)) {
+  if (isClient && !isAuthenticated) {
     return (
       <div className="space-y-6">
         <Alert>
@@ -319,13 +319,12 @@ export const PluginManager: React.FC = () => {
     );
   }
 
-  // Show loading state during hydration
+  // Prevent hydration mismatch by showing minimal UI during SSR
   if (!isClient) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center py-8">
-          <RotateCw className="h-6 w-6 animate-spin mr-2" />
-          Loading...
+          <div className="h-6 w-6 mr-2" />
         </div>
       </div>
     );

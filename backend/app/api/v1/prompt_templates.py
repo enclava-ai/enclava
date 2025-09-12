@@ -429,3 +429,97 @@ Please improve this prompt to make it more effective for a {request.chatbot_type
     except Exception as e:
         log_api_request("improve_prompt_with_ai_error", {"error": str(e), "user_id": user_id})
         raise HTTPException(status_code=500, detail=f"Failed to improve prompt: {str(e)}")
+
+
+@router.post("/seed-defaults")
+async def seed_default_templates(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Seed default prompt templates for all chatbot types"""
+    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    log_api_request("seed_default_templates", {"user_id": user_id})
+    
+    # Define default prompts (same as in reset)
+    default_prompts = {
+        "assistant": {
+            "name": "General Assistant",
+            "description": "A helpful, accurate, and friendly AI assistant",
+            "prompt": "You are a helpful AI assistant. Provide accurate, concise, and friendly responses. Always aim to be helpful while being honest about your limitations. When you don't know something, say so clearly. Be professional but approachable in your communication style."
+        },
+        "customer_support": {
+            "name": "Customer Support Agent",
+            "description": "Professional customer service representative focused on solving problems",
+            "prompt": "You are a professional customer support representative. Be empathetic, professional, and solution-focused in all interactions. Always try to understand the customer's issue fully before providing solutions. Use the knowledge base to provide accurate information. When you cannot resolve an issue, explain clearly how the customer can escalate or get further help. Maintain a helpful and patient tone even in difficult situations."
+        },
+        "teacher": {
+            "name": "Educational Tutor",
+            "description": "Patient and encouraging educational facilitator",
+            "prompt": "You are an experienced educational tutor and learning facilitator. Break down complex concepts into understandable, digestible parts. Use analogies, examples, and step-by-step explanations to help students learn. Encourage critical thinking through thoughtful questions. Be patient, supportive, and encouraging. Adapt your teaching style to different learning preferences. When a student makes mistakes, guide them to the correct answer rather than just providing it."
+        },
+        "researcher": {
+            "name": "Research Assistant",
+            "description": "Thorough researcher focused on evidence-based information",
+            "prompt": "You are a thorough research assistant with a focus on accuracy and evidence-based information. Provide well-researched, factual information with sources when possible. Be thorough in your analysis and present multiple perspectives when relevant topics have different viewpoints. Always distinguish between established facts, current research, and opinions. When information is uncertain or contested, clearly communicate the level of confidence and supporting evidence."
+        },
+        "creative_writer": {
+            "name": "Creative Writing Mentor",
+            "description": "Imaginative storytelling expert and writing coach",
+            "prompt": "You are an experienced creative writing mentor and storytelling expert. Help with brainstorming ideas, character development, plot structure, dialogue, and creative expression. Be imaginative and inspiring while providing constructive, actionable feedback. Encourage experimentation with different writing styles and techniques. When reviewing work, balance praise for strengths with specific suggestions for improvement. Help writers find their unique voice while mastering fundamental storytelling principles."
+        },
+        "custom": {
+            "name": "Custom Chatbot",
+            "description": "Customizable AI assistant with user-defined behavior",
+            "prompt": "You are a helpful AI assistant. Your personality, expertise, and behavior will be defined by the user through custom instructions. Follow the user's guidance on how to respond, what tone to use, and what role to play. Be adaptable and responsive to the specific needs and preferences outlined in your configuration."
+        }
+    }
+    
+    created_templates = []
+    updated_templates = []
+    
+    try:
+        for type_key, template_data in default_prompts.items():
+            # Check if template already exists
+            existing = await db.execute(
+                select(PromptTemplate).where(PromptTemplate.type_key == type_key)
+            )
+            existing_template = existing.scalar_one_or_none()
+            
+            if existing_template:
+                # Only update if it's still the default (version 1)
+                if existing_template.version == 1 and existing_template.is_default:
+                    existing_template.name = template_data["name"]
+                    existing_template.description = template_data["description"]
+                    existing_template.system_prompt = template_data["prompt"]
+                    existing_template.updated_at = datetime.utcnow()
+                    updated_templates.append(type_key)
+            else:
+                # Create new template
+                new_template = PromptTemplate(
+                    id=str(uuid.uuid4()),
+                    name=template_data["name"],
+                    type_key=type_key,
+                    description=template_data["description"],
+                    system_prompt=template_data["prompt"],
+                    is_default=True,
+                    is_active=True,
+                    version=1,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_template)
+                created_templates.append(type_key)
+        
+        await db.commit()
+        
+        return {
+            "message": "Default templates seeded successfully",
+            "created": created_templates,
+            "updated": updated_templates,
+            "total": len(created_templates) + len(updated_templates)
+        }
+        
+    except Exception as e:
+        await db.rollback()
+        log_api_request("seed_default_templates_error", {"error": str(e), "user_id": user_id})
+        raise HTTPException(status_code=500, detail=f"Failed to seed default templates: {str(e)}")

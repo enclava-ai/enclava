@@ -31,6 +31,7 @@ import { Edit3, RotateCcw, Loader2, Save, AlertTriangle, Plus, Sparkles } from '
 import toast from 'react-hot-toast'
 import { apiClient } from '@/lib/api-client'
 import { config } from '@/lib/config'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface PromptTemplate {
   id: string
@@ -54,6 +55,7 @@ interface PromptVariable {
 }
 
 export default function PromptTemplatesPage() {
+  const { user, isAuthenticated } = useAuth()
   const [templates, setTemplates] = useState<PromptTemplate[]>([])
   const [variables, setVariables] = useState<PromptVariable[]>([])
   const [loading, setLoading] = useState(true)
@@ -62,6 +64,7 @@ export default function PromptTemplatesPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [saving, setSaving] = useState(false)
   const [improvingWithAI, setImprovingWithAI] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   // Form state for editing
   const [editForm, setEditForm] = useState({
@@ -93,34 +96,58 @@ export default function PromptTemplatesPage() {
     { value: "custom", label: "Custom Chatbot" },
   ]
 
+  // Fix hydration mismatch
   useEffect(() => {
-    loadData()
+    setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (mounted && isAuthenticated) {
+      loadData()
+    } else if (mounted) {
+      setLoading(false)
+    }
+  }, [mounted, isAuthenticated])
 
   const loadData = async () => {
     try {
       setLoading(true)
       
-      // Get auth token
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No authentication token found')
-      }
-
-      // Load templates and variables in parallel
+      // Load templates and variables in parallel using apiClient which handles auth automatically
       const [templatesResult, variablesResult] = await Promise.allSettled([
         apiClient.get('/api-internal/v1/prompt-templates/templates'),
         apiClient.get('/api-internal/v1/prompt-templates/variables')
       ])
 
-      if (templatesResult.status === 'rejected' || variablesResult.status === 'rejected') {
-        throw new Error('Failed to load data')
+      if (templatesResult.status === 'rejected') {
+        console.error('Failed to load templates:', templatesResult.reason)
+        throw new Error('Failed to load templates')
+      }
+      
+      if (variablesResult.status === 'rejected') {
+        console.error('Failed to load variables:', variablesResult.reason)
+        throw new Error('Failed to load variables')
       }
 
-      setTemplates(templatesResult.value)
+      const loadedTemplates = templatesResult.value
+      setTemplates(loadedTemplates)
       setVariables(variablesResult.value)
+      
+      // If no templates exist, seed the defaults
+      if (loadedTemplates.length === 0) {
+        try {
+          await apiClient.post('/api-internal/v1/prompt-templates/seed-defaults', {})
+          // Reload templates after seeding
+          const newTemplates = await apiClient.get('/api-internal/v1/prompt-templates/templates')
+          setTemplates(newTemplates)
+          toast.success('Default prompt templates created successfully')
+        } catch (error) {
+          console.error('Failed to seed default templates:', error)
+        }
+      }
     } catch (error) {
-      toast.error('Failed to load prompt templates')
+      console.error('Error loading prompt templates:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to load prompt templates')
     } finally {
       setLoading(false)
     }
@@ -193,13 +220,7 @@ export default function PromptTemplatesPage() {
     try {
       setSaving(true)
       
-      // Get auth token
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No authentication token found')
-      }
-      
-      const newTemplate = await apiClient.post('/api-internal/v1/prompt-templates/create', {
+      const newTemplate = await apiClient.post('/api-internal/v1/prompt-templates/templates/create', {
         name: finalForm.name,
         type_key: finalForm.type_key,
         description: finalForm.description,
@@ -235,12 +256,6 @@ export default function PromptTemplatesPage() {
     try {
       setImprovingWithAI(true)
       
-      // Get auth token
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No authentication token found')
-      }
-      
       const result = await apiClient.post('/api-internal/v1/prompt-templates/improve', {
         current_prompt: currentPrompt,
         chatbot_type: chatbotType,
@@ -273,6 +288,32 @@ export default function PromptTemplatesPage() {
       'custom': 'Custom Chatbot'
     }
     return displayNames[typeKey] || typeKey
+  }
+
+  // Prevent hydration mismatch by not rendering dynamic content until mounted
+  if (!mounted) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="h-8 w-8" />
+        </div>
+      </div>
+    )
+  }
+
+  // Check authentication after mounting
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground">
+              Please <a href="/login" className="underline">log in</a> to access prompt templates.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (loading) {

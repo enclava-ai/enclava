@@ -237,8 +237,26 @@ export function ChatbotManager() {
   const loadPromptTemplates = async () => {
     try {
       const templates = await apiClient.get('/api-internal/v1/prompt-templates/templates')
-      setPromptTemplates(templates)
+      
+      // If no templates exist, seed the defaults
+      if (templates.length === 0) {
+        try {
+          await apiClient.post('/api-internal/v1/prompt-templates/seed-defaults', {})
+          // Reload templates after seeding
+          const newTemplates = await apiClient.get('/api-internal/v1/prompt-templates/templates')
+          setPromptTemplates(newTemplates)
+          toast({
+            title: "Templates Initialized",
+            description: "Default prompt templates have been created"
+          })
+        } catch (error) {
+          console.error('Failed to seed default templates:', error)
+        }
+      } else {
+        setPromptTemplates(templates)
+      }
     } catch (error) {
+      console.error('Failed to load prompt templates:', error)
     }
   }
 

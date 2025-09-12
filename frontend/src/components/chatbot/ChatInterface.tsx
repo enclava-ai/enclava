@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import "./ChatInterface.css"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -135,8 +136,8 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
   }, [])
 
   return (
-    <Card className="h-[600px] flex flex-col">
-      <CardHeader className="pb-3">
+    <Card className="h-[600px] flex flex-col bg-background border-border">
+      <CardHeader className="pb-3 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <MessageCircle className="h-5 w-5" />
@@ -161,10 +162,10 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
         >
           <div className="space-y-4 py-4">
             {messages.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
-                <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Start a conversation with your chatbot!</p>
-                <p className="text-sm">Type a message below to begin.</p>
+              <div className="text-center py-8">
+                <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-foreground/70">Start a conversation with your chatbot!</p>
+                <p className="text-sm text-muted-foreground">Type a message below to begin.</p>
               </div>
             )}
 
@@ -172,24 +173,25 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
               <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] min-w-0 space-y-2`}>
                   <div className={`flex items-start space-x-2 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                    <div className={`p-2 rounded-full ${message.role === 'user' ? 'bg-primary' : 'bg-muted'}`}>
+                    <div className={`p-2 rounded-full ${message.role === 'user' ? 'bg-primary' : 'bg-secondary/50 dark:bg-slate-700'}`}>
                       {message.role === 'user' ? (
                         <User className="h-4 w-4 text-primary-foreground" />
                       ) : (
-                        <Bot className="h-4 w-4 text-muted-foreground" />
+                        <Bot className="h-4 w-4 text-muted-foreground dark:text-slate-300" />
                       )}
                     </div>
                     <div className="flex-1 space-y-2 min-w-0">
                       <div className={`rounded-lg p-4 ${
                         message.role === 'user' 
-                          ? 'bg-primary text-primary-foreground ml-auto max-w-fit' 
-                          : 'bg-muted'
+                          ? 'bg-primary text-primary-foreground ml-auto max-w-fit chat-message-user' 
+                          : 'bg-muted text-foreground dark:bg-slate-700 dark:text-slate-200 chat-message-assistant'
                       }`}>
-                        <div className="text-sm prose prose-sm max-w-full break-words overflow-hidden markdown-content">
+                        <div className="text-sm prose prose-sm dark:prose-invert max-w-full break-words overflow-hidden markdown-content dark:text-slate-200">
                           {message.role === 'user' ? (
                             <div className="whitespace-pre-wrap break-words overflow-x-auto">{message.content}</div>
                           ) : (
                             <ReactMarkdown
+                              className="dark:text-slate-100"
                               remarkPlugins={[remarkGfm]}
                               rehypePlugins={[rehypeHighlight]}
                               components={{
@@ -203,17 +205,17 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
                                 code: ({ children, className }) => {
                                   const isInline = !className;
                                   return isInline ? (
-                                    <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono border break-all">
+                                    <code className="bg-muted/50 text-foreground px-1.5 py-0.5 rounded text-xs font-mono border break-all">
                                       {children}
                                     </code>
                                   ) : (
-                                    <code className={`block bg-muted p-3 rounded text-sm font-mono overflow-x-auto border max-w-full ${className || ''}`}>
+                                    <code className={`block bg-muted/50 text-foreground p-3 rounded text-sm font-mono overflow-x-auto border max-w-full ${className || ''}`}>
                                       {children}
                                     </code>
                                   )
                                 },
                                 pre: ({ children }) => (
-                                  <pre className="bg-muted p-3 rounded overflow-x-auto text-sm font-mono mb-2 border max-w-full">
+                                  <pre className="bg-muted/50 text-foreground p-3 rounded overflow-x-auto text-sm font-mono mb-2 border max-w-full">
                                     {children}
                                   </pre>
                                 ),
@@ -235,7 +237,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
                       {/* Sources for assistant messages */}
                       {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
                         <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">Sources:</p>
+                          <p className="text-xs text-foreground/60">Sources:</p>
                           <div className="space-y-1">
                             {message.sources.map((source, index) => (
                               <Badge key={index} variant="outline" className="text-xs">
@@ -246,7 +248,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center justify-between text-xs text-foreground/50 dark:text-slate-400 chat-timestamp">
                         <span>{formatTime(message.timestamp)}</span>
                         <div className="flex items-center space-x-1">
                           <Button
@@ -290,13 +292,13 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
               <div className="flex justify-start">
                 <div className="max-w-[80%]">
                   <div className="flex items-start space-x-2">
-                    <div className="p-2 rounded-full bg-muted">
+                    <div className="p-2 rounded-full bg-secondary/50 dark:bg-slate-700">
                       <Bot className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="bg-muted rounded-lg p-3">
+                    <div className="bg-muted dark:bg-slate-700 rounded-lg p-3 chat-thinking">
                       <div className="flex items-center space-x-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Thinking...</span>
+                        <Loader2 className="h-4 w-4 animate-spin text-foreground dark:text-slate-200" />
+                        <span className="text-sm text-foreground/70 dark:text-slate-200">Thinking...</span>
                       </div>
                     </div>
                   </div>
@@ -314,7 +316,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="flex-1"
+              className="flex-1 bg-background text-foreground placeholder:text-muted-foreground dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-400 chat-input"
               aria-label="Chat message input"
               aria-describedby="chat-input-help"
               maxLength={4000}
@@ -333,7 +335,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
               )}
             </Button>
           </div>
-          <p id="chat-input-help" className="text-xs text-muted-foreground mt-2">
+          <p id="chat-input-help" className="text-xs text-foreground/60 mt-2">
             Press Enter to send, Shift+Enter for new line. Maximum 4000 characters.
           </p>
         </div>
