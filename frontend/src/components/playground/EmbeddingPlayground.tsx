@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -13,6 +13,23 @@ import { Progress } from '@/components/ui/progress'
 import { Download, Zap, Calculator, BarChart3, AlertCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { apiClient } from '@/lib/api-client'
+
+interface Model {
+  id: string
+  object: string
+  created?: number
+  owned_by?: string
+  permission?: any[]
+  root?: string
+  parent?: string
+  provider?: string
+  capabilities?: string[]
+  context_window?: number
+  max_output_tokens?: number
+  supports_streaming?: boolean
+  supports_function_calling?: boolean
+  tasks?: string[]
+}
 
 interface EmbeddingResult {
   text: string
@@ -31,7 +48,7 @@ interface SessionStats {
 
 export default function EmbeddingPlayground() {
   const [text, setText] = useState('')
-  const [model, setModel] = useState('text-embedding-ada-002')
+  const [model, setModel] = useState('')
   const [encodingFormat, setEncodingFormat] = useState('float')
   const [isLoading, setIsLoading] = useState(false)
   const [results, setResults] = useState<EmbeddingResult[]>([])
@@ -43,13 +60,65 @@ export default function EmbeddingPlayground() {
   })
   const [selectedResult, setSelectedResult] = useState<EmbeddingResult | null>(null)
   const [comparisonMode, setComparisonMode] = useState(false)
+  const [embeddingModels, setEmbeddingModels] = useState<Model[]>([])
+  const [loadingModels, setLoadingModels] = useState(true)
   const { toast } = useToast()
+
+  // Fetch available embedding models
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        setLoadingModels(true)
+        const response = await apiClient.get('/api-internal/v1/llm/models')
+        
+        if (response.data) {
+          // Filter models that support embeddings based on tasks field
+          const models = response.data.filter((model: Model) => {
+            // Check if model has embed or embedding in tasks
+            if (model.tasks && Array.isArray(model.tasks)) {
+              return model.tasks.includes('embed') || model.tasks.includes('embedding')
+            }
+            // Fallback: check if model ID contains embedding patterns
+            const modelId = model.id.toLowerCase()
+            return modelId.includes('embed') || modelId.includes('text-embedding')
+          })
+          
+          setEmbeddingModels(models)
+          
+          // Set default model if available
+          if (models.length > 0 && !model) {
+            setModel(models[0].id)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch models:', error)
+        toast({
+          title: "Error",
+          description: "Failed to load embedding models",
+          variant: "destructive"
+        })
+      } finally {
+        setLoadingModels(false)
+      }
+    }
+
+    fetchModels()
+  }, [])
 
   const handleGenerateEmbedding = async () => {
     if (!text.trim()) {
       toast({
         title: "Error",
         description: "Please enter some text to generate embeddings",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!model) {
+      toast({
+        title: "Error",
+        description: "Please select an embedding model",
         variant: "destructive"
       })
       return
@@ -93,13 +162,34 @@ export default function EmbeddingPlayground() {
     }
   }
 
-  const calculateCost = (tokens: number, model: string): number => {
+  const calculateCost = (tokens: number, modelId: string): number => {
+    // Known rates for common embedding models
     const rates: { [key: string]: number } = {
       'text-embedding-ada-002': 0.0001,
       'text-embedding-3-small': 0.00002,
-      'text-embedding-3-large': 0.00013
+      'text-embedding-3-large': 0.00013,
+      'privatemode-text-embedding-ada-002': 0.0001,
+      'privatemode-text-embedding-3-small': 0.00002,
+      'privatemode-text-embedding-3-large': 0.00013
     }
-    return (tokens / 1000) * (rates[model] || 0.0001)
+    
+    // Check for exact match first
+    if (rates[modelId]) {
+      return (tokens / 1000) * rates[modelId]
+    }
+    
+    // Check for pattern matches (e.g., if model contains these patterns)
+    const modelLower = modelId.toLowerCase()
+    if (modelLower.includes('ada-002')) {
+      return (tokens / 1000) * 0.0001
+    } else if (modelLower.includes('3-small')) {
+      return (tokens / 1000) * 0.00002
+    } else if (modelLower.includes('3-large')) {
+      return (tokens / 1000) * 0.00013
+    }
+    
+    // Default rate for unknown models
+    return (tokens / 1000) * 0.0001
   }
 
   const updateSessionStats = (result: EmbeddingResult) => {
@@ -157,14 +247,27 @@ export default function EmbeddingPlayground() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Model</label>
-              <Select value={model} onValueChange={setModel}>
+              <Select value={model} onValueChange={setModel} disabled={loadingModels}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder={loadingModels ? "Loading models..." : "Select a model"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="text-embedding-ada-002">text-embedding-ada-002</SelectItem>
-                  <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
-                  <SelectItem value="text-embedding-3-large">text-embedding-3-large</SelectItem>
+                  {embeddingModels.length === 0 && !loadingModels ? (
+                    <SelectItem value="no-models" disabled>
+                      No embedding models available
+                    </SelectItem>
+                  ) : (
+                    embeddingModels.map((embModel) => (
+                      <SelectItem key={embModel.id} value={embModel.id}>
+                        {embModel.id}
+                        {embModel.owned_by && embModel.owned_by !== 'unknown' && (
+                          <span className="text-muted-foreground ml-2">
+                            ({embModel.owned_by})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

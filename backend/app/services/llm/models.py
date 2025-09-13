@@ -138,6 +138,7 @@ class ModelInfo(BaseModel):
     max_output_tokens: Optional[int] = Field(None, description="Maximum output tokens")
     supports_streaming: bool = Field(False, description="Whether model supports streaming")
     supports_function_calling: bool = Field(False, description="Whether model supports function calling")
+    tasks: Optional[List[str]] = Field(None, description="Model tasks (e.g., generate, embed, vision)")
 
 
 class ProviderStatus(BaseModel):

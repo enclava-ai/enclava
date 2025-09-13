@@ -623,7 +623,7 @@ export function ChatbotManager() {
                         <SelectContent>
                           {ragCollections.map((collection) => (
                             <SelectItem key={collection.id} value={collection.id}>
-                              <div>
+                              <div className="text-foreground">
                                 <div className="font-medium">{collection.name}</div>
                                 <div className="text-sm text-muted-foreground">
                                   {collection.document_count} documents
@@ -889,7 +889,7 @@ export function ChatbotManager() {
                         <SelectContent>
                           {ragCollections.map((collection) => (
                             <SelectItem key={collection.id} value={collection.id}>
-                              <div>
+                              <div className="text-foreground">
                                 <div className="font-medium">{collection.name}</div>
                                 <div className="text-sm text-muted-foreground">
                                   {collection.document_count} documents

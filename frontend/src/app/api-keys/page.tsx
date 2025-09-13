@@ -73,6 +73,7 @@ interface Model {
   max_output_tokens?: number;
   supports_streaming?: boolean;
   supports_function_calling?: boolean;
+  tasks?: string[];  // Added tasks field from PrivateMode API
 }
 
 interface NewApiKeyData {

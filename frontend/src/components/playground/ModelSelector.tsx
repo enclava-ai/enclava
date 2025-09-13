@@ -23,6 +23,7 @@ interface Model {
   max_output_tokens?: number
   supports_streaming?: boolean
   supports_function_calling?: boolean
+  tasks?: string[]  // Added tasks field from PrivateMode API
 }
 
 interface ProviderStatus {
@@ -97,11 +98,21 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
     return 'Unknown'
   }
 
-  const getModelType = (modelId: string): 'chat' | 'embedding' | 'other' => {
+  const getModelType = (model: Model): 'chat' | 'embedding' | 'other' => {
+    // Check if model has tasks field from PrivateMode or other providers
+    if (model.tasks && Array.isArray(model.tasks)) {
+      // Models with "generate" task are chat models
+      if (model.tasks.includes('generate')) return 'chat'
+      // Models with "embed" task are embedding models  
+      if (model.tasks.includes('embed') || model.tasks.includes('embedding')) return 'embedding'
+    }
+    
+    // Fallback to ID-based detection for models without tasks field
+    const modelId = model.id
     if (modelId.includes('embedding') || modelId.includes('embed')) return 'embedding'
     if (modelId.includes('whisper') || modelId.includes('speech')) return 'other'  // Audio models
     
-    // PrivateMode and other chat models
+    // PrivateMode and other chat models by ID pattern
     if (
       modelId.startsWith('privatemode-llama') ||
       modelId.startsWith('privatemode-claude') ||
@@ -114,14 +125,16 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
       modelId.includes('llama') ||
       modelId.includes('gemma') ||
       modelId.includes('qwen') ||
+      modelId.includes('mistral') ||
+      modelId.includes('command') ||
       modelId.includes('latest')
     ) return 'chat'
     
     return 'other'
   }
 
-  const getModelCategory = (modelId: string): string => {
-    const type = getModelType(modelId)
+  const getModelCategory = (model: Model): string => {
+    const type = getModelType(model)
     switch (type) {
       case 'chat': return 'Chat Completion'
       case 'embedding': return 'Text Embedding'
@@ -132,7 +145,7 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
 
   const filteredModels = models.filter(model => {
     if (filter === 'all') return true
-    return getModelType(model.id) === filter
+    return getModelType(model) === filter
   })
 
   const groupedModels = filteredModels.reduce((acc, model) => {
@@ -255,7 +268,7 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
                     <span>{model.id}</span>
                     <div className="flex gap-1">
                       <Badge variant="outline" className="text-xs">
-                        {getModelCategory(model.id)}
+                        {getModelCategory(model)}
                       </Badge>
                       {model.supports_streaming && (
                         <Badge variant="secondary" className="text-xs">
@@ -299,7 +312,7 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
               </div>
               <div>
                 <span className="font-medium">Type:</span>
-                <div className="text-muted-foreground">{getModelCategory(selectedModel.id)}</div>
+                <div className="text-muted-foreground">{getModelCategory(selectedModel)}</div>
               </div>
               <div>
                 <span className="font-medium">Object:</span>

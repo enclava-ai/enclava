@@ -57,15 +57,24 @@ async def get_cached_models() -> List[Dict[str, Any]]:
         # Convert ModelInfo objects to dict format for compatibility
         models = []
         for model_info in model_infos:
-            models.append({
+            model_dict = {
                 "id": model_info.id,
                 "object": model_info.object,
                 "created": model_info.created or int(time.time()),
                 "owned_by": model_info.owned_by,
                 # Add frontend-expected fields
                 "name": getattr(model_info, 'name', model_info.id),  # Use name if available, fallback to id
-                "provider": getattr(model_info, 'provider', model_info.owned_by)  # Use provider if available, fallback to owned_by
-            })
+                "provider": getattr(model_info, 'provider', model_info.owned_by),  # Use provider if available, fallback to owned_by
+                "capabilities": model_info.capabilities,
+                "context_window": model_info.context_window,
+                "max_output_tokens": model_info.max_output_tokens,
+                "supports_streaming": model_info.supports_streaming,
+                "supports_function_calling": model_info.supports_function_calling
+            }
+            # Include tasks field if present
+            if model_info.tasks:
+                model_dict["tasks"] = model_info.tasks
+            models.append(model_dict)
         
         # Update cache
         _models_cache["data"] = models
