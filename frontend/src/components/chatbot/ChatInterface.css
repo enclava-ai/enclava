@@ -1,3 +1,76 @@
+/* Chat interface improvements */
+
+/* Ensure proper scrolling and expansion */
+.chat-interface-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Smooth scrolling for messages */
+[data-radix-scroll-area-viewport] {
+  scroll-behavior: smooth;
+}
+
+/* Better message container spacing */
+.chat-messages-container {
+  padding: 1rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Improved message bubbles */
+.chat-message-user,
+.chat-message-assistant {
+  animation: fadeIn 0.3s ease-in;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Ensure text stays within bounds */
+.chat-message-user *,
+.chat-message-assistant * {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* Fix prose content overflow */
+.prose {
+  max-width: 100% !important;
+}
+
+.prose * {
+  word-wrap: break-word !important;
+  overflow-wrap: anywhere !important;
+  max-width: 100% !important;
+}
+
+/* Prevent code blocks from overflowing */
+.prose pre,
+.prose code {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  word-wrap: normal !important;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Dark mode improvements for chat interface */
 .dark .chat-message-assistant {
   background-color: rgb(51 65 85); /* slate-700 */

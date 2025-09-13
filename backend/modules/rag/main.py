@@ -148,6 +148,7 @@ class RAGModule(BaseModule):
             'application/vnd.ms-excel': self._process_with_markitdown,
             'text/html': self._process_html,
             'application/json': self._process_json,
+            'application/x-ndjson': self._process_jsonl,  # JSONL support
             'text/markdown': self._process_markdown,
             'text/csv': self._process_csv
         }
@@ -227,6 +228,10 @@ class RAGModule(BaseModule):
         if mime_type:
             return mime_type
         
+        # Check for JSONL file extension
+        if filename.lower().endswith('.jsonl'):
+            return 'application/x-ndjson'
+        
         # Try to detect from content
         if content.startswith(b'%PDF'):
             return 'application/pdf'
@@ -247,6 +252,13 @@ class RAGModule(BaseModule):
         elif content.startswith(b'<html') or content.startswith(b'<!DOCTYPE'):
             return 'text/html'
         elif content.startswith(b'{') or content.startswith(b'['):
+            # Check if it's JSONL by looking for newline-delimited JSON
+            try:
+                lines = content.decode('utf-8', errors='ignore').split('\n')
+                if len(lines) > 1 and all(line.strip().startswith('{') for line in lines[:3] if line.strip()):
+                    return 'application/x-ndjson'
+            except:
+                pass
             return 'application/json'
         else:
             return 'text/plain'
@@ -874,6 +886,75 @@ class RAGModule(BaseModule):
             
         except Exception as e:
             logger.error(f"Error processing CSV file: {e}")
+            return ""
+    
+    async def _process_jsonl(self, content: bytes, filename: str) -> str:
+        """Process JSONL files (newline-delimited JSON)
+        
+        Specifically optimized for helpjuice-export.jsonl format:
+        - Each line contains a JSON object with 'id' and 'payload'
+        - Payload contains 'question', 'language', and 'answer' fields
+        - Combines question and answer into searchable content
+        """
+        try:
+            jsonl_content = content.decode('utf-8', errors='replace')
+            lines = jsonl_content.strip().split('\n')
+            
+            processed_articles = []
+            
+            for line_num, line in enumerate(lines, 1):
+                if not line.strip():
+                    continue
+                
+                try:
+                    # Parse each JSON line
+                    data = json.loads(line)
+                    
+                    # Handle helpjuice export format
+                    if 'payload' in data:
+                        payload = data['payload']
+                        article_id = data.get('id', f'article_{line_num}')
+                        
+                        # Extract fields
+                        question = payload.get('question', '')
+                        answer = payload.get('answer', '')
+                        language = payload.get('language', 'EN')
+                        
+                        # Combine question and answer for better search
+                        if question or answer:
+                            # Format as Q&A for better context
+                            article_text = f"## {question}\n\n{answer}\n\n"
+                            
+                            # Add language tag if not English
+                            if language != 'EN':
+                                article_text = f"[{language}] {article_text}"
+                            
+                            # Add metadata separator
+                            article_text += f"---\nArticle ID: {article_id}\nLanguage: {language}\n\n"
+                            
+                            processed_articles.append(article_text)
+                    
+                    # Handle generic JSONL format
+                    else:
+                        # Convert the entire JSON object to readable text
+                        json_text = json.dumps(data, indent=2, ensure_ascii=False)
+                        processed_articles.append(json_text + "\n\n")
+                        
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Error parsing JSONL line {line_num}: {e}")
+                    continue
+                except Exception as e:
+                    logger.warning(f"Error processing JSONL line {line_num}: {e}")
+                    continue
+            
+            # Combine all articles
+            combined_text = '\n'.join(processed_articles)
+            
+            logger.info(f"Successfully processed {len(processed_articles)} articles from JSONL file {filename}")
+            return combined_text
+            
+        except Exception as e:
+            logger.error(f"Error processing JSONL file {filename}: {e}")
             return ""
     
     def _generate_document_id(self, content: str, metadata: Dict[str, Any]) -> str:

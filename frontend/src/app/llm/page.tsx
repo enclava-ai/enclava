@@ -100,7 +100,7 @@ function LLMPageContent() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
+      const token = await import('@/lib/token-manager').then(m => m.tokenManager.getAccessToken())
       if (!token) {
         throw new Error('No authentication token found')
       }

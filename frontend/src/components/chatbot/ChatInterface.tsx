@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react"
 import "./ChatInterface.css"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,55 @@ interface ChatInterfaceProps {
   chatbotName: string
   onClose?: () => void
 }
+
+// Memoized markdown renderer to prevent re-render issues with Next.js HotReload
+const MessageMarkdown = memo(({ content }: { content: string }) => {
+  const markdownComponents = useMemo(() => ({
+    p: ({ children }: any) => <p className="mb-2 last:mb-0 break-words">{children}</p>,
+    h1: ({ children }: any) => <h1 className="text-lg font-bold mb-2 break-words">{children}</h1>,
+    h2: ({ children }: any) => <h2 className="text-base font-bold mb-2 break-words">{children}</h2>,
+    h3: ({ children }: any) => <h3 className="text-sm font-bold mb-2 break-words">{children}</h3>,
+    ul: ({ children }: any) => <ul className="list-disc pl-4 mb-2 break-words">{children}</ul>,
+    ol: ({ children }: any) => <ol className="list-decimal pl-4 mb-2 break-words">{children}</ol>,
+    li: ({ children }: any) => <li className="mb-1 break-words">{children}</li>,
+    code: ({ children, className }: any) => {
+      const isInline = !className;
+      return isInline ? (
+        <code className="bg-muted/50 text-foreground px-1.5 py-0.5 rounded text-xs font-mono border break-words">
+          {children}
+        </code>
+      ) : (
+        <code className={`block bg-muted/50 text-foreground p-3 rounded text-sm font-mono overflow-x-auto border w-full ${className || ''}`}>
+          {children}
+        </code>
+      )
+    },
+    pre: ({ children }: any) => (
+      <pre className="bg-muted/50 text-foreground p-3 rounded overflow-x-auto text-sm font-mono mb-2 border w-full whitespace-pre-wrap">
+        {children}
+      </pre>
+    ),
+    blockquote: ({ children }: any) => (
+      <blockquote className="border-l-4 border-muted-foreground/20 pl-4 italic mb-2 break-words">
+        {children}
+      </blockquote>
+    ),
+    strong: ({ children }: any) => <strong className="font-semibold break-words">{children}</strong>,
+    em: ({ children }: any) => <em className="italic break-words">{children}</em>,
+  }), [])
+
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeHighlight]}
+      components={markdownComponents}
+    >
+      {content}
+    </ReactMarkdown>
+  )
+})
+
+MessageMarkdown.displayName = 'MessageMarkdown'
 
 export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -136,8 +185,8 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
   }, [])
 
   return (
-    <Card className="h-[600px] flex flex-col bg-background border-border">
-      <CardHeader className="pb-3 border-b border-border">
+    <Card className="h-full flex flex-col bg-background border-border">
+      <CardHeader className="pb-3 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <MessageCircle className="h-5 w-5" />
@@ -152,15 +201,15 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
         <Separator />
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-0">
+      <CardContent className="flex-1 flex flex-col p-0 min-h-0 overflow-hidden">
         <ScrollArea 
           ref={scrollAreaRef} 
-          className="flex-1 px-4"
+          className="flex-1 px-4 h-full"
           aria-label="Chat conversation"
           role="log"
           aria-live="polite"
         >
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 chat-messages-container">
             {messages.length === 0 && (
               <div className="text-center py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -171,7 +220,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
 
             {messages.map((message) => (
               <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] min-w-0 space-y-2`}>
+                <div className={`max-w-[85%] min-w-0 space-y-2`}>
                   <div className={`flex items-start space-x-2 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                     <div className={`p-2 rounded-full ${message.role === 'user' ? 'bg-primary' : 'bg-secondary/50 dark:bg-slate-700'}`}>
                       {message.role === 'user' ? (
@@ -183,53 +232,14 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
                     <div className="flex-1 space-y-2 min-w-0">
                       <div className={`rounded-lg p-4 ${
                         message.role === 'user' 
-                          ? 'bg-primary text-primary-foreground ml-auto max-w-fit chat-message-user' 
+                          ? 'bg-primary text-primary-foreground ml-auto chat-message-user' 
                           : 'bg-muted text-foreground dark:bg-slate-700 dark:text-slate-200 chat-message-assistant'
-                      }`}>
-                        <div className="text-sm prose prose-sm dark:prose-invert max-w-full break-words overflow-hidden markdown-content dark:text-slate-200">
+                      } break-words overflow-wrap-anywhere`}>
+                        <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words overflow-wrap-anywhere markdown-content dark:text-slate-200">
                           {message.role === 'user' ? (
                             <div className="whitespace-pre-wrap break-words overflow-x-auto">{message.content}</div>
                           ) : (
-                            <ReactMarkdown
-                              className="dark:text-slate-100"
-                              remarkPlugins={[remarkGfm]}
-                              rehypePlugins={[rehypeHighlight]}
-                              components={{
-                                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                                h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
-                                h3: ({ children }) => <h3 className="text-sm font-bold mb-2">{children}</h3>,
-                                ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
-                                ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
-                                li: ({ children }) => <li className="mb-1">{children}</li>,
-                                code: ({ children, className }) => {
-                                  const isInline = !className;
-                                  return isInline ? (
-                                    <code className="bg-muted/50 text-foreground px-1.5 py-0.5 rounded text-xs font-mono border break-all">
-                                      {children}
-                                    </code>
-                                  ) : (
-                                    <code className={`block bg-muted/50 text-foreground p-3 rounded text-sm font-mono overflow-x-auto border max-w-full ${className || ''}`}>
-                                      {children}
-                                    </code>
-                                  )
-                                },
-                                pre: ({ children }) => (
-                                  <pre className="bg-muted/50 text-foreground p-3 rounded overflow-x-auto text-sm font-mono mb-2 border max-w-full">
-                                    {children}
-                                  </pre>
-                                ),
-                                blockquote: ({ children }) => (
-                                  <blockquote className="border-l-4 border-muted-foreground/20 pl-4 italic mb-2">
-                                    {children}
-                                  </blockquote>
-                                ),
-                                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                                em: ({ children }) => <em className="italic">{children}</em>,
-                              }}
-                            >
-                              {message.content}
-                            </ReactMarkdown>
+                            <MessageMarkdown content={message.content} />
                           )}
                         </div>
                       </div>
@@ -290,7 +300,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="max-w-[80%]">
+                <div className="max-w-[85%]">
                   <div className="flex items-start space-x-2">
                     <div className="p-2 rounded-full bg-secondary/50 dark:bg-slate-700">
                       <Bot className="h-4 w-4 text-muted-foreground" />
@@ -308,7 +318,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
           </div>
         </ScrollArea>
 
-        <div className="p-4 border-t">
+        <div className="p-4 border-t flex-shrink-0">
           <div className="flex space-x-2">
             <Input
               value={input}

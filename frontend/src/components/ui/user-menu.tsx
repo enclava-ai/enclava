@@ -57,11 +57,16 @@ export function UserMenu() {
     setIsChangingPassword(true)
 
     try {
+      const token = await import('@/lib/token-manager').then(m => m.tokenManager.getAccessToken())
+      if (!token) {
+        throw new Error('Authentication required')
+      }
+
       const response = await fetch('/api-internal/v1/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           current_password: passwordData.currentPassword,

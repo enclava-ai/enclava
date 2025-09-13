@@ -302,7 +302,7 @@ class RAGService:
             raise APIException(
                 status_code=400, 
                 error_code="UNSUPPORTED_FILE_TYPE",
-                detail=f"Unsupported file type: {file_ext}. Supported: .pdf, .docx, .doc, .txt, .md"
+                detail=f"Unsupported file type: {file_ext}. Supported: .pdf, .docx, .doc, .txt, .md, .html, .json, .jsonl, .csv, .xlsx, .xls"
             )
         
         # Generate safe filename
@@ -473,7 +473,7 @@ class RAGService:
     
     def _is_supported_file_type(self, file_ext: str) -> bool:
         """Check if file type is supported"""
-        supported_types = {'.pdf', '.docx', '.doc', '.txt', '.md', '.html', '.json', '.csv', '.xlsx', '.xls'}
+        supported_types = {'.pdf', '.docx', '.doc', '.txt', '.md', '.html', '.json', '.jsonl', '.csv', '.xlsx', '.xls'}
         return file_ext.lower() in supported_types
     
     def _generate_safe_filename(self, filename: str) -> str:

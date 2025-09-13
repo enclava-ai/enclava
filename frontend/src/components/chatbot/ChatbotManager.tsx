@@ -1180,7 +1180,7 @@ export function ChatbotManager() {
       {/* Chat Interface Modal */}
       {showChatInterface && testingChatbot && (
         <Dialog open={showChatInterface} onOpenChange={setShowChatInterface}>
-          <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogContent className="max-w-6xl w-[90vw] h-[85vh] p-0 flex flex-col">
             <DialogHeader className="sr-only">
               <DialogTitle>Chat with {testingChatbot.name}</DialogTitle>
               <DialogDescription>
