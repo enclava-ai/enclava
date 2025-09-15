@@ -398,19 +398,26 @@ class PluginInstaller:
             if plugin_id in plugin_loader.loaded_plugins:
                 await plugin_loader.unload_plugin(plugin_id)
             
-            # Backup data if requested
+            # Backup data if requested (handle missing files gracefully)
             backup_path = None
             if keep_data:
-                backup_path = await plugin_db_manager.backup_plugin_data(plugin_id)
+                try:
+                    backup_path = await plugin_db_manager.backup_plugin_data(plugin_id)
+                except Exception as e:
+                    logger.warning(f"Could not backup plugin data (files may be missing): {e}")
+                    # Continue with uninstall even if backup fails
             
             # Delete database schema if not keeping data
             if not keep_data:
                 await plugin_db_manager.delete_plugin_schema(plugin_id)
             
-            # Remove plugin files
+            # Remove plugin files (handle missing directories gracefully)
             plugin_dir = self.plugins_dir / plugin_id
             if plugin_dir.exists():
                 shutil.rmtree(plugin_dir)
+                logger.info(f"Removed plugin directory: {plugin_dir}")
+            else:
+                logger.warning(f"Plugin directory not found (already removed?): {plugin_dir}")
             
             # Update database
             plugin.status = "uninstalled"
