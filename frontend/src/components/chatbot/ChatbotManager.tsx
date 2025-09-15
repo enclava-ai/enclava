@@ -61,7 +61,7 @@ interface ChatbotInstance {
 }
 
 interface RagCollection {
-  id: string
+  id: number | string  // Can be either number (from API) or string (when stored)
   name: string
   description: string
   document_count: number
@@ -614,15 +614,17 @@ export function ChatbotManager() {
                     <div>
                       <Label htmlFor="collection">Knowledge Base Collection</Label>
                       <Select 
-                        value={newChatbot.rag_collection ?? ''} 
-                        onValueChange={(value) => setNewChatbot(prev => ({ ...prev, rag_collection: String(value) }))}
+                        value={String(newChatbot.rag_collection ?? '')} 
+                        onValueChange={(value) => setNewChatbot(prev => ({ ...prev, rag_collection: value }))}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a collection" />
+                          <SelectValue placeholder="Select a collection">
+                            {newChatbot.rag_collection && ragCollections.find(c => String(c.id) === String(newChatbot.rag_collection))?.name}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {ragCollections.map((collection) => (
-                            <SelectItem key={collection.id} value={collection.id}>
+                            <SelectItem key={collection.id} value={String(collection.id)}>
                               <div className="text-foreground">
                                 <div className="font-medium">{collection.name}</div>
                                 <div className="text-sm text-muted-foreground">
@@ -880,15 +882,17 @@ export function ChatbotManager() {
                     <div>
                       <Label htmlFor="edit-collection">Knowledge Base Collection</Label>
                       <Select 
-                        value={editChatbot.rag_collection ?? ''} 
-                        onValueChange={(value) => setEditChatbot(prev => ({ ...prev, rag_collection: String(value) }))}
+                        value={String(editChatbot.rag_collection ?? '')} 
+                        onValueChange={(value) => setEditChatbot(prev => ({ ...prev, rag_collection: value }))}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a collection" />
+                          <SelectValue placeholder="Select a collection">
+                            {editChatbot.rag_collection && ragCollections.find(c => String(c.id) === String(editChatbot.rag_collection))?.name}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {ragCollections.map((collection) => (
-                            <SelectItem key={collection.id} value={collection.id}>
+                            <SelectItem key={collection.id} value={String(collection.id)}>
                               <div className="text-foreground">
                                 <div className="font-medium">{collection.name}</div>
                                 <div className="text-sm text-muted-foreground">
