@@ -155,7 +155,7 @@ services:
     environment:
       - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY}
       - PRIVATEMODE_CACHE_MODE=${PRIVATEMODE_CACHE_MODE:-none}
-      - PRIVATEMODE_CACHE_SALT=${PRIVATEMODE_CACHE_SALT}
+      - PRIVATEMODE_CACHE_SALT=${PRIVATEMODE_CACHE_SALT:-}
     entrypoint: ["/bin/privatemode-proxy"]
     command: [
       "--apiKey=${PRIVATEMODE_API_KEY}",
