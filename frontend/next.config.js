@@ -10,12 +10,20 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
+    // Enable standalone output for better Docker compatibility
+    outputStandalone: true,
   },
-  webpack: (config) => {
+  webpack: (config, { isServer, dev }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': require('path').resolve(__dirname, 'src'),
+      '@': require('path').join(__dirname, 'src'),
     };
+    
+    // Optional: Add debug logging
+    if (dev) {
+      console.log('Webpack alias config:', config.resolve.alias);
+    }
+    
     return config;
   },
   env: {

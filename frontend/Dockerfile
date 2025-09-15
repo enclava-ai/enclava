@@ -48,10 +48,10 @@ RUN adduser --system --uid 1001 nextjs
 # Copy node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy built application
+# Copy built application (standalone output)
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
 # Set the correct permission for prerender cache
 RUN chown -R nextjs:nodejs .next
@@ -64,5 +64,5 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application (standalone)
+CMD ["node", "server.js"]
