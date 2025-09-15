@@ -105,7 +105,6 @@ services:
     volumes:
       - enclava-postgres-data:/var/lib/postgresql/data
       - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - postgres-backups:/backups
     networks:
       - enclava-net
     restart: unless-stopped
