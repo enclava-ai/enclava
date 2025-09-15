@@ -163,10 +163,7 @@ services:
     networks:
       - enclava-net
     restart: unless-stopped
-    profiles:
-      - privatemode
 
-  
 volumes:
   enclava-postgres-data:
     driver: local
