@@ -1,0 +1,32 @@
+[flake8]
+max-line-length = 88
+extend-ignore = 
+    # E203: whitespace before ':' (conflicts with black)
+    E203,
+    # E501: line too long (handled by black)
+    E501,
+    # W503: line break before binary operator (conflicts with black)
+    W503,
+    # F401: module imported but unused (handled by isort)
+    F401
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    .tox,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    migrations,
+    alembic/versions
+per-file-ignores =
+    # Allow unused imports in __init__.py files
+    __init__.py:F401,F403
+    # Allow long lines in test files for readability
+    tests/*.py:E501
+    # Allow specific test patterns
+    test_*.py:E501,F401,F811
+max-complexity = 12

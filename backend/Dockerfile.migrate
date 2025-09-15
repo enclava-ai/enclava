@@ -1,0 +1,22 @@
+# Migration container for running Alembic migrations
+# Reuses the backend image but runs only database migrations
+
+# Build from the backend image to reuse dependencies
+FROM enclava-backend:latest
+
+# Install PostgreSQL client for database health checks
+USER root
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy migration script (if not already present)
+COPY scripts/migrate.sh /usr/local/bin/migrate.sh
+RUN chmod +x /usr/local/bin/migrate.sh
+
+# Switch back to app user
+USER enclava
+
+# Set default command to run migrations
+CMD ["/usr/local/bin/migrate.sh"]

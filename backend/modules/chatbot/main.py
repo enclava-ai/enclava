@@ -9,7 +9,6 @@ Provides AI chatbot capabilities with:
 - UI-configurable settings
 """
 
-import asyncio
 import json
 from pprint import pprint
 import uuid
@@ -295,7 +294,9 @@ class ChatbotModule(BaseModule):
             # Force the session to see the committed changes
             db.expire_all()
             
-            # Get conversation history for context - INCLUDING the message we just created
+            # Get conversation history for context - includes the current message we just created
+            # Fetch up to memory_length pairs of messages (user + assistant)
+            # The +1 ensures we include the current message if we're at the limit
             messages = db.query(DBMessage).filter(
                 DBMessage.conversation_id == conversation.id
             ).order_by(DBMessage.timestamp.desc()).limit(chatbot_config.memory_length * 2 + 1).all()
@@ -424,16 +425,11 @@ class ChatbotModule(BaseModule):
                 import traceback
                 logger.warning(f"RAG search traceback: {traceback.format_exc()}")
         
-        # Build conversation context
+        # Build conversation context (includes the current message from db_messages)
         messages = self._build_conversation_messages(db_messages, config, rag_context, context)
         
-        # CRITICAL: Add the current user message to the messages array
-        # This ensures the LLM knows what the user is asking, not just the history
-        messages.append({
-            "role": "user",
-            "content": message
-        })
-        logger.info(f"Added current user message to messages array")
+        # Note: Current user message is already included in db_messages from the query
+        logger.info(f"Built conversation context with {len(messages)} messages")
         
         # LLM completion
         logger.info(f"Attempting LLM completion with model: {config.model}")
@@ -546,9 +542,7 @@ class ChatbotModule(BaseModule):
             else:
                 logger.info(f"Skipped message with role {msg.role}")
         
-        logger.info(f"Final messages array has {len(messages)} messages")
-        from pprint import pprint
-        pprint(messages)  # For debugging, can be removed in production
+        logger.info(f"Final messages array has {len(messages)} messages")  # For debugging, can be removed in production
         return messages
     
     async def _get_or_create_conversation(self, conversation_id: Optional[str], 

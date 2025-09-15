@@ -405,7 +405,7 @@ class RAGService:
             if os.path.exists(document.file_path):
                 os.remove(document.file_path)
         except Exception as e:
-            print(f"Warning: Could not delete file {document.file_path}: {e}")
+            logger.warning(f"Could not delete file {document.file_path}: {e}")
         
         return True
     
