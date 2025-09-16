@@ -138,7 +138,6 @@ services:
       - QDRANT__LOG_LEVEL=INFO
     volumes:
       - enclava-qdrant-data:/qdrant/storage
-      - ./qdrant/config.yaml:/qdrant/config/production.yaml:ro
     networks:
       - enclava-net
     restart: unless-stopped
