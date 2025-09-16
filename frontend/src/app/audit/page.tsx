@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { downloadFile } from "../lib/file-download";
+import { downloadFile } from "@/lib/file-download";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "../lib/api-client";
+import { apiClient } from "@/lib/api-client";
 import { config } from "@/lib/config";
 
 interface AuditLog {

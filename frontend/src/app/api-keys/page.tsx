@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+export const dynamic = 'force-dynamic'
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ import {
   Bot
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "../lib/api-client";
+import { apiClient } from "@/lib/api-client";
 
 interface ApiKey {
   id: string;
@@ -93,7 +94,7 @@ const PERMISSION_OPTIONS = [
   { value: "llm:embeddings", label: "LLM Embeddings" },
 ];
 
-export default function ApiKeysPage() {
+function ApiKeysPageContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -904,5 +905,13 @@ export default function ApiKeysPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ApiKeysPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto p-6">Loading...</div>}>
+      <ApiKeysPageContent />
+    </Suspense>
   );
 }

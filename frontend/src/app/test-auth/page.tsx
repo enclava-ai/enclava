@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useState } from "react"
-import { apiClient } from "../lib/api-client"
+import { apiClient } from "@/lib/api-client"
 import { tokenManager } from "@/lib/token-manager"
 
 export default function TestAuthPage() {

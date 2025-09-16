@@ -9,10 +9,8 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  experimental: {
-    // Enable standalone output for better Docker compatibility
-    outputStandalone: true,
-  },
+  // Enable standalone output for better Docker compatibility
+  output: 'standalone',
   webpack: (config, { isServer, dev }) => {
     config.resolve.alias = {
       ...config.resolve.alias,

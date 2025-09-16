@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
 import { useToast } from "@/hooks/use-toast"
 import { config } from "@/lib/config"
-import { apiClient } from "../lib/api-client"
+import { apiClient } from "@/lib/api-client"
 
 // Force dynamic rendering for authentication
 export const dynamic = 'force-dynamic'
