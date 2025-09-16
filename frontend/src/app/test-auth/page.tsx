@@ -26,16 +26,18 @@ export default function TestAuthPage() {
   const getTokenInfo = () => {
     const expiry = tokenManager.getTokenExpiry()
     const refreshExpiry = tokenManager.getRefreshTokenExpiry()
-    
-    if (!expiry) return "No token"
-    
+
+    if (!expiry.access_token_expiry) return "No token"
+
     const now = new Date()
-    const timeUntilExpiry = Math.floor((expiry.getTime() - now.getTime()) / 1000)
-    
+    const accessTimeUntilExpiry = Math.floor((expiry.access_token_expiry - now.getTime() / 1000))
+    const refreshTimeUntilExpiry = refreshExpiry ? Math.floor((refreshExpiry - now.getTime() / 1000)) : null
+
     return `
-Token expires in: ${Math.floor(timeUntilExpiry / 60)} minutes ${timeUntilExpiry % 60} seconds
-Access token expiry: ${expiry.toLocaleString()}
-Refresh token expiry: ${refreshExpiry?.toLocaleString() || 'N/A'}
+Access token expires in: ${Math.floor(accessTimeUntilExpiry / 60)} minutes ${accessTimeUntilExpiry % 60} seconds
+Refresh token expires in: ${refreshTimeUntilExpiry ? `${Math.floor(refreshTimeUntilExpiry / 60)} minutes ${refreshTimeUntilExpiry % 60} seconds` : 'N/A'}
+Access token expiry: ${new Date(expiry.access_token_expiry * 1000).toLocaleString()}
+Refresh token expiry: ${refreshExpiry ? new Date(refreshExpiry * 1000).toLocaleString() : 'N/A'}
 Authenticated: ${tokenManager.isAuthenticated()}
     `
   }
