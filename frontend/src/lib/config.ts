@@ -3,6 +3,17 @@ export const config = {
   APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'Enclava',
   DEFAULT_LANGUAGE: 'en',
   SUPPORTED_LANGUAGES: ['en', 'es', 'fr', 'de', 'it'],
+  getPublicApiUrl() {
+    if (this.API_BASE_URL) {
+      return this.API_BASE_URL
+    }
+
+    if (typeof window !== 'undefined' && window.location.origin) {
+      return window.location.origin
+    }
+
+    return ''
+  },
 
   // Feature flags
   FEATURES: {
