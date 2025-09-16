@@ -13,7 +13,7 @@ import { DocumentUpload } from "@/components/rag/document-upload"
 import { DocumentBrowser } from "@/components/rag/document-browser"
 import { useAuth } from "@/contexts/AuthContext"
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '../lib/api-client'
 
 interface Collection {
   id: string

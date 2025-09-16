@@ -25,7 +25,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '../lib/api-client'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useRouter } from 'next/navigation'
 

@@ -31,7 +31,7 @@ import {
   Play
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/lib/api-client";
+import { apiClient } from "../lib/api-client";
 import { useModules, triggerModuleRefresh } from '@/contexts/ModulesContext';
 import { Badge } from '@/components/ui/badge';
 

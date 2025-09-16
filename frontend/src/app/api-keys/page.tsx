@@ -36,7 +36,7 @@ import {
   Bot
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/lib/api-client";
+import { apiClient } from "../lib/api-client";
 
 interface ApiKey {
   id: string;

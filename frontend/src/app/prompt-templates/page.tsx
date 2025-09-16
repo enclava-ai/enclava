@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Edit3, RotateCcw, Loader2, Save, AlertTriangle, Plus, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '../lib/api-client'
 import { config } from '@/lib/config'
 import { useAuth } from '@/contexts/AuthContext'
 

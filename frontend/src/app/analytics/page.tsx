@@ -20,7 +20,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from '../lib/api-client'
 
 interface AnalyticsData {
   overview: {
