@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "tsconfig-paths-webpack-plugin": "^4.1.0",
     "@hookform/resolvers": "^3.3.2",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.0.4",
