@@ -119,25 +119,52 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
     setInput("")
     setIsLoading(true)
 
+    // Enhanced logging for debugging
+    const debugInfo = {
+      chatbotId,
+      messageLength: messageToSend.length,
+      conversationId,
+      timestamp: new Date().toISOString(),
+      messagesCount: messages.length
+    }
+    console.log('=== CHAT REQUEST DEBUG ===', debugInfo)
+
     try {
       // Build conversation history in OpenAI format
       const conversationHistory = messages.map(msg => ({
         role: msg.role,
         content: msg.content
       }))
-      
+
+      const requestData = {
+        messages: conversationHistory,
+        conversation_id: conversationId || undefined
+      }
+
+      console.log('=== CHAT API REQUEST ===', {
+        url: `/api-internal/v1/chatbot/${chatbotId}/chat/completions`,
+        data: requestData
+      })
+
       const data = await chatbotApi.chat(
         chatbotId,
         messageToSend,
-        {
-          messages: conversationHistory,
-          conversation_id: conversationId || undefined
-        }
+        requestData
       )
-      
+
+      console.log('=== CHAT API RESPONSE ===', {
+        status: 'success',
+        data,
+        responseKeys: Object.keys(data),
+        hasChoices: !!data.choices,
+        hasResponse: !!data.response,
+        content: data.choices?.[0]?.message?.content || data.response || 'No response'
+      })
+
       // Update conversation ID if it's a new conversation
       if (!conversationId && data.conversation_id) {
-        setConversationId(data.conversation_id)
+        setConversationId(data.conversationId)
+        console.log('Updated conversation ID:', data.conversation_id)
       }
 
       const assistantMessage: ChatMessage = {
@@ -150,8 +177,18 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
 
       setMessages(prev => [...prev, assistantMessage])
 
-    } catch (error) {
-      console.error('Chat error:', error)
+    } catch (error: any) {
+      console.error('=== CHAT ERROR DEBUG ===', {
+        errorType: typeof error,
+        error,
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorResponse: error?.response?.data,
+        errorStatus: error?.response?.status,
+        errorConfig: error?.config,
+        errorStack: error?.stack,
+        timestamp: new Date().toISOString()
+      })
 
       // Handle different error types
       if (error && typeof error === 'object') {

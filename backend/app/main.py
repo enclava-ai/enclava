@@ -135,6 +135,10 @@ app.add_middleware(
 # Add analytics middleware
 setup_analytics_middleware(app)
 
+# Add debugging middleware for detailed request/response logging
+from app.middleware.debugging import setup_debugging_middleware
+setup_debugging_middleware(app)
+
 # Add security middleware
 from app.middleware.security import setup_security_middleware
 setup_security_middleware(app, enabled=settings.API_SECURITY_ENABLED)
