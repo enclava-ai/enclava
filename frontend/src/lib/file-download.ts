@@ -1,3 +1,5 @@
+import Cookies from 'js-cookie';
+
 export const downloadFile = async (url: string, filename?: string): Promise<void> => {
   try {
     const response = await fetch(url);
@@ -117,7 +119,16 @@ export const uploadFile = async (
         reject(new Error('Network error during upload'));
       };
 
+      // Get authentication token from cookies
+      const token = Cookies.get('access_token');
+
       xhr.open('POST', url, true);
+
+      // Set the authorization header if token exists
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
       xhr.send(formData);
     });
   } catch (error) {
