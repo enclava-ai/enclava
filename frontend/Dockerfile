@@ -22,9 +22,9 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build the application using npm only
+# Ensure all dependencies are installed for build
 RUN npm install
-RUN npm install autoprefixer
+RUN npm install --save-dev autoprefixer
 RUN npm run build
 
 # Production image, copy all the files and run next
