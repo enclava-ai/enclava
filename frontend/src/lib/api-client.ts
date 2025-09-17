@@ -106,5 +106,5 @@ export const chatbotApi = {
   update: async (id: string, data: any) => apiClient.put(`/api/chatbot/update/${id}`, data),
   delete: async (id: string) => apiClient.delete(`/api/chatbot/delete/${id}`),
   chat: async (id: string, message: string, config?: any) =>
-    apiClient.post(`/api/chatbot/chat`, { chatbot_id: id, message, ...config }),
+    apiClient.post(`/api/chatbot/chat/${id}`, { message, ...config }),
 };

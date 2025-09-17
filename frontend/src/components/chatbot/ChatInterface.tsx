@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { MessageCircle, Send, Bot, User, Loader2, Copy, ThumbsUp, ThumbsDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateTimestampId } from "@/lib/id-utils"
-import { chatbotApi, type AppError } from "@/lib/api-client"
+import { chatbotApi } from "@/lib/api-client"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeHighlight from "rehype-highlight"
@@ -126,11 +126,10 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
         content: msg.content
       }))
       
-      const data = await chatbotApi.sendMessage(
+      const data = await chatbotApi.chat(
         chatbotId,
         messageToSend,
-        conversationId || undefined,
-        conversationHistory
+        { conversation_id: conversationId || undefined }
       )
       
       // Update conversation ID if it's a new conversation
@@ -149,15 +148,36 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       setMessages(prev => [...prev, assistantMessage])
 
     } catch (error) {
-      const appError = error as AppError
-      
-      // More specific error handling
-      if (appError.code === 'UNAUTHORIZED') {
-        toast.error("Authentication Required", "Please log in to continue chatting.")
-      } else if (appError.code === 'NETWORK_ERROR') {
-        toast.error("Connection Error", "Please check your internet connection and try again.")
+      console.error('Chat error:', error)
+
+      // Handle different error types
+      if (error && typeof error === 'object') {
+        if ('response' in error) {
+          // Axios error
+          const status = error.response?.status
+          if (status === 401) {
+            toast.error("Authentication Required", "Please log in to continue chatting.")
+          } else if (status === 429) {
+            toast.error("Rate Limit", "Too many requests. Please wait and try again.")
+          } else {
+            toast.error("Message Failed", error.response?.data?.detail || "Failed to send message. Please try again.")
+          }
+        } else if ('code' in error) {
+          // Custom error with code
+          if (error.code === 'UNAUTHORIZED') {
+            toast.error("Authentication Required", "Please log in to continue chatting.")
+          } else if (error.code === 'NETWORK_ERROR') {
+            toast.error("Connection Error", "Please check your internet connection and try again.")
+          } else {
+            toast.error("Message Failed", error.message || "Failed to send message. Please try again.")
+          }
+        } else {
+          // Generic error
+          toast.error("Message Failed", error.message || "Failed to send message. Please try again.")
+        }
       } else {
-        toast.error("Message Failed", appError.message || "Failed to send message. Please try again.")
+        // Fallback for unknown error types
+        toast.error("Message Failed", "An unexpected error occurred. Please try again.")
       }
     } finally {
       setIsLoading(false)

@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { generateId } from '@/lib/id-utils'
-import { chatbotApi, type AppError } from '@/lib/api-client'
+import { chatbotApi } from '@/lib/api-client'
 import { useToast } from './use-toast'
 
 export interface ChatbotConfig {
@@ -59,10 +59,10 @@ export function useChatbotForm() {
   const loadChatbots = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await chatbotApi.listChatbots()
+      const data = await chatbotApi.list()
       setChatbots(data)
     } catch (error) {
-      const appError = error as AppError
+      console.error('Load chatbots error:', error)
       toast.error("Loading Failed", "Failed to load chatbots")
     } finally {
       setIsLoading(false)
@@ -73,15 +73,20 @@ export function useChatbotForm() {
   const createChatbot = useCallback(async (config: ChatbotConfig) => {
     setIsSubmitting(true)
     try {
-      const newChatbot = await chatbotApi.createChatbot(config)
+      const newChatbot = await chatbotApi.create(config)
       setChatbots(prev => [...prev, newChatbot])
       toast.success("Success", `Chatbot "${config.name}" created successfully`)
       return newChatbot
     } catch (error) {
-      const appError = error as AppError
-      
-      if (appError.code === 'VALIDATION_ERROR') {
-        toast.error("Validation Error", appError.details || "Please check your input")
+      console.error('Create chatbot error:', error)
+
+      if (error && typeof error === 'object' && 'response' in error) {
+        const detail = error.response?.data?.detail || error.response?.data?.error
+        if (detail) {
+          toast.error("Validation Error", detail)
+        } else {
+          toast.error("Creation Failed", "Failed to create chatbot")
+        }
       } else {
         toast.error("Creation Failed", "Failed to create chatbot")
       }
@@ -95,12 +100,12 @@ export function useChatbotForm() {
   const updateChatbot = useCallback(async (id: string, config: ChatbotConfig) => {
     setIsSubmitting(true)
     try {
-      const updatedChatbot = await chatbotApi.updateChatbot(id, config)
+      const updatedChatbot = await chatbotApi.update(id, config)
       setChatbots(prev => prev.map(bot => bot.id === id ? updatedChatbot : bot))
       toast.success("Success", `Chatbot "${config.name}" updated successfully`)
       return updatedChatbot
     } catch (error) {
-      const appError = error as AppError
+      console.error('Update chatbot error:', error)
       toast.error("Update Failed", "Failed to update chatbot")
       throw error
     } finally {
@@ -112,11 +117,11 @@ export function useChatbotForm() {
   const deleteChatbot = useCallback(async (id: string) => {
     setIsSubmitting(true)
     try {
-      await chatbotApi.deleteChatbot(id)
+      await chatbotApi.delete(id)
       setChatbots(prev => prev.filter(bot => bot.id !== id))
       toast.success("Success", "Chatbot deleted successfully")
     } catch (error) {
-      const appError = error as AppError
+      console.error('Delete chatbot error:', error)
       toast.error("Deletion Failed", "Failed to delete chatbot")
       throw error
     } finally {
