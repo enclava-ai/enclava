@@ -9,7 +9,8 @@ from sqlalchemy import text
 from app.core.security import get_current_user
 from app.db.database import get_db
 from app.models.user import User
-from app.models.chatbot import ChatbotInstance, PromptTemplate
+from app.models.chatbot import ChatbotInstance
+from app.models.prompt_template import PromptTemplate
 from app.models.rag_collection import RagCollection
 
 router = APIRouter()
