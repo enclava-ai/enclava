@@ -49,7 +49,7 @@ axiosInstance.interceptors.response.use(
       try {
         const refreshToken = Cookies.get('refresh_token');
         if (refreshToken) {
-          const response = await axios.post(`${getApiBaseUrl()}/api/auth/refresh`, {
+          const response = await axios.post(`${getApiBaseUrl()}/api-internal/v1/auth/refresh`, {
             refresh_token: refreshToken,
           });
 
@@ -101,10 +101,19 @@ export const apiClient = {
 
 // Chatbot specific API methods
 export const chatbotApi = {
-  create: async (data: any) => apiClient.post('/api/chatbot/create', data),
-  list: async () => apiClient.get('/api/chatbot/list'),
-  update: async (id: string, data: any) => apiClient.put(`/api/chatbot/update/${id}`, data),
-  delete: async (id: string) => apiClient.delete(`/api/chatbot/delete/${id}`),
-  chat: async (id: string, message: string, config?: any) =>
-    apiClient.post(`/api/chatbot/chat/${id}`, { message, ...config }),
+  create: async (data: any) => apiClient.post('/api-internal/v1/chatbot/create', data),
+  list: async () => apiClient.get('/api-internal/v1/chatbot/list'),
+  update: async (id: string, data: any) => apiClient.put(`/api-internal/v1/chatbot/update/${id}`, data),
+  delete: async (id: string) => apiClient.delete(`/api-internal/v1/chatbot/delete/${id}`),
+  chat: async (id: string, message: string, config?: any) => {
+    // For OpenAI-compatible chat completions
+    const messages = [
+      ...(config?.messages || []),
+      { role: 'user', content: message }
+    ]
+    return apiClient.post(`/api-internal/v1/chatbot/${id}/chat/completions`, {
+      messages,
+      ...config
+    })
+  },
 };

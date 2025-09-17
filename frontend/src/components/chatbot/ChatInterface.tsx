@@ -129,7 +129,10 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       const data = await chatbotApi.chat(
         chatbotId,
         messageToSend,
-        { conversation_id: conversationId || undefined }
+        {
+          messages: conversationHistory,
+          conversation_id: conversationId || undefined
+        }
       )
       
       // Update conversation ID if it's a new conversation
@@ -138,9 +141,9 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       }
 
       const assistantMessage: ChatMessage = {
-        id: data.message_id || generateTimestampId('msg'),
+        id: data.id || generateTimestampId('msg'),
         role: 'assistant',
-        content: data.response,
+        content: data.choices?.[0]?.message?.content || data.response || 'No response',
         timestamp: new Date(),
         sources: data.sources
       }
