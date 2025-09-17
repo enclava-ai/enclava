@@ -16,7 +16,7 @@ from .models import (
     ModelInfo, ProviderStatus, LLMMetrics
 )
 from .config import config_manager, ProviderConfig
-from .security import security_manager
+# Security service removed as requested
 from .resilience import ResilienceManagerFactory
 from .metrics import metrics_collector
 from .providers import BaseLLMProvider, PrivateModeProvider
@@ -149,53 +149,8 @@ class LLMService:
         if not request.messages:
             raise ValidationError("Messages cannot be empty", field="messages")
         
-        # Security validation
-        # Chatbot and RAG system requests should have relaxed security validation
-        is_system_request = (
-            request.user_id == "rag_system" or 
-            request.user_id == "chatbot_user" or 
-            str(request.user_id).startswith("chatbot_")
-        )
-        
+        # Security validation removed as requested
         messages_dict = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-        is_safe, risk_score, detected_patterns = security_manager.validate_prompt_security(messages_dict)
-        
-        if not is_safe and not is_system_request:
-            # Log security violation for regular user requests
-            security_manager.create_audit_log(
-                user_id=request.user_id,
-                api_key_id=request.api_key_id,
-                provider="blocked",
-                model=request.model,
-                request_type="chat_completion",
-                risk_score=risk_score,
-                detected_patterns=[p.get("pattern", "") for p in detected_patterns]
-            )
-            
-            # Record blocked request
-            metrics_collector.record_request(
-                provider="security",
-                model=request.model,
-                request_type="chat_completion",
-                success=False,
-                latency_ms=0,
-                security_risk_score=risk_score,
-                error_code="SECURITY_BLOCKED",
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
-            
-            raise SecurityError(
-                "Request blocked due to security concerns",
-                risk_score=risk_score,
-                details={"detected_patterns": detected_patterns}
-            )
-        elif not is_safe and is_system_request:
-            # For system requests (chatbot/RAG), log but don't block
-            logger.info(f"System request contains security patterns (risk_score={risk_score:.2f}) but allowing due to system context")
-            if detected_patterns:
-                logger.info(f"Detected patterns: {[p.get('pattern', 'unknown') for p in detected_patterns]}")
-            # Allow system requests regardless of security patterns
         
         # Get provider for model
         provider_name = self._get_provider_for_model(request.model)
@@ -204,18 +159,7 @@ class LLMService:
         if not provider:
             raise ProviderError(f"No available provider for model '{request.model}'", provider=provider_name)
         
-        # Log detailed request if enabled
-        security_manager.log_detailed_request(
-            messages=messages_dict,
-            model=request.model,
-            user_id=request.user_id,
-            provider=provider_name,
-            context_info={
-                "temperature": request.temperature,
-                "max_tokens": request.max_tokens,
-                "risk_score": f"{risk_score:.3f}"
-            }
-        )
+        # Security logging removed as requested
         
         # Execute with resilience
         resilience_manager = ResilienceManagerFactory.get_manager(provider_name)
@@ -226,22 +170,15 @@ class LLMService:
                 provider.create_chat_completion,
                 request,
                 retryable_exceptions=(ProviderError, TimeoutError),
-                non_retryable_exceptions=(SecurityError, ValidationError)
+                non_retryable_exceptions=(ValidationError,)
             )
             
-            # Update response with security information
-            response.security_check = is_safe
-            response.risk_score = risk_score
-            response.detected_patterns = [p.get("pattern", "") for p in detected_patterns]
+            # Set default security values since security is removed
+            response.security_check = True
+            response.risk_score = 0.0
+            response.detected_patterns = []
             
-            # Log detailed response if enabled
-            if response.choices:
-                content = response.choices[0].message.content
-                security_manager.log_detailed_response(
-                    response_content=content,
-                    token_usage=response.usage.model_dump() if response.usage else None,
-                    provider=provider_name
-                )
+            # Security logging removed as requested
             
             # Record successful request
             total_latency = (time.time() - start_time) * 1000
@@ -252,26 +189,12 @@ class LLMService:
                 success=True,
                 latency_ms=total_latency,
                 token_usage=response.usage.model_dump() if response.usage else None,
-                security_risk_score=risk_score,
+                # security_risk_score removed as requested
                 user_id=request.user_id,
                 api_key_id=request.api_key_id
             )
             
-            # Create audit log
-            security_manager.create_audit_log(
-                user_id=request.user_id,
-                api_key_id=request.api_key_id,
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion",
-                risk_score=risk_score,
-                detected_patterns=[p.get("pattern", "") for p in detected_patterns],
-                metadata={
-                    "success": True,
-                    "latency_ms": total_latency,
-                    "token_usage": response.usage.model_dump() if response.usage else None
-                }
-            )
+            # Security audit logging removed as requested
             
             return response
         
@@ -286,28 +209,13 @@ class LLMService:
                 request_type="chat_completion",
                 success=False,
                 latency_ms=total_latency,
-                security_risk_score=risk_score,
+                # security_risk_score removed as requested
                 error_code=error_code,
                 user_id=request.user_id,
                 api_key_id=request.api_key_id
             )
             
-            # Create audit log for failure
-            security_manager.create_audit_log(
-                user_id=request.user_id,
-                api_key_id=request.api_key_id,
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion",
-                risk_score=risk_score,
-                detected_patterns=[p.get("pattern", "") for p in detected_patterns],
-                metadata={
-                    "success": False,
-                    "error": str(e),
-                    "error_code": error_code,
-                    "latency_ms": total_latency
-                }
-            )
+            # Security audit logging removed as requested
             
             raise
     
@@ -316,26 +224,8 @@ class LLMService:
         if not self._initialized:
             await self.initialize()
         
-        # Security validation (same as non-streaming)
-        # Chatbot and RAG system requests should have relaxed security validation
-        is_system_request = (
-            request.user_id == "rag_system" or 
-            request.user_id == "chatbot_user" or 
-            str(request.user_id).startswith("chatbot_")
-        )
-        
+        # Security validation removed as requested
         messages_dict = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-        is_safe, risk_score, detected_patterns = security_manager.validate_prompt_security(messages_dict)
-        
-        if not is_safe and not is_system_request:
-            raise SecurityError(
-                "Streaming request blocked due to security concerns",
-                risk_score=risk_score,
-                details={"detected_patterns": detected_patterns}
-            )
-        elif not is_safe and is_system_request:
-            # For system requests (chatbot/RAG), log but don't block
-            logger.info(f"System streaming request contains security patterns (risk_score={risk_score:.2f}) but allowing due to system context")
         
         # Get provider
         provider_name = self._get_provider_for_model(request.model)
@@ -352,7 +242,7 @@ class LLMService:
                 provider.create_chat_completion_stream,
                 request,
                 retryable_exceptions=(ProviderError, TimeoutError),
-                non_retryable_exceptions=(SecurityError, ValidationError)
+                non_retryable_exceptions=(ValidationError,)
             ):
                 yield chunk
         
@@ -365,7 +255,7 @@ class LLMService:
                 request_type="chat_completion_stream",
                 success=False,
                 latency_ms=0,
-                security_risk_score=risk_score,
+                # security_risk_score removed as requested
                 error_code=error_code,
                 user_id=request.user_id,
                 api_key_id=request.api_key_id
@@ -377,34 +267,7 @@ class LLMService:
         if not self._initialized:
             await self.initialize()
         
-        # Security validation for embedding input
-        # RAG system requests (document embedding) should use relaxed security validation
-        is_rag_system = request.user_id == "rag_system"
-        
-        if not is_rag_system:
-            # Apply normal security validation for user-generated embedding requests
-            input_text = request.input if isinstance(request.input, str) else " ".join(request.input)
-            is_safe, risk_score, detected_patterns = security_manager.validate_prompt_security([
-                {"role": "user", "content": input_text}
-            ])
-            
-            if not is_safe:
-                raise SecurityError(
-                    "Embedding request blocked due to security concerns",
-                    risk_score=risk_score,
-                    details={"detected_patterns": detected_patterns}
-                )
-        else:
-            # For RAG system requests, log but don't block (document content can contain legitimate text that triggers patterns)
-            input_text = request.input if isinstance(request.input, str) else " ".join(request.input)
-            is_safe, risk_score, detected_patterns = security_manager.validate_prompt_security([
-                {"role": "user", "content": input_text}
-            ])
-            
-            if detected_patterns:
-                logger.info(f"RAG document embedding contains security patterns (risk_score={risk_score:.2f}) but allowing due to document context")
-            
-            # Allow RAG system requests regardless of security patterns
+        # Security validation removed as requested
         
         # Get provider
         provider_name = self._get_provider_for_model(request.model)
@@ -422,12 +285,12 @@ class LLMService:
                 provider.create_embedding,
                 request,
                 retryable_exceptions=(ProviderError, TimeoutError),
-                non_retryable_exceptions=(SecurityError, ValidationError)
+                non_retryable_exceptions=(ValidationError,)
             )
             
-            # Update response with security information
-            response.security_check = is_safe
-            response.risk_score = risk_score
+            # Set default security values since security is removed
+            response.security_check = True
+            response.risk_score = 0.0
             
             # Record successful request
             total_latency = (time.time() - start_time) * 1000
@@ -438,7 +301,7 @@ class LLMService:
                 success=True,
                 latency_ms=total_latency,
                 token_usage=response.usage.model_dump() if response.usage else None,
-                security_risk_score=risk_score,
+                # security_risk_score removed as requested
                 user_id=request.user_id,
                 api_key_id=request.api_key_id
             )
@@ -456,7 +319,7 @@ class LLMService:
                 request_type="embedding",
                 success=False,
                 latency_ms=total_latency,
-                security_risk_score=risk_score,
+                # security_risk_score removed as requested
                 error_code=error_code,
                 user_id=request.user_id,
                 api_key_id=request.api_key_id

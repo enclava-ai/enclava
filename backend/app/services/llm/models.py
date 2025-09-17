@@ -71,11 +71,11 @@ class ChatResponse(BaseModel):
     usage: Optional[TokenUsage] = Field(None, description="Token usage")
     system_fingerprint: Optional[str] = Field(None, description="System fingerprint")
     
-    # Security and audit information
-    security_check: bool = Field(..., description="Whether security check passed")
-    risk_score: float = Field(..., description="Security risk score")
-    detected_patterns: List[str] = Field(default_factory=list, description="Detected security patterns")
-    
+    # Security fields maintained for backward compatibility
+    security_check: Optional[bool] = Field(None, description="Whether security check passed")
+    risk_score: Optional[float] = Field(None, description="Security risk score")
+    detected_patterns: Optional[List[str]] = Field(None, description="Detected security patterns")
+
     # Performance metrics
     latency_ms: Optional[float] = Field(None, description="Response latency in milliseconds")
     provider_latency_ms: Optional[float] = Field(None, description="Provider-specific latency")
@@ -117,10 +117,11 @@ class EmbeddingResponse(BaseModel):
     provider: str = Field(..., description="Provider used")
     usage: Optional[TokenUsage] = Field(None, description="Token usage")
     
-    # Security and audit information
-    security_check: bool = Field(..., description="Whether security check passed")
-    risk_score: float = Field(..., description="Security risk score")
-    
+    # Security fields maintained for backward compatibility
+    security_check: Optional[bool] = Field(None, description="Whether security check passed")
+    risk_score: Optional[float] = Field(None, description="Security risk score")
+    detected_patterns: Optional[List[str]] = Field(None, description="Detected security patterns")
+
     # Performance metrics
     latency_ms: Optional[float] = Field(None, description="Response latency in milliseconds")
     provider_latency_ms: Optional[float] = Field(None, description="Provider-specific latency")
@@ -157,9 +158,7 @@ class LLMMetrics(BaseModel):
     total_requests: int = Field(0, description="Total requests processed")
     successful_requests: int = Field(0, description="Successful requests")
     failed_requests: int = Field(0, description="Failed requests")
-    security_blocked_requests: int = Field(0, description="Security blocked requests")
     average_latency_ms: float = Field(0.0, description="Average response latency")
-    average_risk_score: float = Field(0.0, description="Average security risk score")
     provider_metrics: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Per-provider metrics")
     last_updated: datetime = Field(default_factory=datetime.utcnow, description="Last metrics update")
 
