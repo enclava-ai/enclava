@@ -4,6 +4,16 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { useRouter } from "next/navigation"
 import { tokenManager } from "@/lib/token-manager"
 
+// Helper function to get API URL with proper protocol
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol.slice(0, -1) // Remove ':' from 'https:'
+    const host = window.location.hostname
+    return `${protocol}://${host}`
+  }
+  return `http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`
+}
+
 interface User {
   id: string
   email: string
@@ -84,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = await tokenManager.getAccessToken()
       if (!token) return
 
-      const response = await fetch('/api-internal/v1/auth/me', {
+      const response = await fetch(`${getApiUrl()}/api-internal/v1/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -114,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
     
     try {
-      const response = await fetch('/api-internal/v1/auth/login', {
+      const response = await fetch(`${getApiUrl()}/api-internal/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

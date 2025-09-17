@@ -48,7 +48,8 @@ class Settings(BaseSettings):
         """Derive CORS origins from BASE_URL if not explicitly set"""
         if v is None:
             base_url = info.data.get('BASE_URL', 'localhost')
-            return [f"http://{base_url}"]
+            # Support both HTTP and HTTPS for production environments
+            return [f"http://{base_url}", f"https://{base_url}"]
         return v if isinstance(v, list) else [v]
     
     # CORS origins (derived from BASE_URL)

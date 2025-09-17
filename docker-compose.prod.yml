@@ -23,9 +23,11 @@ services:
 
   # Database migration service - runs once to apply migrations
   enclava-migrate:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile.prod
+    env_file:
+      - ./.env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@enclava-postgres:5432/${POSTGRES_DB}
     depends_on:
@@ -40,6 +42,8 @@ services:
     build: 
       context: ./backend
       dockerfile: Dockerfile.prod
+    env_file:
+      - ./.env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@enclava-postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://enclava-redis:6379
@@ -76,11 +80,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: runner  # Use the production stage from multi-stage build
+    env_file:
+      - ./.env
     environment:
       - BASE_URL=${BASE_URL}
       - NEXT_PUBLIC_BASE_URL=${BASE_URL}
-      - BACKEND_INTERNAL_PORT=8000
-      - FRONTEND_INTERNAL_PORT=3000
       - INTERNAL_API_URL=http://enclava-backend:8000
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1

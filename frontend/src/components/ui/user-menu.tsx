@@ -18,6 +18,16 @@ import {
 import { User, Settings, Lock, LogOut, ChevronDown } from "lucide-react"
 import { useState } from "react"
 
+// Helper function to get API URL with proper protocol
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol.slice(0, -1) // Remove ':' from 'https:'
+    const host = window.location.hostname
+    return `${protocol}://${host}`
+  }
+  return `http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`
+}
+
 export function UserMenu() {
   const { user, logout } = useAuth()
   const { toast } = useToast()
@@ -62,7 +72,7 @@ export function UserMenu() {
         throw new Error('Authentication required')
       }
 
-      const response = await fetch('/api-internal/v1/auth/change-password', {
+      const response = await fetch(`${getApiUrl()}/api-internal/v1/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

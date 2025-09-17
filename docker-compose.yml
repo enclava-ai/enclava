@@ -68,11 +68,8 @@ services:
       # Required base URL (derives APP/API/WS URLs)  
       - BASE_URL=${BASE_URL}
       - NEXT_PUBLIC_BASE_URL=${BASE_URL}
-      # Docker internal ports
-      - BACKEND_INTERNAL_PORT=${BACKEND_INTERNAL_PORT}
-      - FRONTEND_INTERNAL_PORT=${FRONTEND_INTERNAL_PORT}
       # Internal API URL
-      - INTERNAL_API_URL=http://enclava-backend:${BACKEND_INTERNAL_PORT}
+      - INTERNAL_API_URL=http://enclava-backend:8000
     depends_on:
       - enclava-backend
     ports:

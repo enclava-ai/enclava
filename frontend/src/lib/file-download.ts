@@ -76,11 +76,19 @@ export const downloadFileFromData = (
 export const uploadFile = async (
   file: File,
   url: string,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  additionalData?: Record<string, any>
 ): Promise<any> => {
   try {
     const formData = new FormData();
     formData.append('file', file);
+
+    // Add additional form data if provided
+    if (additionalData) {
+      Object.entries(additionalData).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+    }
 
     const xhr = new XMLHttpRequest();
 

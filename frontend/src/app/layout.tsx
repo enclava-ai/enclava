@@ -16,8 +16,21 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
+// Function to determine the base URL with proper protocol
+const getBaseUrl = () => {
+  // In production, we need to detect if we're behind HTTPS
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http'
+    const host = process.env.NEXT_PUBLIC_BASE_URL || window.location.hostname
+    return `${protocol}://${host}`
+  }
+  // For build time/server side, default to HTTP for dev, HTTPS for production
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+  return `${protocol}://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(`http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`),
+  metadataBase: new URL(getBaseUrl()),
   title: 'Enclava Platform',
   description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
   keywords: ['AI', 'Enclava', 'Confidential Computing', 'LLM', 'TEE'],
@@ -26,7 +39,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: `http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`,
+    url: getBaseUrl(),
     title: 'Enclava Platform',
     description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
     siteName: 'Enclava',

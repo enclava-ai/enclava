@@ -1,10 +1,23 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || '';
+// Dynamic base URL with protocol detection
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    // Client-side: use the same protocol as the current page
+    const protocol = window.location.protocol.slice(0, -1); // Remove ':' from 'https:'
+    const host = window.location.hostname;
+    return `${protocol}://${host}`;
+  }
+
+  // Server-side: use environment variable or default to localhost
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'localhost';
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+  return `${protocol}://${baseUrl}`;
+};
 
 const axiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -36,7 +49,7 @@ axiosInstance.interceptors.response.use(
       try {
         const refreshToken = Cookies.get('refresh_token');
         if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+          const response = await axios.post(`${getApiBaseUrl()}/api/auth/refresh`, {
             refresh_token: refreshToken,
           });
 
