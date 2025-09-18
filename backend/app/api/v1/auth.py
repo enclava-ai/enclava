@@ -1,6 +1,5 @@
 """Authentication API endpoints"""
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
@@ -172,54 +171,6 @@ async def login(
         bcrypt_rounds=settings.BCRYPT_ROUNDS,
     )
     
-    # DEBUG: Check Redis connection (keep lightweight to avoid request stalls)
-    if settings.APP_DEBUG:
-        try:
-            logger.info("LOGIN_REDIS_CHECK_START", redis_url=redis_url)
-            import redis.asyncio as redis
-
-            redis_url = settings.REDIS_URL
-            logger.info(f"Redis URL: {redis_url}")
-            redis_client = redis.from_url(
-                redis_url,
-                socket_connect_timeout=1.0,
-                socket_timeout=1.0,
-            )
-            test_start = datetime.utcnow()
-            try:
-                await asyncio.wait_for(redis_client.ping(), timeout=1.5)
-                test_end = datetime.utcnow()
-                logger.info(
-                    "LOGIN_REDIS_CHECK_SUCCESS",
-                    duration_seconds=(test_end - test_start).total_seconds(),
-                )
-            except asyncio.TimeoutError:
-                logger.warning("LOGIN_REDIS_CHECK_TIMEOUT", timeout_seconds=1.5)
-            finally:
-                await redis_client.close()
-        except Exception as e:
-            logger.error("LOGIN_REDIS_CHECK_FAILURE", error=str(e))
-
-    # DEBUG: Check database connection with timeout
-    if settings.APP_DEBUG:
-        try:
-            logger.info("LOGIN_DB_PING_START")
-            test_start = datetime.utcnow()
-            await asyncio.wait_for(db.execute(select(1)), timeout=3.0)
-            test_end = datetime.utcnow()
-            logger.info(
-                "LOGIN_DB_PING_SUCCESS",
-                duration_seconds=(test_end - test_start).total_seconds(),
-            )
-        except asyncio.TimeoutError:
-            logger.warning("LOGIN_DB_PING_TIMEOUT", timeout_seconds=3.0)
-        except Exception as e:
-            logger.error("LOGIN_DB_PING_FAILURE", error=str(e))
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database connection error"
-            )
-
     start_time = datetime.utcnow()
 
     # Get user by email
