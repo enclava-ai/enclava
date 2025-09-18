@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days
     SESSION_EXPIRE_MINUTES: int = int(os.getenv("SESSION_EXPIRE_MINUTES", "1440"))  # 24 hours
     API_KEY_PREFIX: str = os.getenv("API_KEY_PREFIX", "en_")
+    BCRYPT_ROUNDS: int = int(os.getenv("BCRYPT_ROUNDS", "6"))  # Bcrypt work factor - lower for production performance
     
     # Admin user provisioning (used only on first startup)
     ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL")

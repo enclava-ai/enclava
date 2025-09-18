@@ -159,16 +159,34 @@ async def login(
 ):
     """Login user and return access tokens"""
     
+    logger.info(f"Login attempt for email: {user_data.email}")
+    start_time = datetime.utcnow()
+    
     # Get user by email
     stmt = select(User).where(User.email == user_data.email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     
-    if not user or not verify_password(user_data.password, user.hashed_password):
+    if not user:
+        logger.warning(f"User not found: {user_data.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
+    
+    logger.info(f"User found, starting password verification...")
+    verify_start = datetime.utcnow()
+    
+    if not verify_password(user_data.password, user.hashed_password):
+        verify_end = datetime.utcnow()
+        logger.warning(f"Password verification failed. Time taken: {(verify_end - verify_start).total_seconds()} seconds")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    
+    verify_end = datetime.utcnow()
+    logger.info(f"Password verification successful. Time taken: {(verify_end - verify_start).total_seconds()} seconds")
     
     if not user.is_active:
         raise HTTPException(

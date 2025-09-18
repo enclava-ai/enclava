@@ -20,7 +20,12 @@ from app.utils.exceptions import AuthenticationError, AuthorizationError
 logger = logging.getLogger(__name__)
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use a lower work factor for better performance in production
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=settings.BCRYPT_ROUNDS
+)
 
 # JWT token handling
 security = HTTPBearer()
