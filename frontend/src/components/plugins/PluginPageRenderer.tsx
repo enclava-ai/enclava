@@ -8,7 +8,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@/components/providers/auth-provider';
+import { tokenManager } from '@/lib/token-manager';
 import { usePlugin, type PluginInfo } from '../../contexts/PluginContext';
 import { config } from '../../lib/config';
 
@@ -48,8 +49,8 @@ const PluginIframe: React.FC<PluginIframeProps> = ({
       // Validate origin - should be from our backend
       const allowedOrigins = [
         window.location.origin,
-        config.getBackendUrl(),
-        config.getApiUrl()
+        config.API_BASE_URL,
+        config.API_BASE_URL
       ].filter(Boolean);
       
       if (!allowedOrigins.some(origin => event.origin.startsWith(origin))) {
@@ -161,7 +162,8 @@ export const PluginPageRenderer: React.FC<PluginPageRendererProps> = ({
   pagePath,
   componentName
 }) => {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
+  const token = tokenManager.getAccessToken();
   const { 
     installedPlugins, 
     getPluginPages, 

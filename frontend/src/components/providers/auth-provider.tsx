@@ -9,6 +9,7 @@ interface User {
   id: string
   username: string
   email: string
+  name?: string
   role: string
   permissions: string[]
   created_at: string
@@ -18,6 +19,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
+  isAuthenticated: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => void
   register: (username: string, email: string, password: string) => Promise<void>
@@ -114,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     isLoading,
+    isAuthenticated: !!user,
     login,
     logout,
     register,
