@@ -266,21 +266,38 @@ class ModulePermissionRegistry:
         
         return True
     
-    def get_user_permissions(self, roles: List[str], 
+    def get_user_permissions(self, roles: List[str],
                            custom_permissions: List[str] = None) -> List[str]:
         """Get effective permissions for a user based on roles and custom permissions"""
-        permissions = set()
+        import time
+        start_time = time.time()
+        logger.info(f"=== GET USER PERMISSIONS START === Roles: {roles}, Custom perms: {custom_permissions}")
         
-        # Add role-based permissions
-        for role in roles:
-            role_perms = self.role_permissions.get(role, self.default_roles.get(role, []))
-            permissions.update(role_perms)
-        
-        # Add custom permissions
-        if custom_permissions:
-            permissions.update(custom_permissions)
-        
-        return list(permissions)
+        try:
+            permissions = set()
+            
+            # Add role-based permissions
+            for role in roles:
+                role_perms = self.role_permissions.get(role, self.default_roles.get(role, []))
+                logger.info(f"Role '{role}' has {len(role_perms)} permissions")
+                permissions.update(role_perms)
+            
+            # Add custom permissions
+            if custom_permissions:
+                permissions.update(custom_permissions)
+                logger.info(f"Added {len(custom_permissions)} custom permissions")
+            
+            result = list(permissions)
+            end_time = time.time()
+            duration = end_time - start_time
+            logger.info(f"=== GET USER PERMISSIONS END === Total permissions: {len(result)}, Duration: {duration:.3f}s")
+            
+            return result
+        except Exception as e:
+            end_time = time.time()
+            duration = end_time - start_time
+            logger.error(f"=== GET USER PERMISSIONS FAILED === Duration: {duration:.3f}s, Error: {e}")
+            raise
     
     def get_module_permissions(self, module_id: str) -> List[Permission]:
         """Get all permissions for a specific module"""

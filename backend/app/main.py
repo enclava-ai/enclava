@@ -57,8 +57,16 @@ async def lifespan(app: FastAPI):
     init_analytics_service()
     
     # Initialize module manager with FastAPI app for router registration
+    logger.info("Initializing module manager...")
     await module_manager.initialize(app)
     app.state.module_manager = module_manager
+    logger.info("Module manager initialized successfully")
+    
+    # Initialize permission registry
+    logger.info("Initializing permission registry...")
+    from app.services.permission_manager import permission_registry
+    permission_registry.register_platform_permissions()
+    logger.info("Permission registry initialized successfully")
     
     # Initialize document processor
     from app.services.document_processor import document_processor

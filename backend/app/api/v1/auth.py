@@ -2,6 +2,7 @@
 Authentication API endpoints
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -24,6 +25,8 @@ from app.core.security import (
 from app.db.database import get_db
 from app.models.user import User
 from app.utils.exceptions import AuthenticationError, ValidationError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
@@ -159,21 +162,57 @@ async def login(
 ):
     """Login user and return access tokens"""
     
+    logger.info(f"=== LOGIN DEBUG ===")
     logger.info(f"Login attempt for email: {user_data.email}")
+    logger.info(f"Current UTC time: {datetime.utcnow().isoformat()}")
+    logger.info(f"Settings check - DATABASE_URL: {'SET' if settings.DATABASE_URL else 'NOT SET'}")
+    logger.info(f"Settings check - JWT_SECRET: {'SET' if settings.JWT_SECRET else 'NOT SET'}")
+    logger.info(f"Settings check - ADMIN_EMAIL: {settings.ADMIN_EMAIL}")
+    logger.info(f"Settings check - BCRYPT_ROUNDS: {settings.BCRYPT_ROUNDS}")
+    
+    # DEBUG: Check database connection with timeout
+    try:
+        logger.info("Testing database connection...")
+        test_start = datetime.utcnow()
+        await db.execute(select(1))
+        test_end = datetime.utcnow()
+        logger.info(f"Database connection test successful. Time: {(test_end - test_start).total_seconds()} seconds")
+    except Exception as e:
+        logger.error(f"Database connection test failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database connection error"
+        )
+    
     start_time = datetime.utcnow()
     
     # Get user by email
+    logger.info("Querying user by email...")
+    query_start = datetime.utcnow()
     stmt = select(User).where(User.email == user_data.email)
     result = await db.execute(stmt)
+    query_end = datetime.utcnow()
+    logger.info(f"User query completed. Time: {(query_end - query_start).total_seconds()} seconds")
+    
     user = result.scalar_one_or_none()
     
     if not user:
         logger.warning(f"User not found: {user_data.email}")
+        # List available users for debugging
+        try:
+            all_users_stmt = select(User).limit(5)
+            all_users_result = await db.execute(all_users_stmt)
+            all_users = all_users_result.scalars().all()
+            logger.info(f"Available users (first 5): {[u.email for u in all_users]}")
+        except Exception as e:
+            logger.error(f"Could not list users: {e}")
+        
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
     
+    logger.info(f"User found: {user.email}, is_active: {user.is_active}")
     logger.info(f"User found, starting password verification...")
     verify_start = datetime.utcnow()
     
@@ -195,10 +234,16 @@ async def login(
         )
     
     # Update last login
+    logger.info("Updating last login...")
+    update_start = datetime.utcnow()
     user.update_last_login()
     await db.commit()
+    update_end = datetime.utcnow()
+    logger.info(f"Last login updated. Time: {(update_end - update_start).total_seconds()} seconds")
     
     # Create tokens
+    logger.info("Creating tokens...")
+    token_start = datetime.utcnow()
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     logger.info(f"Creating access token with expiration: {access_token_expires}")
     logger.info(f"ACCESS_TOKEN_EXPIRE_MINUTES from settings: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}")
@@ -216,6 +261,11 @@ async def login(
     refresh_token = create_refresh_token(
         data={"sub": str(user.id), "type": "refresh"}
     )
+    token_end = datetime.utcnow()
+    logger.info(f"Tokens created. Time: {(token_end - token_start).total_seconds()} seconds")
+    
+    total_time = datetime.utcnow() - start_time
+    logger.info(f"=== LOGIN COMPLETED === Total time: {total_time.total_seconds()} seconds")
     
     return TokenResponse(
         access_token=access_token,

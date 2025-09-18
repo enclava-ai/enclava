@@ -68,17 +68,33 @@ metadata = MetaData()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Get database session"""
-    async with async_session_factory() as session:
-        try:
-            yield session
-        except Exception as e:
-            # Only log if there's an actual error, not normal operation
-            if str(e).strip():  # Only log if error message exists
-                logger.error(f"Database session error: {str(e)}", exc_info=True)
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+    import time
+    start_time = time.time()
+    request_id = f"db_{int(time.time() * 1000)}"
+    
+    logger.info(f"[{request_id}] === DATABASE SESSION START ===")
+    
+    try:
+        logger.info(f"[{request_id}] Creating database session...")
+        async with async_session_factory() as session:
+            logger.info(f"[{request_id}] Database session created successfully")
+            try:
+                yield session
+            except Exception as e:
+                # Only log if there's an actual error, not normal operation
+                if str(e).strip():  # Only log if error message exists
+                    logger.error(f"[{request_id}] Database session error: {str(e)}", exc_info=True)
+                await session.rollback()
+                raise
+            finally:
+                close_start = time.time()
+                await session.close()
+                close_time = time.time() - close_start
+                total_time = time.time() - start_time
+                logger.info(f"[{request_id}] Database session closed. Close time: {close_time:.3f}s, Total time: {total_time:.3f}s")
+    except Exception as e:
+        logger.error(f"[{request_id}] Failed to create database session: {e}", exc_info=True)
+        raise
 
 
 async def init_db():

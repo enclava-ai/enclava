@@ -71,8 +71,11 @@ class DebuggingMiddleware(BaseHTTPMiddleware):
         response = None
         response_body = None
 
+        # Add timeout detection
         try:
+            logger.info(f"=== START PROCESSING REQUEST === {request_id} at {datetime.utcnow().isoformat()}")
             response = await call_next(request)
+            logger.info(f"=== REQUEST COMPLETED === {request_id} at {datetime.utcnow().isoformat()}")
 
             # Capture response body for successful JSON responses
             if response.status_code < 400 and isinstance(response, JSONResponse):

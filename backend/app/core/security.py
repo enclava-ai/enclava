@@ -32,7 +32,25 @@ security = HTTPBearer()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+    import time
+    start_time = time.time()
+    logger.info(f"=== PASSWORD VERIFICATION START === BCRYPT_ROUNDS: {settings.BCRYPT_ROUNDS}")
+    
+    try:
+        result = pwd_context.verify(plain_password, hashed_password)
+        end_time = time.time()
+        duration = end_time - start_time
+        logger.info(f"=== PASSWORD VERIFICATION END === Duration: {duration:.3f}s, Result: {result}")
+        
+        if duration > 5:
+            logger.warning(f"PASSWORD VERIFICATION TOOK TOO LONG: {duration:.3f}s")
+            
+        return result
+    except Exception as e:
+        end_time = time.time()
+        duration = end_time - start_time
+        logger.error(f"=== PASSWORD VERIFICATION FAILED === Duration: {duration:.3f}s, Error: {e}")
+        raise
 
 def get_password_hash(password: str) -> str:
     """Generate password hash"""
@@ -48,22 +66,42 @@ def get_api_key_hash(api_key: str) -> str:
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """Create JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    import time
+    start_time = time.time()
+    logger.info(f"=== CREATE ACCESS TOKEN START ===")
     
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
-    
-    # Log token creation details
-    logger.info(f"Created access token for user {data.get('sub')}")
-    logger.info(f"Token expires at: {expire.isoformat()} (UTC)")
-    logger.info(f"Current UTC time: {datetime.utcnow().isoformat()}")
-    logger.info(f"ACCESS_TOKEN_EXPIRE_MINUTES setting: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}")
-    
-    return encoded_jwt
+    try:
+        to_encode = data.copy()
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        to_encode.update({"exp": expire})
+        logger.info(f"JWT encode start...")
+        encode_start = time.time()
+        encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+        encode_end = time.time()
+        encode_duration = encode_end - encode_start
+        
+        end_time = time.time()
+        total_duration = end_time - start_time
+        
+        # Log token creation details
+        logger.info(f"Created access token for user {data.get('sub')}")
+        logger.info(f"Token expires at: {expire.isoformat()} (UTC)")
+        logger.info(f"Current UTC time: {datetime.utcnow().isoformat()}")
+        logger.info(f"ACCESS_TOKEN_EXPIRE_MINUTES setting: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}")
+        logger.info(f"JWT encode duration: {encode_duration:.3f}s")
+        logger.info(f"Total token creation duration: {total_duration:.3f}s")
+        logger.info(f"=== CREATE ACCESS TOKEN END ===")
+        
+        return encoded_jwt
+    except Exception as e:
+        end_time = time.time()
+        total_duration = end_time - start_time
+        logger.error(f"=== CREATE ACCESS TOKEN FAILED === Duration: {total_duration:.3f}s, Error: {e}")
+        raise
 
 def create_refresh_token(data: Dict[str, Any]) -> str:
     """Create JWT refresh token"""
