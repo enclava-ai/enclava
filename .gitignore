@@ -1,3 +1,4 @@
 .env
 backend/.config_encryption_key
 backend/storage/
+frontend/node_modules/
