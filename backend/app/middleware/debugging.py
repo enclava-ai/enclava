@@ -74,6 +74,13 @@ class DebuggingMiddleware(BaseHTTPMiddleware):
         # Add timeout detection
         try:
             logger.info(f"=== START PROCESSING REQUEST === {request_id} at {datetime.utcnow().isoformat()}")
+            logger.info(f"Request path: {request.url.path}")
+            logger.info(f"Request method: {request.method}")
+            
+            # Check if this is the login endpoint
+            if request.url.path == "/api-internal/v1/auth/login" and request.method == "POST":
+                logger.info(f"=== LOGIN REQUEST DETECTED === {request_id}")
+                
             response = await call_next(request)
             logger.info(f"=== REQUEST COMPLETED === {request_id} at {datetime.utcnow().isoformat()}")
 

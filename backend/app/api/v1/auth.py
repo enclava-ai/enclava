@@ -162,6 +162,9 @@ async def login(
 ):
     """Login user and return access tokens"""
     
+    logger.info(f"==================================================")
+    logger.info(f"=== LOGIN ENDPOINT REACHED ===")
+    logger.info(f"==================================================")
     logger.info(f"=== LOGIN DEBUG ===")
     logger.info(f"Login attempt for email: {user_data.email}")
     logger.info(f"Current UTC time: {datetime.utcnow().isoformat()}")
@@ -169,6 +172,21 @@ async def login(
     logger.info(f"Settings check - JWT_SECRET: {'SET' if settings.JWT_SECRET else 'NOT SET'}")
     logger.info(f"Settings check - ADMIN_EMAIL: {settings.ADMIN_EMAIL}")
     logger.info(f"Settings check - BCRYPT_ROUNDS: {settings.BCRYPT_ROUNDS}")
+    
+    # DEBUG: Check Redis connection
+    try:
+        logger.info("Testing Redis connection...")
+        import redis.asyncio as redis
+        redis_url = settings.REDIS_URL
+        logger.info(f"Redis URL: {redis_url}")
+        redis_client = redis.from_url(redis_url)
+        test_start = datetime.utcnow()
+        await redis_client.ping()
+        test_end = datetime.utcnow()
+        logger.info(f"Redis connection test successful. Time: {(test_end - test_start).total_seconds()} seconds")
+        await redis_client.close()
+    except Exception as e:
+        logger.error(f"Redis connection test failed: {e}")
     
     # DEBUG: Check database connection with timeout
     try:
