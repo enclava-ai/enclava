@@ -182,6 +182,9 @@ async def login(
     
     # Create tokens
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    logger.info(f"Creating access token with expiration: {access_token_expires}")
+    logger.info(f"ACCESS_TOKEN_EXPIRE_MINUTES from settings: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}")
+    
     access_token = create_access_token(
         data={
             "sub": str(user.id),
@@ -234,6 +237,10 @@ async def refresh_token(
         
         # Create new access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        logger.info(f"REFRESH: Creating new access token with expiration: {access_token_expires}")
+        logger.info(f"REFRESH: ACCESS_TOKEN_EXPIRE_MINUTES from settings: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}")
+        logger.info(f"REFRESH: Current UTC time: {datetime.utcnow().isoformat()}")
+        
         access_token = create_access_token(
             data={
                 "sub": str(user.id),
