@@ -1,6 +1,6 @@
 """
 Configuration Management Service - Core App Integration
-Provides centralized configuration management with hot-reloading and encryption.
+Provides centralized configuration management with hot-reloading.
 """
 import asyncio
 import json
@@ -12,7 +12,6 @@ from typing import Dict, Any, Optional, List, Union, Callable
 from pathlib import Path
 from dataclasses import dataclass, asdict
 from datetime import datetime
-from cryptography.fernet import Fernet
 import yaml
 import logging
 from watchdog.observers import Observer
@@ -50,7 +49,6 @@ class ConfigStats:
     total_configs: int
     active_watchers: int
     config_versions: int
-    encrypted_configs: int
     hot_reloads_performed: int
     validation_errors: int
     last_reload_time: datetime
@@ -111,7 +109,6 @@ class ConfigManager:
         self.schemas: Dict[str, ConfigSchema] = {}
         self.versions: Dict[str, List[ConfigVersion]] = {}
         self.watchers: Dict[str, Observer] = {}
-        self.encrypted_configs: set = set()
         self.config_paths: Dict[str, Path] = {}
         self.environment = os.getenv('ENVIRONMENT', 'development')
         self.start_time = time.time()
@@ -119,16 +116,11 @@ class ConfigManager:
             total_configs=0,
             active_watchers=0,
             config_versions=0,
-            encrypted_configs=0,
             hot_reloads_performed=0,
             validation_errors=0,
             last_reload_time=datetime.now(),
             uptime=0
         )
-        
-        # Initialize encryption key
-        self.encryption_key = self._get_or_create_encryption_key()
-        self.cipher = Fernet(self.encryption_key)
         
         # Base configuration directories
         self.config_base_dir = Path("configs")
@@ -139,19 +131,6 @@ class ConfigManager:
         self.env_config_dir.mkdir(exist_ok=True)
         
         logger.info(f"ConfigManager initialized for environment: {self.environment}")
-    
-    def _get_or_create_encryption_key(self) -> bytes:
-        """Get or create encryption key for sensitive configurations"""
-        key_file = Path(".config_encryption_key")
-        
-        if key_file.exists():
-            return key_file.read_bytes()
-        else:
-            key = Fernet.generate_key()
-            key_file.write_bytes(key)
-            key_file.chmod(0o600)  # Restrict permissions
-            logger.info("Generated new encryption key for configuration management")
-            return key
     
     def register_schema(self, name: str, schema: ConfigSchema):
         """Register a configuration schema for validation"""
@@ -231,7 +210,7 @@ class ConfigManager:
         return version
     
     async def set_config(self, name: str, config_data: Dict[str, Any], 
-                        encrypted: bool = False, description: str = "Manual update") -> bool:
+                        description: str = "Manual update") -> bool:
         """Set configuration with validation and versioning"""
         try:
             # Validate configuration
@@ -241,16 +220,12 @@ class ConfigManager:
             # Create version before updating
             self._create_version(name, config_data, description)
             
-            # Handle encryption if requested
-            if encrypted:
-                self.encrypted_configs.add(name)
-                
             # Store configuration
             self.configs[name] = config_data.copy()
             self.stats.total_configs = len(self.configs)
             
             # Save to file
-            await self._save_config_to_file(name, config_data, encrypted)
+            await self._save_config_to_file(name, config_data)
             
             logger.info(f"Configuration '{name}' updated successfully")
             return True
@@ -288,22 +263,15 @@ class ConfigManager:
         except (KeyError, TypeError):
             return default
     
-    async def _save_config_to_file(self, name: str, config_data: Dict[str, Any], encrypted: bool = False):
+    async def _save_config_to_file(self, name: str, config_data: Dict[str, Any]):
         """Save configuration to file"""
         file_path = self.env_config_dir / f"{name}.json"
         
         try:
-            if encrypted:
-                # Encrypt sensitive data
-                json_str = json.dumps(config_data, indent=2)
-                encrypted_data = self.cipher.encrypt(json_str.encode())
-                file_path.write_bytes(encrypted_data)
-                logger.debug(f"Saved encrypted config '{name}' to {file_path}")
-            else:
-                # Save as regular JSON
-                with open(file_path, 'w') as f:
-                    json.dump(config_data, f, indent=2)
-                logger.debug(f"Saved config '{name}' to {file_path}")
+            # Save as regular JSON
+            with open(file_path, 'w') as f:
+                json.dump(config_data, f, indent=2)
+            logger.debug(f"Saved config '{name}' to {file_path}")
             
             self.config_paths[name] = file_path
             
@@ -319,15 +287,9 @@ class ConfigManager:
             return None
         
         try:
-            if name in self.encrypted_configs:
-                # Decrypt sensitive data
-                encrypted_data = file_path.read_bytes()
-                decrypted_data = self.cipher.decrypt(encrypted_data)
-                return json.loads(decrypted_data.decode())
-            else:
-                # Load regular JSON
-                with open(file_path, 'r') as f:
-                    return json.load(f)
+            # Load regular JSON
+            with open(file_path, 'r') as f:
+                return json.load(f)
                     
         except Exception as e:
             logger.error(f"Error loading config '{name}' from file: {str(e)}")

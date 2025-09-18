@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Nginx reverse proxy - Internal routing only (since SSL is handled by host)
   enclava-nginx:
