@@ -69,8 +69,15 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
       setLastUpdated(new Date())
       
     } catch (err) {
-      // Only set error if we're authenticated (to avoid noise on auth pages)
-      if (tokenManager.isAuthenticated()) {
+      // If we get a 401 error, clear the tokens
+      if (err && typeof err === 'object' && 'response' in err && (err.response as any)?.status === 401) {
+        tokenManager.clearTokens()
+        setModules([])
+        setEnabledModules(new Set())
+        setError(null)
+        setLastUpdated(null)
+      } else if (tokenManager.isAuthenticated()) {
+        // Only set error if we're authenticated (to avoid noise on auth pages)
         setError(err instanceof Error ? err.message : "Failed to load modules")
       }
     } finally {

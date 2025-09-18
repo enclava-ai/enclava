@@ -114,9 +114,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (typeof window !== 'undefined') {
           localStorage.setItem('user', JSON.stringify(user))
         }
+      } else if (response.status === 401) {
+        // Token is invalid or expired, clear it
+        console.log('Token invalid, clearing tokens')
+        tokenManager.clearTokens()
+        setUser(null)
       }
     } catch (error) {
       console.error('Failed to fetch user info:', error)
+      // If there's an error, clear tokens to be safe
+      tokenManager.clearTokens()
+      setUser(null)
     }
   }
 
@@ -140,11 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json()
       
       // Store tokens in TokenManager
-      tokenManager.setTokens(
-        data.access_token,
-        data.refresh_token,
-        data.expires_in
-      )
+      tokenManager.setTokens(data.access_token, data.refresh_token)
       
       // Fetch user info
       await fetchUserInfo()
@@ -161,8 +165,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    tokenManager.logout()
-    // Token manager will emit 'logout' event which we handle above
+    tokenManager.clearTokens()
+    setUser(null)
+    router.push('/login')
   }
 
   return (

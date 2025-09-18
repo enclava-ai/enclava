@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { UserMenu } from "@/components/ui/user-menu"
-import { useAuth } from "@/contexts/AuthContext"
+import { useAuth } from "@/components/providers/auth-provider"
 import { useModules } from "@/contexts/ModulesContext"
 import { usePlugin } from "@/contexts/PluginContext"
 import {

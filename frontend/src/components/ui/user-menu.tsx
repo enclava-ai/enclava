@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { useAuth } from "@/contexts/AuthContext"
+import { useAuth } from "@/components/providers/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import {
   DropdownMenu,
