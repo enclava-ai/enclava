@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,7 +94,7 @@ const PERMISSION_OPTIONS = [
   { value: "llm:embeddings", label: "LLM Embeddings" },
 ];
 
-export default function ApiKeysPage() {
+function ApiKeysContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -904,5 +905,13 @@ export default function ApiKeysPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ApiKeysPage() {
+  return (
+    <Suspense fallback={<div>Loading API keys...</div>}>
+      <ApiKeysContent />
+    </Suspense>
   );
 }

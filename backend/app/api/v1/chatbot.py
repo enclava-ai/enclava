@@ -275,14 +275,14 @@ async def chat_with_chatbot(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Send a message to a chatbot and get a response"""
+    """Send a message to a chatbot and get a response (without persisting conversation)"""
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
     log_api_request("chat_with_chatbot", {
         "user_id": user_id,
         "chatbot_id": chatbot_id,
         "message_length": len(request.message)
     })
-    
+
     try:
         # Get the chatbot instance
         result = await db.execute(
@@ -291,74 +291,40 @@ async def chat_with_chatbot(
             .where(ChatbotInstance.created_by == str(user_id))
         )
         chatbot = result.scalar_one_or_none()
-        
+
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found")
-        
+
         if not chatbot.is_active:
             raise HTTPException(status_code=400, detail="Chatbot is not active")
-        
-        # Initialize conversation service
-        conversation_service = ConversationService(db)
-        
-        # Get or create conversation
-        conversation = await conversation_service.get_or_create_conversation(
-            chatbot_id=chatbot_id,
-            user_id=str(user_id),
-            conversation_id=request.conversation_id
-        )
-        
-        # Add user message to conversation
-        await conversation_service.add_message(
-            conversation_id=conversation.id,
-            role="user",
-            content=request.message,
-            metadata={}
-        )
-        
+
         # Get chatbot module and generate response
         try:
             chatbot_module = module_manager.modules.get("chatbot")
             if not chatbot_module:
                 raise HTTPException(status_code=500, detail="Chatbot module not available")
-            
-            # Load conversation history for context
-            conversation_history = await conversation_service.get_conversation_history(
-                conversation_id=conversation.id,
-                limit=chatbot.config.get('memory_length', 10),
-                include_system=False
-            )
-            
-            # Use the chatbot module to generate a response
+
+            # Use the chatbot module to generate a response (without persisting)
             response_data = await chatbot_module.chat(
                 chatbot_config=chatbot.config,
                 message=request.message,
-                conversation_history=conversation_history,
+                conversation_history=[],  # Empty history for test chat
                 user_id=str(user_id)
             )
-            
+
             response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
-            
+
         except Exception as e:
             # Use fallback response
             fallback_responses = chatbot.config.get("fallback_responses", [
                 "I'm sorry, I'm having trouble processing your request right now."
             ])
             response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
-        
-        # Save assistant message using conversation service
-        assistant_message = await conversation_service.add_message(
-            conversation_id=conversation.id,
-            role="assistant",
-            content=response_content,
-            metadata={},
-            sources=response_data.get("sources")
-        )
-        
+
+        # Return response without conversation ID (since we're not persisting)
         return {
-            "conversation_id": conversation.id,
             "response": response_content,
-            "timestamp": assistant_message.timestamp.isoformat()
+            "sources": response_data.get("sources")
         }
         
     except HTTPException:

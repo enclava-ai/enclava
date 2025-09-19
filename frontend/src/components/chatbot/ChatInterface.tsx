@@ -87,9 +87,8 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [conversationId, setConversationId] = useState<string | null>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
-  const { toast } = useToast()
+  const { success: toastSuccess, error: toastError } = useToast()
 
   const scrollToBottom = useCallback(() => {
     if (scrollAreaRef.current) {
@@ -120,23 +119,20 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
     setIsLoading(true)
 
     try {
-      // Build conversation history in OpenAI format
+      let data: any
+
+      // Use internal API
       const conversationHistory = messages.map(msg => ({
         role: msg.role,
         content: msg.content
       }))
-      
-      const data = await chatbotApi.sendMessage(
+
+      data = await chatbotApi.sendMessage(
         chatbotId,
         messageToSend,
-        conversationId || undefined,
+        undefined, // No conversation ID
         conversationHistory
       )
-      
-      // Update conversation ID if it's a new conversation
-      if (!conversationId && data.conversation_id) {
-        setConversationId(data.conversation_id)
-      }
 
       const assistantMessage: ChatMessage = {
         id: data.message_id || generateTimestampId('msg'),
@@ -153,16 +149,16 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       
       // More specific error handling
       if (appError.code === 'UNAUTHORIZED') {
-        toast.error("Authentication Required", "Please log in to continue chatting.")
+        toastError("Authentication Required", "Please log in to continue chatting.")
       } else if (appError.code === 'NETWORK_ERROR') {
-        toast.error("Connection Error", "Please check your internet connection and try again.")
+        toastError("Connection Error", "Please check your internet connection and try again.")
       } else {
-        toast.error("Message Failed", appError.message || "Failed to send message. Please try again.")
+        toastError("Message Failed", appError.message || "Failed to send message. Please try again.")
       }
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, chatbotId, conversationId, messages, toast])
+  }, [input, isLoading, chatbotId, messages, toastError])
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -174,11 +170,11 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
   const copyMessage = useCallback(async (content: string) => {
     try {
       await navigator.clipboard.writeText(content)
-      toast.success("Copied", "Message copied to clipboard")
+      toastSuccess("Copied", "Message copied to clipboard")
     } catch (error) {
-      toast.error("Copy Failed", "Unable to copy message to clipboard")
+      toastError("Copy Failed", "Unable to copy message to clipboard")
     }
-  }, [toast])
+  }, [toastSuccess, toastError])
 
   const formatTime = useCallback((date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

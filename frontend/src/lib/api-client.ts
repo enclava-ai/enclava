@@ -86,11 +86,31 @@ export const chatbotApi = {
   deleteChatbot(id: string) {
     return apiClient.delete(`/api-internal/v1/chatbot/delete/${encodeURIComponent(id)}`)
   },
+  // Legacy method with JWT auth (to be deprecated)
   sendMessage(chatbotId: string, message: string, conversationId?: string, history?: Array<{role: string; content: string}>) {
-    const body: any = { chatbot_id: chatbotId, message }
+    const body: any = { message }
     if (conversationId) body.conversation_id = conversationId
     if (history) body.history = history
-    return apiClient.post('/api-internal/v1/chatbot/chat', body)
+    return apiClient.post(`/api-internal/v1/chatbot/chat/${encodeURIComponent(chatbotId)}`, body)
   },
+  // OpenAI-compatible chatbot API with API key auth
+  sendOpenAIChatMessage(chatbotId: string, messages: Array<{role: string; content: string}>, apiKey: string, options?: {
+    temperature?: number
+    max_tokens?: number
+    stream?: boolean
+  }) {
+    const body: any = {
+      messages,
+      ...options
+    }
+    return fetch(`/api/v1/chatbot/external/${encodeURIComponent(chatbotId)}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(body)
+    }).then(res => res.json())
+  }
 }
 

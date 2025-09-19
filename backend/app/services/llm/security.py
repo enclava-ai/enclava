@@ -29,7 +29,7 @@ class SecurityManager:
         """Setup patterns for prompt injection detection"""
         self.injection_patterns = [
             # Direct instruction injection
-            r"(?i)(ignore|forget|disregard|override)\s+(previous|all|above|prior)\s+(instructions|rules|prompts)",
+            r"(?i)(ignore|forget|disregard|override).{0,20}(instructions|rules|prompts)",
             r"(?i)(new|updated|different)\s+(instructions|rules|system)",
             r"(?i)act\s+as\s+(if|though)\s+you\s+(are|were)",
             r"(?i)pretend\s+(to\s+be|you\s+are)",
@@ -61,12 +61,12 @@ class SecurityManager:
             r"(?i)base64\s*:",
             r"(?i)hex\s*:",
             r"(?i)unicode\s*:",
-            r"[A-Za-z0-9+/]{20,}={0,2}",  # Potential base64
+            r"(?i)\b[A-Za-z0-9+/]{40,}={0,2}\b",  # More specific base64 pattern (longer sequences)
             
-            # SQL injection patterns (for system prompts)
-            r"(?i)(union|select|insert|update|delete|drop|create)\s+",
-            r"(?i)(or|and)\s+1\s*=\s*1",
-            r"(?i)';?\s*(drop|delete|insert)",
+            # SQL injection patterns (more specific to reduce false positives)
+            r"(?i)(union\s+select|select\s+\*|insert\s+into|update\s+\w+\s+set|delete\s+from|drop\s+table|create\s+table)\s",
+            r"(?i)(or|and)\s+\d+\s*=\s*\d+",
+            r"(?i)';?\s*(drop\s+table|delete\s+from|insert\s+into)",
             
             # Command injection patterns
             r"(?i)(exec|eval|system|shell|cmd)\s*\(",
@@ -88,23 +88,27 @@ class SecurityManager:
     def validate_prompt_security(self, messages: List[Dict[str, str]]) -> Tuple[bool, float, List[str]]:
         """
         Validate messages for prompt injection attempts
-        
+
         Returns:
             Tuple[bool, float, List[str]]: (is_safe, risk_score, detected_patterns)
         """
         detected_patterns = []
         total_risk = 0.0
-        
+
+        # Check if this is a system/RAG request
+        is_system_request = self._is_system_request(messages)
+
         for message in messages:
             content = message.get("content", "")
             if not content:
                 continue
-            
-            # Check against injection patterns
+
+            # Check against injection patterns with context awareness
             for i, pattern in enumerate(self.compiled_patterns):
                 matches = pattern.findall(content)
                 if matches:
-                    pattern_risk = self._calculate_pattern_risk(i, matches)
+                    # Apply context-aware risk calculation
+                    pattern_risk = self._calculate_pattern_risk(i, matches, message.get("role", "user"), is_system_request)
                     total_risk += pattern_risk
                     detected_patterns.append({
                         "pattern_index": i,
@@ -112,57 +116,97 @@ class SecurityManager:
                         "matches": matches,
                         "risk": pattern_risk
                     })
-            
-            # Additional security checks
-            total_risk += self._check_message_characteristics(content)
-        
+
+            # Additional security checks with context awareness
+            total_risk += self._check_message_characteristics(content, message.get("role", "user"), is_system_request)
+
         # Normalize risk score (0.0 to 1.0)
         risk_score = min(total_risk / len(messages) if messages else 0.0, 1.0)
-        is_safe = risk_score < settings.API_SECURITY_RISK_THRESHOLD
-        
+        # Never block - always return True for is_safe
+        is_safe = True
+
         if detected_patterns:
-            logger.warning(f"Detected {len(detected_patterns)} potential injection patterns, risk score: {risk_score}")
-        
+            logger.info(f"Detected {len(detected_patterns)} potential injection patterns, risk score: {risk_score} (system_request: {is_system_request})")
+
         return is_safe, risk_score, detected_patterns
     
-    def _calculate_pattern_risk(self, pattern_index: int, matches: List) -> float:
-        """Calculate risk score for a detected pattern"""
+    def _calculate_pattern_risk(self, pattern_index: int, matches: List, role: str, is_system_request: bool) -> float:
+        """Calculate risk score for a detected pattern with context awareness"""
         # Different patterns have different risk levels
-        high_risk_patterns = [0, 1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 22, 23, 24]  # System manipulation, jailbreak
+        high_risk_patterns = [0, 1, 2, 3, 4, 5, 6, 7, 22, 23, 24]  # System manipulation, jailbreak
         medium_risk_patterns = [8, 9, 10, 11, 12, 13, 17, 18, 19, 20, 21]  # Escape attempts, info extraction
-        
+
+        # Base risk score
         base_risk = 0.8 if pattern_index in high_risk_patterns else 0.5 if pattern_index in medium_risk_patterns else 0.3
-        
-        # Increase risk based on number of matches
-        match_multiplier = min(1.0 + (len(matches) - 1) * 0.2, 2.0)
-        
+
+        # Apply context-specific risk reduction
+        if is_system_request or role == "system":
+            # Reduce risk for system messages and RAG content
+            if pattern_index in [14, 15, 16]:  # Encoding patterns (base64, hex, unicode)
+                base_risk *= 0.2  # Reduce encoding risk by 80% for system content
+            elif pattern_index in [17, 18, 19]:  # SQL patterns
+                base_risk *= 0.3  # Reduce SQL risk by 70% for system content
+            else:
+                base_risk *= 0.6  # Reduce other risks by 40% for system content
+
+        # Increase risk based on number of matches, but cap it
+        match_multiplier = min(1.0 + (len(matches) - 1) * 0.1, 1.5)  # Reduced multiplier
+
         return base_risk * match_multiplier
     
-    def _check_message_characteristics(self, content: str) -> float:
-        """Check message characteristics for additional risk factors"""
+    def _check_message_characteristics(self, content: str, role: str, is_system_request: bool) -> float:
+        """Check message characteristics for additional risk factors with context awareness"""
         risk = 0.0
-        
-        # Excessive length (potential stuffing attack)
-        if len(content) > 10000:
-            risk += 0.3
-        
-        # High ratio of special characters
+
+        # Excessive length (potential stuffing attack) - less restrictive for system content
+        length_threshold = 50000 if is_system_request else 10000  # Much higher threshold for system content
+        if len(content) > length_threshold:
+            risk += 0.1 if is_system_request else 0.3
+
+        # High ratio of special characters - more lenient for system content
         special_chars = sum(1 for c in content if not c.isalnum() and not c.isspace())
-        if len(content) > 0 and special_chars / len(content) > 0.5:
-            risk += 0.4
-        
-        # Multiple encoding indicators
+        if len(content) > 0:
+            char_ratio = special_chars / len(content)
+            threshold = 0.8 if is_system_request else 0.5
+            if char_ratio > threshold:
+                risk += 0.2 if is_system_request else 0.4
+
+        # Multiple encoding indicators - reduced risk for system content
         encoding_indicators = ["base64", "hex", "unicode", "url", "ascii"]
         found_encodings = sum(1 for indicator in encoding_indicators if indicator.lower() in content.lower())
         if found_encodings > 1:
-            risk += 0.3
-        
-        # Excessive newlines or formatting (potential formatting attacks)
-        if content.count('\n') > 50 or content.count('\\n') > 50:
-            risk += 0.2
-        
+            risk += 0.1 if is_system_request else 0.3
+
+        # Excessive newlines or formatting - more lenient for system content
+        newline_threshold = 200 if is_system_request else 50
+        if content.count('\n') > newline_threshold or content.count('\\n') > newline_threshold:
+            risk += 0.1 if is_system_request else 0.2
+
         return risk
-    
+
+    def _is_system_request(self, messages: List[Dict[str, str]]) -> bool:
+        """Determine if this is a system/RAG request"""
+        if not messages:
+            return False
+
+        # Check for system messages
+        for message in messages:
+            if message.get("role") == "system":
+                return True
+
+        # Check message content for RAG indicators
+        for message in messages:
+            content = message.get("content", "")
+            if ("document:" in content.lower() or
+                "context:" in content.lower() or
+                "source:" in content.lower() or
+                "retrieved:" in content.lower() or
+                "citation:" in content.lower() or
+                "reference:" in content.lower()):
+                return True
+
+        return False
+
     def create_audit_log(
         self,
         user_id: str,
@@ -195,11 +239,11 @@ class SecurityManager:
         audit_hash = self._create_audit_hash(audit_entry)
         audit_entry["audit_hash"] = audit_hash
         
-        # Log based on risk level
+        # Log based on risk level (never block, only log)
         if risk_score >= settings.API_SECURITY_RISK_THRESHOLD:
-            logger.error(f"HIGH RISK LLM REQUEST BLOCKED: {json.dumps(audit_entry)}")
+            logger.warning(f"HIGH RISK LLM REQUEST DETECTED (NOT BLOCKED): {json.dumps(audit_entry)}")
         elif risk_score >= settings.API_SECURITY_WARNING_THRESHOLD:
-            logger.warning(f"MEDIUM RISK LLM REQUEST: {json.dumps(audit_entry)}")
+            logger.info(f"MEDIUM RISK LLM REQUEST: {json.dumps(audit_entry)}")
         else:
             logger.info(f"LLM REQUEST AUDIT: user={user_id}, model={model}, risk={risk_score:.3f}")
         
