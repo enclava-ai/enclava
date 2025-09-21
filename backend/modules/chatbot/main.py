@@ -265,7 +265,6 @@ class ChatbotModule(BaseModule):
     
     async def chat_completion(self, request: ChatRequest, user_id: str, db: Session) -> ChatResponse:
         """Generate chat completion response"""
-        logger.info("=== CHAT COMPLETION METHOD CALLED ===")
         
         # Get chatbot configuration from database
         db_chatbot = db.query(DBChatbotInstance).filter(DBChatbotInstance.id == request.chatbot_id).first()
@@ -364,11 +363,10 @@ class ChatbotModule(BaseModule):
                 metadata={"error": str(e), "fallback": True}
             )
     
-    async def _generate_response(self, message: str, db_messages: List[DBMessage],
+    async def _generate_response(self, message: str, db_messages: List[DBMessage], 
                                config: ChatbotConfig, context: Optional[Dict] = None, db: Session = None) -> tuple[str, Optional[List]]:
         """Generate response using LLM with optional RAG"""
-        logger.info("=== _generate_response METHOD CALLED ===")
-
+        
         # Lazy load dependencies if not available
         await self._ensure_dependencies()
         
@@ -397,8 +395,8 @@ class ChatbotModule(BaseModule):
                                   for i, result in enumerate(rag_results)]
                         
                         # Build full RAG context from all results
-                        rag_context = "\\n\\nRelevant information from knowledge base:\\n" + "\\n\\n".join([
-                            f"[Document {i+1}]:\\n{result.document.content}" for i, result in enumerate(rag_results)
+                        rag_context = "\n\nRelevant information from knowledge base:\n" + "\n\n".join([
+                            f"[Document {i+1}]:\n{result.document.content}" for i, result in enumerate(rag_results)
                         ])
                         
                         # Detailed RAG logging - ALWAYS log for debugging
@@ -407,14 +405,14 @@ class ChatbotModule(BaseModule):
                         logger.info(f"Collection: {qdrant_collection_name}")
                         logger.info(f"Number of results: {len(rag_results)}")
                         for i, result in enumerate(rag_results):
-                            logger.info(f"\\n--- RAG Result {i+1} ---")
+                            logger.info(f"\n--- RAG Result {i+1} ---")
                             logger.info(f"Score: {getattr(result, 'score', 'N/A')}")
                             logger.info(f"Document ID: {getattr(result.document, 'id', 'N/A')}")
                             logger.info(f"Full Content ({len(result.document.content)} chars):")
                             logger.info(f"{result.document.content}")
                             if hasattr(result.document, 'metadata'):
                                 logger.info(f"Metadata: {result.document.metadata}")
-                        logger.info(f"\\n=== RAG CONTEXT BEING ADDED TO PROMPT ({len(rag_context)} chars) ===")
+                        logger.info(f"\n=== RAG CONTEXT BEING ADDED TO PROMPT ({len(rag_context)} chars) ===")
                         logger.info(rag_context)
                         logger.info("=== END RAG SEARCH RESULTS ===")
                     else:
@@ -428,11 +426,6 @@ class ChatbotModule(BaseModule):
                 logger.warning(f"RAG search traceback: {traceback.format_exc()}")
         
         # Build conversation context (includes the current message from db_messages)
-        logger.info(f"=== CRITICAL DEBUG ===")
-        logger.info(f"rag_context length: {len(rag_context)}")
-        logger.info(f"rag_context empty: {not rag_context}")
-        logger.info(f"rag_context preview: {rag_context[:200] if rag_context else 'EMPTY'}")
-        logger.info(f"=== END CRITICAL DEBUG ===")
         messages = self._build_conversation_messages(db_messages, config, rag_context, context)
         
         # Note: Current user message is already included in db_messages from the query
@@ -452,9 +445,9 @@ class ChatbotModule(BaseModule):
         if config.use_rag and rag_context:
             logger.info(f"RAG context added: {len(rag_context)} characters")
             logger.info(f"RAG sources: {len(sources) if sources else 0} documents")
-        logger.info("\\n=== COMPLETE MESSAGES SENT TO LLM ===")
+        logger.info("\n=== COMPLETE MESSAGES SENT TO LLM ===")
         for i, msg in enumerate(messages):
-            logger.info(f"\\n--- Message {i+1} ---")
+            logger.info(f"\n--- Message {i+1} ---")
             logger.info(f"Role: {msg['role']}")
             logger.info(f"Content ({len(msg['content'])} chars):")
             # Truncate long content for logging (full RAG context can be very long)
@@ -518,38 +511,34 @@ class ChatbotModule(BaseModule):
             # Return fallback if available
             return "I'm currently unable to process your request. Please try again later.", None
     
-    def _build_conversation_messages(self, db_messages: List[DBMessage], config: ChatbotConfig,
+    def _build_conversation_messages(self, db_messages: List[DBMessage], config: ChatbotConfig, 
                                    rag_context: str = "", context: Optional[Dict] = None) -> List[Dict]:
         """Build messages array for LLM completion"""
-
+        
         messages = []
-        logger.info(f"DEBUG: _build_conversation_messages called. rag_context length: {len(rag_context)}")
-
-        # System prompt - keep it clean without RAG context
+        
+        # System prompt
         system_prompt = config.system_prompt
+        if rag_context:
+            # Add explicit instruction to use RAG context
+            system_prompt += "\n\nIMPORTANT: Use the following information from the knowledge base to answer the user's question. " \
+                           "This information is directly relevant to their query and should be your primary source:\n" + rag_context
         if context and context.get('additional_instructions'):
             system_prompt += f"\n\nAdditional instructions: {context['additional_instructions']}"
-
+            
         messages.append({"role": "system", "content": system_prompt})
-
+        
         logger.info(f"Building messages from {len(db_messages)} database messages")
-
+        
         # Conversation history (messages are already limited by memory_length in the query)
         # Reverse to get chronological order
         # Include ALL messages - the current user message is needed for the LLM to respond!
         for idx, msg in enumerate(reversed(db_messages)):
             logger.info(f"Processing message {idx}: role={msg.role}, content_preview={msg.content[:50] if msg.content else 'None'}...")
             if msg.role in ["user", "assistant"]:
-                # For user messages, prepend RAG context if available
-                content = msg.content
-                if msg.role == "user" and rag_context and idx == 0:
-                    # Add RAG context to the current user message (first in reversed order)
-                    content = f"Relevant information from knowledge base:\n{rag_context}\n\nQuestion: {msg.content}"
-                    logger.info("Added RAG context to user message")
-
                 messages.append({
                     "role": msg.role,
-                    "content": content
+                    "content": msg.content
                 })
                 logger.info(f"Added message with role {msg.role} to LLM messages")
             else:
@@ -690,10 +679,9 @@ class ChatbotModule(BaseModule):
         return router
     
     # API Compatibility Methods
-    async def chat(self, chatbot_config: Dict[str, Any], message: str,
+    async def chat(self, chatbot_config: Dict[str, Any], message: str, 
                    conversation_history: List = None, user_id: str = "anonymous") -> Dict[str, Any]:
         """Chat method for API compatibility"""
-        logger.info("=== CHAT METHOD (API COMPATIBILITY) CALLED ===")
         logger.info(f"Chat method called with message: {message[:50]}... by user: {user_id}")
         
         # Lazy load dependencies
@@ -723,20 +711,21 @@ class ChatbotModule(BaseModule):
                     fallback_responses=chatbot_config.get("fallback_responses", [])
                 )
                 
-                # For API compatibility, create a temporary DBMessage for the current message
-                # so RAG context can be properly added
-                from app.models.chatbot import ChatbotMessage as DBMessage
+                # Generate response using internal method
+                # Create a temporary message object for the current user message
+                temp_messages = [
+                    DBMessage(
+                        id=0,
+                        conversation_id=0,
+                        role="user",
+                        content=message,
+                        timestamp=datetime.utcnow(),
+                        metadata={}
+                    )
+                ]
 
-                # Create a temporary user message with the current message
-                temp_user_message = DBMessage(
-                    conversation_id="temp_conversation",
-                    role=MessageRole.USER.value,
-                    content=message
-                )
-
-                # Generate response using internal method with the current message included
                 response_content, sources = await self._generate_response(
-                    message, [temp_user_message], config, None, db
+                    message, temp_messages, config, None, db
                 )
                 
                 return {
