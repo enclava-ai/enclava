@@ -61,12 +61,12 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             if analysis.is_threat and (analysis.should_block or analysis.risk_score >= settings.API_SECURITY_WARNING_THRESHOLD):
                 await self._log_security_event(request, analysis)
             
-            # Check if request should be blocked
-            if analysis.should_block:
+            # Check if request should be blocked (excluding rate limiting)
+            if analysis.should_block and not analysis.rate_limit_exceeded:
                 threat_detection_service.stats['threats_blocked'] += 1
                 logger.warning(f"Blocked request from {request.client.host if request.client else 'unknown'}: "
                              f"risk_score={analysis.risk_score:.3f}, threats={len(analysis.threats)}")
-                
+
                 # Return security block response
                 return self._create_block_response(analysis)
             
@@ -136,17 +136,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         """Create response for blocked requests"""
         # Determine status code based on threat type
         status_code = 403  # Forbidden by default
-        
-        # Rate limiting gets 429
-        if analysis.rate_limit_exceeded:
-            status_code = 429
-        
+
         # Critical threats get 403
         for threat in analysis.threats:
             if threat.threat_type in ["command_injection", "sql_injection"]:
                 status_code = 403
                 break
-        
+
         response_data = {
             "error": "Security Policy Violation",
             "message": "Request blocked due to security policy violation",
@@ -155,24 +151,12 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "threat_count": len(analysis.threats),
             "recommendations": analysis.recommendations[:3]  # Limit to first 3 recommendations
         }
-        
-        # Add rate limiting info if applicable
-        if analysis.rate_limit_exceeded:
-            response_data["error"] = "Rate Limit Exceeded"
-            response_data["message"] = f"Rate limit exceeded for {analysis.auth_level.value} user"
-            response_data["retry_after"] = "60"  # Suggest retry after 60 seconds
-        
+
         response = JSONResponse(
             content=response_data,
             status_code=status_code
         )
-        
-        # Add rate limiting headers
-        if analysis.rate_limit_exceeded:
-            response.headers["Retry-After"] = "60"
-            response.headers["X-RateLimit-Limit"] = "See API documentation"
-            response.headers["X-RateLimit-Reset"] = str(int(time.time() + 60))
-        
+
         return response
     
     def _add_security_headers(self, response: Response) -> Response:

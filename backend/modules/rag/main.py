@@ -60,6 +60,7 @@ import tiktoken
 from app.core.config import settings
 from app.core.logging import log_module_event
 from app.services.base_module import BaseModule, Permission
+from app.services.enhanced_embedding_service import enhanced_embedding_service
 
 
 @dataclass
@@ -1125,9 +1126,17 @@ class RAGModule(BaseModule):
             # Chunk the document
             chunks = self._chunk_text(content)
             
-            # Generate embeddings for all chunks in batch (more efficient)
-            embeddings = await self._generate_embeddings(chunks)
-            
+            # Generate embeddings with enhanced rate limiting handling
+            embeddings, success = await enhanced_embedding_service.get_embeddings_with_retry(chunks)
+
+            # Log if fallback embeddings were used
+            if not success:
+                logger.warning(f"Used fallback embeddings for document {doc_id} - search quality may be degraded")
+                log_module_event("rag", "fallback_embeddings_used", {
+                    "document_id": doc_id,
+                    "content_preview": content[:100] + "..." if len(content) > 100 else content
+                })
+
             # Create document points
             points = []
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
@@ -1188,9 +1197,17 @@ class RAGModule(BaseModule):
             # Chunk the document
             chunks = self._chunk_text(processed_doc.content)
             
-            # Generate embeddings for all chunks in batch (more efficient)
-            embeddings = await self._generate_embeddings(chunks)
-            
+            # Generate embeddings with enhanced rate limiting handling
+            embeddings, success = await enhanced_embedding_service.get_embeddings_with_retry(chunks)
+
+            # Log if fallback embeddings were used
+            if not success:
+                logger.warning(f"Used fallback embeddings for document {processed_doc.id} - search quality may be degraded")
+                log_module_event("rag", "fallback_embeddings_used", {
+                    "document_id": processed_doc.id,
+                    "filename": processed_doc.original_filename
+                })
+
             # Create document points with enhanced metadata
             points = []
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):

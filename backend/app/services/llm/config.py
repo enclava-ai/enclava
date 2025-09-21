@@ -65,7 +65,16 @@ class LLMServiceConfig(BaseModel):
     
     # Provider configurations
     providers: Dict[str, ProviderConfig] = Field(default_factory=dict, description="Provider configurations")
-    
+
+    # Token rate limiting (organization-wide)
+    token_limits_per_minute: Dict[str, int] = Field(
+        default_factory=lambda: {
+            "prompt_tokens": 20000,    # PrivateMode Standard tier
+            "completion_tokens": 10000  # PrivateMode Standard tier
+        },
+        description="Token rate limits per minute (organization-wide)"
+    )
+
     # Model routing (model_name -> provider_name)
     model_routing: Dict[str, str] = Field(default_factory=dict, description="Model to provider routing")
     
@@ -91,8 +100,8 @@ def create_default_config() -> LLMServiceConfig:
         supported_models=[],  # Will be populated dynamically from proxy
         capabilities=["chat", "embeddings", "tee"],
         priority=1,
-        max_requests_per_minute=100,
-        max_requests_per_hour=2000,
+        max_requests_per_minute=20,    # PrivateMode Standard tier limit: 20 req/min
+        max_requests_per_hour=1200,   # 20 req/min * 60 min
         supports_streaming=True,
         supports_function_calling=True,
         max_context_window=128000,
