@@ -18,77 +18,17 @@ logger = get_logger(__name__)
 
 
 class SecurityMiddleware(BaseHTTPMiddleware):
-    """Security middleware for threat detection and request filtering"""
-    
+    """Security middleware for threat detection and request filtering - DISABLED"""
+
     def __init__(self, app, enabled: bool = True):
         super().__init__(app)
-        self.enabled = enabled and settings.API_SECURITY_ENABLED
-        logger.info(f"SecurityMiddleware initialized, enabled: {self.enabled}")
+        self.enabled = False  # Force disable regardless of settings
+        logger.info("SecurityMiddleware initialized, enabled: False (DISABLED)")
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Process request through security analysis"""
-        if not self.enabled:
-            # Security disabled, pass through
-            return await call_next(request)
-        
-        # Skip security analysis for certain endpoints
-        if self._should_skip_security(request):
-            response = await call_next(request)
-            return self._add_security_headers(response)
-        
-        # Simple authentication check - drop requests without valid auth
-        if not self._has_valid_auth(request):
-            return JSONResponse(
-                content={"error": "Authentication required", "message": "Valid API key or authentication token required"},
-                status_code=401,
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        
-        try:
-            # Get user context if available
-            user_context = getattr(request.state, 'user', None)
-            
-            # Perform security analysis
-            start_time = time.time()
-            analysis = await threat_detection_service.analyze_request(request, user_context)
-            analysis_time = time.time() - start_time
-            
-            # Store analysis in request state for later use
-            request.state.security_analysis = analysis
-            
-            # Log security events (only for significant threats to reduce false positive noise)
-            # Only log if: being blocked OR risk score above warning threshold (0.6)
-            if analysis.is_threat and (analysis.should_block or analysis.risk_score >= settings.API_SECURITY_WARNING_THRESHOLD):
-                await self._log_security_event(request, analysis)
-            
-            # Check if request should be blocked (excluding rate limiting)
-            if analysis.should_block and not analysis.rate_limit_exceeded:
-                threat_detection_service.stats['threats_blocked'] += 1
-                logger.warning(f"Blocked request from {request.client.host if request.client else 'unknown'}: "
-                             f"risk_score={analysis.risk_score:.3f}, threats={len(analysis.threats)}")
-
-                # Return security block response
-                return self._create_block_response(analysis)
-            
-            # Log warnings for medium-risk requests
-            if analysis.risk_score >= settings.API_SECURITY_WARNING_THRESHOLD:
-                logger.warning(f"High-risk request detected from {request.client.host if request.client else 'unknown'}: "
-                             f"risk_score={analysis.risk_score:.3f}, auth_level={analysis.auth_level.value}")
-            
-            # Continue with request processing
-            response = await call_next(request)
-            
-            # Add security headers and metrics
-            response = self._add_security_headers(response)
-            response = self._add_security_metrics(response, analysis, analysis_time)
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"Security middleware error: {e}")
-            # Continue with request on security middleware errors to avoid breaking the app
-            response = await call_next(request)
-            return self._add_security_headers(response)
+        """Process request through security analysis - DISABLED"""
+        # Security disabled, always pass through
+        return await call_next(request)
     
     def _should_skip_security(self, request: Request) -> bool:
         """Determine if security analysis should be skipped for this request"""

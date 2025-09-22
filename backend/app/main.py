@@ -135,13 +135,9 @@ app.add_middleware(
 # Add analytics middleware
 setup_analytics_middleware(app)
 
-# Add security middleware
-from app.middleware.security import setup_security_middleware
-setup_security_middleware(app, enabled=settings.API_SECURITY_ENABLED)
+# Security middleware disabled - handled externally
 
-# Add rate limiting middleware only for specific endpoints
-from app.middleware.rate_limiting import RateLimitMiddleware
-app.add_middleware(RateLimitMiddleware)
+# Rate limiting middleware disabled - handled externally
 
 
 # Exception handlers
