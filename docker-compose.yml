@@ -15,16 +15,18 @@ services:
 
   # Database migration service - runs once to apply migrations
   enclava-migrate:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
     environment:
       - DATABASE_URL=postgresql://enclava_user:enclava_pass@enclava-postgres:5432/enclava_db
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-here}
     depends_on:
       - enclava-postgres
     command: ["/usr/local/bin/migrate.sh"]
     volumes:
       - ./backend:/app
+      - ./.env:/app/.env
     networks:
       - enclava-net
     restart: "no"  # Run once and exit
@@ -63,9 +65,9 @@ services:
   enclava-frontend:
     image: node:18-alpine
     working_dir: /app
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npm ci --ignore-scripts && npm run dev"
     environment:
-      # Required base URL (derives APP/API/WS URLs)  
+      # Required base URL (derives APP/API/WS URLs)
       - BASE_URL=${BASE_URL}
       - NEXT_PUBLIC_BASE_URL=${BASE_URL}
       # Docker internal ports
@@ -79,7 +81,7 @@ services:
       - "3002:3000"  # Direct frontend access for development
     volumes:
       - ./frontend:/app
-      - /app/node_modules
+      - enclava-frontend-node-modules:/app/node_modules
     networks:
       - enclava-net
     restart: unless-stopped
@@ -148,6 +150,7 @@ volumes:
   enclava-postgres-data:
   enclava-redis-data:
   enclava-qdrant-data:
+  enclava-frontend-node-modules:
 #  enclava-ollama-data:
 
 networks:

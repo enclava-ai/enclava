@@ -69,6 +69,7 @@ class ChatbotConfig:
     memory_length: int = 10  # Number of previous messages to remember
     use_rag: bool = False
     rag_top_k: int = 5
+    rag_score_threshold: float = 0.02  # Lowered from default 0.3 to allow more results
     fallback_responses: List[str] = None
     
     def __post_init__(self):
@@ -386,7 +387,8 @@ class ChatbotModule(BaseModule):
                     rag_results = await self.rag_module.search_documents(
                         query=message,
                         max_results=config.rag_top_k,
-                        collection_name=qdrant_collection_name
+                        collection_name=qdrant_collection_name,
+                        score_threshold=config.rag_score_threshold
                     )
                     
                     if rag_results:

@@ -32,10 +32,26 @@ class ChatbotCreateRequest(BaseModel):
     use_rag: bool = False
     rag_collection: Optional[str] = None
     rag_top_k: int = 5
+    rag_score_threshold: float = 0.02  # Lowered from default 0.3 to allow more results
     temperature: float = 0.7
     max_tokens: int = 1000
     memory_length: int = 10
     fallback_responses: List[str] = []
+
+
+class ChatbotUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    chatbot_type: Optional[str] = None
+    model: Optional[str] = None
+    system_prompt: Optional[str] = None
+    use_rag: Optional[bool] = None
+    rag_collection: Optional[str] = None
+    rag_top_k: Optional[int] = None
+    rag_score_threshold: Optional[float] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    memory_length: Optional[int] = None
+    fallback_responses: Optional[List[str]] = None
 
 
 class ChatRequest(BaseModel):
@@ -190,7 +206,7 @@ async def create_chatbot(
 @router.put("/update/{chatbot_id}")
 async def update_chatbot(
     chatbot_id: str,
-    request: ChatbotCreateRequest,
+    request: ChatbotUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -214,28 +230,23 @@ async def update_chatbot(
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found or access denied")
         
-        # Update chatbot configuration
-        config = {
-            "name": request.name,
-            "chatbot_type": request.chatbot_type,
-            "model": request.model,
-            "system_prompt": request.system_prompt,
-            "use_rag": request.use_rag,
-            "rag_collection": request.rag_collection,
-            "rag_top_k": request.rag_top_k,
-            "temperature": request.temperature,
-            "max_tokens": request.max_tokens,
-            "memory_length": request.memory_length,
-            "fallback_responses": request.fallback_responses
-        }
-        
+        # Get existing config
+        existing_config = chatbot.config.copy() if chatbot.config else {}
+
+        # Update only the fields that are provided in the request
+        update_data = request.dict(exclude_unset=True)
+
+        # Merge with existing config, preserving unset values
+        for key, value in update_data.items():
+            existing_config[key] = value
+
         # Update the chatbot
         await db.execute(
             update(ChatbotInstance)
             .where(ChatbotInstance.id == chatbot_id)
             .values(
-                name=request.name,
-                config=config,
+                name=existing_config.get("name", chatbot.name),
+                config=existing_config,
                 updated_at=datetime.utcnow()
             )
         )
