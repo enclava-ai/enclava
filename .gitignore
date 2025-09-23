@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+*.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.sqlite3
+*.db
+
+# FastAPI logs
+*.log
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js build
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env.production
+frontend/.env.development
+
+
+backend/storage/
+# TypeScript
+*.tsbuildinfo
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+backend/.pytest_cache/
+backend/.mypy_cache/
+.mypy_cache/
+*.prof
+
+backend/_to_delete/ 
+backend/__pycache__/ 
+backend/app/core/__pycache__/
+backend/app/services/__pycache__/
+backend/app/services/llm/__pycache__/
+backend/app/services/llm/providers/__pycache__/
+backend/app/utils/__pycache__/
+backend/modules/rag/__pycache__/
+frontend/.next/ 
+frontend/node_modules/
+node_modules/
+venv/ 
