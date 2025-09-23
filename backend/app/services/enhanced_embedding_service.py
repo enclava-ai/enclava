@@ -25,9 +25,10 @@ class EnhancedEmbeddingService(EmbeddingService):
             'requests_count': 0,
             'window_start': time.time(),
             'window_size': 60,  # 1 minute window
-            'max_requests_per_minute': int(getattr(settings, 'RAG_EMBEDDING_MAX_REQUESTS_PER_MINUTE', 60)),  # Configurable
+            'max_requests_per_minute': int(getattr(settings, 'RAG_EMBEDDING_MAX_REQUESTS_PER_MINUTE', 12)),  # Configurable
             'retry_delays': [int(x) for x in getattr(settings, 'RAG_EMBEDDING_RETRY_DELAYS', '1,2,4,8,16').split(',')],  # Exponential backoff
-            'delay_between_batches': float(getattr(settings, 'RAG_EMBEDDING_DELAY_BETWEEN_BATCHES', 0.5)),
+            'delay_between_batches': float(getattr(settings, 'RAG_EMBEDDING_DELAY_BETWEEN_BATCHES', 1.0)),
+            'delay_per_request': float(getattr(settings, 'RAG_EMBEDDING_DELAY_PER_REQUEST', 0.5)),
             'last_rate_limit_error': None
         }
 
@@ -38,7 +39,7 @@ class EnhancedEmbeddingService(EmbeddingService):
         if max_retries is None:
             max_retries = int(getattr(settings, 'RAG_EMBEDDING_RETRY_COUNT', 3))
 
-        batch_size = int(getattr(settings, 'RAG_EMBEDDING_BATCH_SIZE', 5))
+        batch_size = int(getattr(settings, 'RAG_EMBEDDING_BATCH_SIZE', 3))
 
         if not self.initialized:
             logger.warning("Embedding service not initialized, using fallback")
@@ -75,9 +76,6 @@ class EnhancedEmbeddingService(EmbeddingService):
 
                 # Make the request
                 embeddings = await self._get_embeddings_batch_impl(texts)
-
-                # Update rate limit tracker on success
-                self._update_rate_limit_tracker(success=True)
 
                 return embeddings, True
 
@@ -120,6 +118,12 @@ class EnhancedEmbeddingService(EmbeddingService):
         embeddings = []
 
         for text in texts:
+            # Respect rate limit before each request
+            while self._is_rate_limited():
+                delay = self._get_rate_limit_delay()
+                logger.warning(f"Rate limit window exceeded, waiting {delay:.2f}s before next request")
+                await asyncio.sleep(delay)
+
             # Truncate text if needed
             max_chars = 1600
             truncated_text = text[:max_chars] if len(text) > max_chars else text
@@ -142,8 +146,14 @@ class EnhancedEmbeddingService(EmbeddingService):
                         self._dimension_confirmed = True
                 else:
                     raise ValueError("Empty embedding in response")
-            else:
-                raise ValueError("Invalid response structure")
+                else:
+                    raise ValueError("Invalid response structure")
+
+            # Count this successful request and optionally delay between requests
+            self._update_rate_limit_tracker(success=True)
+            per_req_delay = self.rate_limit_tracker.get('delay_per_request', 0)
+            if per_req_delay and per_req_delay > 0:
+                await asyncio.sleep(per_req_delay)
 
         return embeddings
 

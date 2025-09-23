@@ -17,9 +17,8 @@ from .models import (
 )
 from .config import config_manager, ProviderConfig
 from ...core.config import settings
-from .security import security_manager
 from .resilience import ResilienceManagerFactory
-from .metrics import metrics_collector
+# from .metrics import metrics_collector
 from .providers import BaseLLMProvider, PrivateModeProvider
 from .exceptions import (
     LLMError, ProviderError, SecurityError, ConfigurationError,
@@ -150,45 +149,8 @@ class LLMService:
         if not request.messages:
             raise ValidationError("Messages cannot be empty", field="messages")
         
-        # Security validation (only if enabled)
-        messages_dict = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-
-        if settings.API_SECURITY_ENABLED:
-            is_safe, risk_score, detected_patterns = security_manager.validate_prompt_security(messages_dict)
-        else:
-            # Security disabled - always safe
-            is_safe, risk_score, detected_patterns = True, 0.0, []
-
-        if not is_safe:
-            # Log security violation
-            security_manager.create_audit_log(
-                user_id=request.user_id,
-                api_key_id=request.api_key_id,
-                provider="blocked",
-                model=request.model,
-                request_type="chat_completion",
-                risk_score=risk_score,
-                detected_patterns=[p.get("pattern", "") for p in detected_patterns]
-            )
-
-            # Record blocked request
-            metrics_collector.record_request(
-                provider="security",
-                model=request.model,
-                request_type="chat_completion",
-                success=False,
-                latency_ms=0,
-                security_risk_score=risk_score,
-                error_code="SECURITY_BLOCKED",
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
-
-            raise SecurityError(
-                "Request blocked due to security concerns",
-                risk_score=risk_score,
-                details={"detected_patterns": detected_patterns}
-            )
+        # Security validation disabled - always allow requests
+        risk_score = 0.0
         
         # Get provider for model
         provider_name = self._get_provider_for_model(request.model)
@@ -197,18 +159,7 @@ class LLMService:
         if not provider:
             raise ProviderError(f"No available provider for model '{request.model}'", provider=provider_name)
         
-        # Log detailed request if enabled
-        security_manager.log_detailed_request(
-            messages=messages_dict,
-            model=request.model,
-            user_id=request.user_id,
-            provider=provider_name,
-            context_info={
-                "temperature": request.temperature,
-                "max_tokens": request.max_tokens,
-                "risk_score": f"{risk_score:.3f}"
-            }
-        )
+        # Security logging disabled
         
         # Execute with resilience
         resilience_manager = ResilienceManagerFactory.get_manager(provider_name)
@@ -222,85 +173,46 @@ class LLMService:
                 non_retryable_exceptions=(SecurityError, ValidationError)
             )
             
-            # Update response with security information
-            response.security_check = is_safe
-            response.risk_score = risk_score
-            response.detected_patterns = [p.get("pattern", "") for p in detected_patterns]
+            # Security features disabled
             
-            # Log detailed response if enabled
-            if response.choices:
-                content = response.choices[0].message.content
-                security_manager.log_detailed_response(
-                    response_content=content,
-                    token_usage=response.usage.model_dump() if response.usage else None,
-                    provider=provider_name
-                )
+            # Security logging disabled
             
-            # Record successful request
+            # Record successful request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion",
-                success=True,
-                latency_ms=total_latency,
-                token_usage=response.usage.model_dump() if response.usage else None,
-                security_risk_score=risk_score,
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
+            # metrics_collector.record_request(
+            #     provider=provider_name,
+            #     model=request.model,
+            #     request_type="chat_completion",
+            #     success=True,
+            #     latency_ms=total_latency,
+            #     token_usage=response.usage.model_dump() if response.usage else None,
+            #     security_risk_score=risk_score,
+            #     user_id=request.user_id,
+            #     api_key_id=request.api_key_id
+            # )
             
-            # Create audit log
-            security_manager.create_audit_log(
-                user_id=request.user_id,
-                api_key_id=request.api_key_id,
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion",
-                risk_score=risk_score,
-                detected_patterns=[p.get("pattern", "") for p in detected_patterns],
-                metadata={
-                    "success": True,
-                    "latency_ms": total_latency,
-                    "token_usage": response.usage.model_dump() if response.usage else None
-                }
-            )
+            # Security audit logging disabled
             
             return response
         
         except Exception as e:
-            # Record failed request
+            # Record failed request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
             error_code = getattr(e, 'error_code', e.__class__.__name__)
+
+            # metrics_collector.record_request(
+            #     provider=provider_name,
+            #     model=request.model,
+            #     request_type="chat_completion",
+            #     success=False,
+            #     latency_ms=total_latency,
+            #     security_risk_score=risk_score,
+            #     error_code=error_code,
+            #     user_id=request.user_id,
+            #     api_key_id=request.api_key_id
+            # )
             
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion",
-                success=False,
-                latency_ms=total_latency,
-                security_risk_score=risk_score,
-                error_code=error_code,
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
-            
-            # Create audit log for failure
-            security_manager.create_audit_log(
-                user_id=request.user_id,
-                api_key_id=request.api_key_id,
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion",
-                risk_score=risk_score,
-                detected_patterns=[p.get("pattern", "") for p in detected_patterns],
-                metadata={
-                    "success": False,
-                    "error": str(e),
-                    "error_code": error_code,
-                    "latency_ms": total_latency
-                }
-            )
+            # Security audit logging disabled
             
             raise
     
@@ -309,21 +221,8 @@ class LLMService:
         if not self._initialized:
             await self.initialize()
         
-        # Security validation (same as non-streaming)
-        messages_dict = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-
-        if settings.API_SECURITY_ENABLED:
-            is_safe, risk_score, detected_patterns = security_manager.validate_prompt_security(messages_dict)
-        else:
-            # Security disabled - always safe
-            is_safe, risk_score, detected_patterns = True, 0.0, []
-
-        if not is_safe:
-            raise SecurityError(
-                "Streaming request blocked due to security concerns",
-                risk_score=risk_score,
-                details={"detected_patterns": detected_patterns}
-            )
+        # Security validation disabled - always allow streaming requests
+        risk_score = 0.0
         
         # Get provider
         provider_name = self._get_provider_for_model(request.model)
@@ -345,19 +244,19 @@ class LLMService:
                 yield chunk
         
         except Exception as e:
-            # Record streaming failure
+            # Record streaming failure - metrics disabled
             error_code = getattr(e, 'error_code', e.__class__.__name__)
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion_stream",
-                success=False,
-                latency_ms=0,
-                security_risk_score=risk_score,
-                error_code=error_code,
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
+            # metrics_collector.record_request(
+            #     provider=provider_name,
+            #     model=request.model,
+            #     request_type="chat_completion_stream",
+            #     success=False,
+            #     latency_ms=0,
+            #     security_risk_score=risk_score,
+            #     error_code=error_code,
+            #     user_id=request.user_id,
+            #     api_key_id=request.api_key_id
+            # )
             raise
     
     async def create_embedding(self, request: EmbeddingRequest) -> EmbeddingResponse:
@@ -365,23 +264,8 @@ class LLMService:
         if not self._initialized:
             await self.initialize()
         
-        # Security validation for embedding input
-        input_text = request.input if isinstance(request.input, str) else " ".join(request.input)
-
-        if settings.API_SECURITY_ENABLED:
-            is_safe, risk_score, detected_patterns = security_manager.validate_prompt_security([
-                {"role": "user", "content": input_text}
-            ])
-        else:
-            # Security disabled - always safe
-            is_safe, risk_score, detected_patterns = True, 0.0, []
-
-        if not is_safe:
-            raise SecurityError(
-                "Embedding request blocked due to security concerns",
-                risk_score=risk_score,
-                details={"detected_patterns": detected_patterns}
-            )
+        # Security validation disabled - always allow embedding requests
+        risk_score = 0.0
         
         # Get provider
         provider_name = self._get_provider_for_model(request.model)
@@ -402,42 +286,40 @@ class LLMService:
                 non_retryable_exceptions=(SecurityError, ValidationError)
             )
             
-            # Update response with security information
-            response.security_check = is_safe
-            response.risk_score = risk_score
+            # Security features disabled
             
-            # Record successful request
+            # Record successful request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="embedding",
-                success=True,
-                latency_ms=total_latency,
-                token_usage=response.usage.model_dump() if response.usage else None,
-                security_risk_score=risk_score,
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
+            # metrics_collector.record_request(
+            #     provider=provider_name,
+            #     model=request.model,
+            #     request_type="embedding",
+            #     success=True,
+            #     latency_ms=total_latency,
+            #     token_usage=response.usage.model_dump() if response.usage else None,
+            #     security_risk_score=risk_score,
+            #     user_id=request.user_id,
+            #     api_key_id=request.api_key_id
+            # )
             
             return response
         
         except Exception as e:
-            # Record failed request
+            # Record failed request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
             error_code = getattr(e, 'error_code', e.__class__.__name__)
-            
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="embedding",
-                success=False,
-                latency_ms=total_latency,
-                security_risk_score=risk_score,
-                error_code=error_code,
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
+
+            # metrics_collector.record_request(
+            #     provider=provider_name,
+            #     model=request.model,
+            #     request_type="embedding",
+            #     success=False,
+            #     latency_ms=total_latency,
+            #     security_risk_score=risk_score,
+            #     error_code=error_code,
+            #     user_id=request.user_id,
+            #     api_key_id=request.api_key_id
+            # )
             
             raise
     
@@ -492,20 +374,26 @@ class LLMService:
         return status_dict
     
     def get_metrics(self) -> LLMMetrics:
-        """Get service metrics"""
-        return metrics_collector.get_metrics()
+        """Get service metrics - metrics disabled"""
+        # return metrics_collector.get_metrics()
+        return LLMMetrics(
+            total_requests=0,
+            success_rate=0.0,
+            avg_latency_ms=0,
+            error_rates={}
+        )
     
     def get_health_summary(self) -> Dict[str, Any]:
-        """Get comprehensive health summary"""
-        metrics_health = metrics_collector.get_health_summary()
+        """Get comprehensive health summary - metrics disabled"""
+        # metrics_health = metrics_collector.get_health_summary()
         resilience_health = ResilienceManagerFactory.get_all_health_status()
-        
+
         return {
             "service_status": "healthy" if self._initialized else "initializing",
             "startup_time": self._startup_time.isoformat() if self._startup_time else None,
             "provider_count": len(self._providers),
             "active_providers": list(self._providers.keys()),
-            "metrics": metrics_health,
+            "metrics": {"status": "disabled"},
             "resilience": resilience_health
         }
     

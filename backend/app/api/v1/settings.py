@@ -97,7 +97,6 @@ SETTINGS_STORE: Dict[str, Dict[str, Any]] = {
     "api": {
         # Security Settings
         "security_enabled": {"value": True, "type": "boolean", "description": "Enable API security system"},
-        "threat_detection_enabled": {"value": True, "type": "boolean", "description": "Enable threat detection analysis"},
         "rate_limiting_enabled": {"value": True, "type": "boolean", "description": "Enable rate limiting"},
         "ip_reputation_enabled": {"value": True, "type": "boolean", "description": "Enable IP reputation checking"},
         "anomaly_detection_enabled": {"value": True, "type": "boolean", "description": "Enable anomaly detection"},
@@ -112,7 +111,6 @@ SETTINGS_STORE: Dict[str, Dict[str, Any]] = {
         "rate_limit_premium_per_hour": {"value": 100000, "type": "integer", "description": "Rate limit for premium users per hour"},
         
         # Security Thresholds
-        "security_risk_threshold": {"value": 0.8, "type": "float", "description": "Risk score threshold for blocking requests (0.0-1.0)"},
         "security_warning_threshold": {"value": 0.6, "type": "float", "description": "Risk score threshold for warnings (0.0-1.0)"},
         "anomaly_threshold": {"value": 0.7, "type": "float", "description": "Anomaly severity threshold (0.0-1.0)"},
         
@@ -601,7 +599,6 @@ async def reset_to_defaults(
         "api": {
             # Security Settings
             "security_enabled": {"value": True, "type": "boolean"},
-            "threat_detection_enabled": {"value": True, "type": "boolean"},
             "rate_limiting_enabled": {"value": True, "type": "boolean"},
             "ip_reputation_enabled": {"value": True, "type": "boolean"},
             "anomaly_detection_enabled": {"value": True, "type": "boolean"},
@@ -616,7 +613,6 @@ async def reset_to_defaults(
             "rate_limit_premium_per_hour": {"value": 100000, "type": "integer"},
             
             # Security Thresholds
-            "security_risk_threshold": {"value": 0.8, "type": "float"},
             "security_warning_threshold": {"value": 0.6, "type": "float"},
             "anomaly_threshold": {"value": 0.7, "type": "float"},
             

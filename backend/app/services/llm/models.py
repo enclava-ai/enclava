@@ -157,7 +157,6 @@ class LLMMetrics(BaseModel):
     total_requests: int = Field(0, description="Total requests processed")
     successful_requests: int = Field(0, description="Successful requests")
     failed_requests: int = Field(0, description="Failed requests")
-    security_blocked_requests: int = Field(0, description="Security blocked requests")
     average_latency_ms: float = Field(0.0, description="Average response latency")
     average_risk_score: float = Field(0.0, description="Average security risk score")
     provider_metrics: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Per-provider metrics")

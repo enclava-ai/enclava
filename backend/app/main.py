@@ -52,10 +52,18 @@ async def lifespan(app: FastAPI):
     
     # Initialize config manager
     await init_config_manager()
-    
+
+    # Initialize LLM service (needed by RAG module)
+    from app.services.llm.service import llm_service
+    try:
+        await llm_service.initialize()
+        logger.info("LLM service initialized successfully")
+    except Exception as e:
+        logger.warning(f"LLM service initialization failed: {e}")
+
     # Initialize analytics service
     init_analytics_service()
-    
+
     # Initialize module manager with FastAPI app for router registration
     await module_manager.initialize(app)
     app.state.module_manager = module_manager

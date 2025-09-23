@@ -452,6 +452,8 @@ class PrivateModeProvider(BaseLLMProvider):
                 
                 else:
                     error_text = await response.text()
+                    # Log the detailed error response from the provider
+                    logger.error(f"PrivateMode embedding error - Status {response.status}: {error_text}")
                     self._handle_http_error(response.status, error_text, "embeddings")
         
         except aiohttp.ClientError as e:

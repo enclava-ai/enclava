@@ -12,8 +12,8 @@ from ..v1.audit import router as audit_router
 from ..v1.settings import router as settings_router
 from ..v1.analytics import router as analytics_router
 from ..v1.rag import router as rag_router
+from ..rag_debug import router as rag_debug_router
 from ..v1.prompt_templates import router as prompt_templates_router
-from ..v1.security import router as security_router
 from ..v1.plugin_registry import router as plugin_registry_router
 from ..v1.platform import router as platform_router
 from ..v1.llm_internal import router as llm_internal_router
@@ -52,11 +52,12 @@ internal_api_router.include_router(analytics_router, prefix="/analytics", tags=[
 # Include RAG routes (frontend RAG document management)
 internal_api_router.include_router(rag_router, prefix="/rag", tags=["internal-rag"])
 
+# Include RAG debug routes (for demo and debugging)
+internal_api_router.include_router(rag_debug_router, prefix="/rag/debug", tags=["internal-rag-debug"])
+
 # Include prompt template routes (frontend prompt template management)
 internal_api_router.include_router(prompt_templates_router, prefix="/prompt-templates", tags=["internal-prompt-templates"])
 
-# Include security routes (frontend security settings)
-internal_api_router.include_router(security_router, prefix="/security", tags=["internal-security"])
 
 # Include plugin registry routes (frontend plugin management)
 internal_api_router.include_router(plugin_registry_router, prefix="/plugins", tags=["internal-plugins"])

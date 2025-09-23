@@ -745,8 +745,7 @@ async def get_llm_metrics(
                 "total_requests": metrics.total_requests,
                 "successful_requests": metrics.successful_requests,
                 "failed_requests": metrics.failed_requests,
-                "security_blocked_requests": metrics.security_blocked_requests,
-                "average_latency_ms": metrics.average_latency_ms,
+                  "average_latency_ms": metrics.average_latency_ms,
                 "average_risk_score": metrics.average_risk_score,
                 "provider_metrics": metrics.provider_metrics,
                 "last_updated": metrics.last_updated.isoformat()
