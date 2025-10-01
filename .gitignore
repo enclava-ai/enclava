@@ -32,6 +32,7 @@ frontend/.env.development
 
 
 backend/storage/
+
 # TypeScript
 *.tsbuildinfo
 

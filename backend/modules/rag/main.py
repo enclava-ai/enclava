@@ -1495,8 +1495,16 @@ class RAGModule(BaseModule):
         """Search for relevant documents"""
         if not self.enabled:
             raise RuntimeError("RAG module not initialized")
-        
+
         collection_name = collection_name or self.default_collection_name
+
+        # Special handling for collections with different vector dimensions
+        SPECIAL_COLLECTIONS = {
+            "bitbox02_faq_local": {
+                "dimension": 384,
+                "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+            }
+        }
         max_results = max_results or self.config.get("max_results", 10)
         
         # Check cache (include collection name in cache key)
@@ -1510,9 +1518,24 @@ class RAGModule(BaseModule):
             start_time = time.time()
             
             # Generate query embedding with task-specific prefix for better retrieval
-            # The E5 model works better with "query:" prefix for search queries
-            optimized_query = f"query: {query}"
-            query_embedding = await self._generate_embedding(optimized_query)
+            try:
+                # Check if this is a special collection
+                if collection_name in SPECIAL_COLLECTIONS:
+                    # Try to import sentence-transformers
+                    import sentence_transformers
+                    from sentence_transformers import SentenceTransformer
+                    model = SentenceTransformer(SPECIAL_COLLECTIONS[collection_name]["model"])
+                    query_embedding = model.encode([query], normalize_embeddings=True)[0].tolist()
+                    logger.info(f"Using {SPECIAL_COLLECTIONS[collection_name]['dimension']}-dim local model for {collection_name}")
+                else:
+                    # The E5 model works better with "query:" prefix for search queries
+                    optimized_query = f"query: {query}"
+                    query_embedding = await self._generate_embedding(optimized_query)
+            except ImportError:
+                # Fallback to default embedding if sentence-transformers is not available
+                logger.warning(f"sentence-transformers not available, falling back to default embedding for {collection_name}")
+                optimized_query = f"query: {query}"
+                query_embedding = await self._generate_embedding(optimized_query)
             
             # Build filter
             search_filter = None
@@ -1565,14 +1588,31 @@ class RAGModule(BaseModule):
                 doc_id = result.payload.get("document_id")
                 content = result.payload.get("content", "")
                 score = result.score
-                
+
+                # Generic content extraction for documents without a 'content' field
+                if not content:
+                    # Build content from all text-based fields in the payload
+                    # This makes the RAG module completely agnostic to document structure
+                    text_fields = []
+                    for field, value in result.payload.items():
+                        # Skip system/metadata fields
+                        if field not in ["document_id", "chunk_index", "chunk_count", "indexed_at", "processed_at",
+                                        "file_hash", "mime_type", "file_type", "created_at", "__collection_metadata__"]:
+                            # Include any field that has a non-empty string value
+                            if value and isinstance(value, str) and len(value.strip()) > 0:
+                                text_fields.append(f"{field}: {value}")
+
+                    # Join all text fields to create content
+                    if text_fields:
+                        content = "\n\n".join(text_fields)
+
                 # Log each raw result for debugging
                 logger.info(f"\n--- Raw Result {i+1} ---")
                 logger.info(f"Score: {score}")
                 logger.info(f"Document ID: {doc_id}")
                 logger.info(f"Content preview (first 200 chars): {content[:200]}")
                 logger.info(f"Metadata keys: {list(result.payload.keys())}")
-                
+
                 # Aggregate scores by document
                 if doc_id in document_scores:
                     document_scores[doc_id]["score"] = max(document_scores[doc_id]["score"], score)

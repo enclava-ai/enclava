@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# Install CPU-only PyTorch and compatible numpy first (faster download)
+RUN pip install --no-cache-dir torch==2.5.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu -f https://download.pytorch.org/whl/torch_stable.html
+
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 COPY tests/requirements-test.txt ./tests/

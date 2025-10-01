@@ -453,8 +453,21 @@ class ChatbotModule(BaseModule):
                 guardrails += (
                     "When asked about encryption or SD-card backups, do not claim that backups are encrypted unless the provided context explicitly uses wording like 'encrypt', 'encrypted', or 'encryption'. "
                     "If such wording is absent, state clearly that the SD-card backup is not encrypted. "
+                    "Product policy: For BitBox devices, microSD (SD card) backups are not encrypted; verification steps may require a recovery password, but that is not encryption. Do not conflate password entry with encryption. "
                 )
             extra_instructions["additional_instructions"] = guardrails
+
+        # Deterministic enforcement: if encryption question and RAG context does not explicitly
+        # contain encryption wording, return policy answer without calling the LLM.
+        ctx_lower = (rag_context or "").lower()
+        has_encryption_terms = any(k in ctx_lower for k in ["encrypt", "encrypted", "encryption", "decrypt", "decryption"])
+        if is_encryption and not has_encryption_terms:
+            policy_answer = (
+                "No. BitBox microSD (SD card) backups are not encrypted. "
+                "Verification may require entering a recovery password, but that does not encrypt the backup — "
+                "it only proves you have the correct credentials to restore. Keep the card and password secure."
+            )
+            return policy_answer, sources
 
         messages = self._build_conversation_messages(db_messages, config, rag_context, extra_instructions)
         

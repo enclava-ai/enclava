@@ -46,6 +46,7 @@ qdrant-client==1.7.0
 
 # Text Processing
 tiktoken==0.5.1
+numpy>=1.26.0
 
 # Basic document processing (lightweight)
 markitdown==0.0.1a2
@@ -56,8 +57,9 @@ python-docx==1.1.0
 # nltk==3.8.1
 # spacy==3.7.2
 
-# Heavy ML dependencies (REMOVED - unused in codebase)
-# sentence-transformers==2.6.1  # REMOVED - not used anywhere in codebase
+# Heavy ML dependencies (sentence-transformers will be installed separately)
+# Note: PyTorch is already installed in the base Docker image
+sentence-transformers==2.6.1  # Added back - needed for bitbox02_faq_local collection
 # transformers==4.35.2  # REMOVED - already commented out
 
 # Configuration
