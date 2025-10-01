@@ -1503,6 +1503,10 @@ class RAGModule(BaseModule):
             "bitbox02_faq_local": {
                 "dimension": 384,
                 "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+            },
+            "bitbox_local_rag": {
+                "dimension": 384,
+                "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
             }
         }
         max_results = max_results or self.config.get("max_results", 10)
