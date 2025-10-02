@@ -16,9 +16,10 @@ from .models import (
     ModelInfo, ProviderStatus, LLMMetrics
 )
 from .config import config_manager, ProviderConfig
-# Security service removed as requested
+from ...core.config import settings
+
 from .resilience import ResilienceManagerFactory
-from .metrics import metrics_collector
+# from .metrics import metrics_collector
 from .providers import BaseLLMProvider, PrivateModeProvider
 from .exceptions import (
     LLMError, ProviderError, SecurityError, ConfigurationError,
@@ -149,8 +150,7 @@ class LLMService:
         if not request.messages:
             raise ValidationError("Messages cannot be empty", field="messages")
         
-        # Security validation removed as requested
-        messages_dict = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        risk_score = 0.0
         
         # Get provider for model
         provider_name = self._get_provider_for_model(request.model)
@@ -159,7 +159,6 @@ class LLMService:
         if not provider:
             raise ProviderError(f"No available provider for model '{request.model}'", provider=provider_name)
         
-        # Security logging removed as requested
         
         # Execute with resilience
         resilience_manager = ResilienceManagerFactory.get_manager(provider_name)
@@ -173,49 +172,20 @@ class LLMService:
                 non_retryable_exceptions=(ValidationError,)
             )
             
-            # Set default security values since security is removed
-            response.security_check = True
-            response.risk_score = 0.0
-            response.detected_patterns = []
+
+
             
-            # Security logging removed as requested
-            
-            # Record successful request
+            # Record successful request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion",
-                success=True,
-                latency_ms=total_latency,
-                token_usage=response.usage.model_dump() if response.usage else None,
-                # security_risk_score removed as requested
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
-            
-            # Security audit logging removed as requested
+      
             
             return response
         
         except Exception as e:
-            # Record failed request
+            # Record failed request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
             error_code = getattr(e, 'error_code', e.__class__.__name__)
-            
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion",
-                success=False,
-                latency_ms=total_latency,
-                # security_risk_score removed as requested
-                error_code=error_code,
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
-            
-            # Security audit logging removed as requested
+
             
             raise
     
@@ -224,8 +194,9 @@ class LLMService:
         if not self._initialized:
             await self.initialize()
         
-        # Security validation removed as requested
-        messages_dict = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        # Security validation disabled - always allow streaming requests
+        risk_score = 0.0
+
         
         # Get provider
         provider_name = self._get_provider_for_model(request.model)
@@ -247,19 +218,8 @@ class LLMService:
                 yield chunk
         
         except Exception as e:
-            # Record streaming failure
+            # Record streaming failure - metrics disabled
             error_code = getattr(e, 'error_code', e.__class__.__name__)
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="chat_completion_stream",
-                success=False,
-                latency_ms=0,
-                # security_risk_score removed as requested
-                error_code=error_code,
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
             raise
     
     async def create_embedding(self, request: EmbeddingRequest) -> EmbeddingResponse:
@@ -267,7 +227,9 @@ class LLMService:
         if not self._initialized:
             await self.initialize()
         
-        # Security validation removed as requested
+        # Security validation disabled - always allow embedding requests
+        risk_score = 0.0
+
         
         # Get provider
         provider_name = self._get_provider_for_model(request.model)
@@ -288,43 +250,17 @@ class LLMService:
                 non_retryable_exceptions=(ValidationError,)
             )
             
-            # Set default security values since security is removed
-            response.security_check = True
-            response.risk_score = 0.0
             
-            # Record successful request
+            # Record successful request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="embedding",
-                success=True,
-                latency_ms=total_latency,
-                token_usage=response.usage.model_dump() if response.usage else None,
-                # security_risk_score removed as requested
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
+
             
             return response
         
         except Exception as e:
-            # Record failed request
+            # Record failed request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
-            error_code = getattr(e, 'error_code', e.__class__.__name__)
-            
-            metrics_collector.record_request(
-                provider=provider_name,
-                model=request.model,
-                request_type="embedding",
-                success=False,
-                latency_ms=total_latency,
-                # security_risk_score removed as requested
-                error_code=error_code,
-                user_id=request.user_id,
-                api_key_id=request.api_key_id
-            )
-            
+            error_code = getattr(e, 'error_code', e.__class__.__name__)            
             raise
     
     async def get_models(self, provider_name: Optional[str] = None) -> List[ModelInfo]:
@@ -378,20 +314,26 @@ class LLMService:
         return status_dict
     
     def get_metrics(self) -> LLMMetrics:
-        """Get service metrics"""
-        return metrics_collector.get_metrics()
+        """Get service metrics - metrics disabled"""
+        # return metrics_collector.get_metrics()
+        return LLMMetrics(
+            total_requests=0,
+            success_rate=0.0,
+            avg_latency_ms=0,
+            error_rates={}
+        )
     
     def get_health_summary(self) -> Dict[str, Any]:
-        """Get comprehensive health summary"""
-        metrics_health = metrics_collector.get_health_summary()
+        """Get comprehensive health summary - metrics disabled"""
+        # metrics_health = metrics_collector.get_health_summary()
         resilience_health = ResilienceManagerFactory.get_all_health_status()
-        
+
         return {
             "service_status": "healthy" if self._initialized else "initializing",
             "startup_time": self._startup_time.isoformat() if self._startup_time else None,
             "provider_count": len(self._providers),
             "active_providers": list(self._providers.keys()),
-            "metrics": metrics_health,
+            "metrics": {"status": "disabled"},
             "resilience": resilience_health
         }
     

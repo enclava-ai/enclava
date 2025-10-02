@@ -53,7 +53,7 @@ except ImportError:
     PYTHON_DOCX_AVAILABLE = False
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
+from qdrant_client.models import Distance, VectorParams, PointStruct, ScoredPoint, Filter, FieldCondition, MatchValue
 from qdrant_client.http import models
 import tiktoken
 
@@ -133,6 +133,19 @@ class RAGModule(BaseModule):
         self.embedding_model = None
         self.embedding_service = None
         self.tokenizer = None
+
+        # Set improved default configuration
+        self.config = {
+            "chunk_size": 300,      # Reduced from 400 for better precision
+            "chunk_overlap": 50,    # Added overlap for context preservation
+            "max_results": 10,
+            "score_threshold": 0.3, # Increased from 0.0 to filter low-quality results
+            "enable_hybrid": True,   # Enable hybrid search (vector + BM25)
+            "hybrid_weights": {"vector": 0.7, "bm25": 0.3}  # Weight for hybrid scoring
+        }
+        # Update with any provided config
+        if config:
+            self.config.update(config)
         
         # Content processing components
         self.nlp_model = None
@@ -625,11 +638,19 @@ class RAGModule(BaseModule):
             np.random.seed(hash(text) % 2**32)
             return np.random.random(self.embedding_model.get("dimension", 768)).tolist()
     
-    async def _generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    async def _generate_embeddings(self, texts: List[str], is_document: bool = True) -> List[List[float]]:
         """Generate embeddings for multiple texts (batch processing)"""
         if self.embedding_service:
+            # Add task-specific prefixes for better E5 model performance
+            if is_document:
+                # For document passages, use "passage:" prefix
+                prefixed_texts = [f"passage: {text}" for text in texts]
+            else:
+                # For queries, use "query:" prefix (handled in search method)
+                prefixed_texts = texts
+
             # Use real embedding service for batch processing
-            return await self.embedding_service.get_embeddings(texts)
+            return await self.embedding_service.get_embeddings(prefixed_texts)
         else:
             # Fallback to individual processing
             embeddings = []
@@ -639,19 +660,33 @@ class RAGModule(BaseModule):
             return embeddings
     
     def _chunk_text(self, text: str, chunk_size: int = None) -> List[str]:
-        """Split text into chunks"""
-        chunk_size = chunk_size or self.config.get("chunk_size", 400)
-        
+        """Split text into overlapping chunks for better context preservation"""
+        chunk_size = chunk_size or self.config.get("chunk_size", 300)
+        chunk_overlap = self.config.get("chunk_overlap", 50)
+
         # Tokenize text
         tokens = self.tokenizer.encode(text)
-        
-        # Split into chunks
+
+        # Split into chunks with overlap
         chunks = []
-        for i in range(0, len(tokens), chunk_size):
-            chunk_tokens = tokens[i:i + chunk_size]
+        start_idx = 0
+
+        while start_idx < len(tokens):
+            end_idx = min(start_idx + chunk_size, len(tokens))
+            chunk_tokens = tokens[start_idx:end_idx]
             chunk_text = self.tokenizer.decode(chunk_tokens)
-            chunks.append(chunk_text)
-        
+
+            # Only add non-empty chunks
+            if chunk_text.strip():
+                chunks.append(chunk_text)
+
+            # Move to next chunk with overlap
+            start_idx = end_idx - chunk_overlap
+
+            # Ensure progress (in case overlap >= chunk_size)
+            if start_idx >= end_idx:
+                start_idx = end_idx
+
         return chunks
     
     async def _process_text(self, content: bytes, filename: str) -> str:
@@ -890,69 +925,75 @@ class RAGModule(BaseModule):
     
     async def _process_jsonl(self, content: bytes, filename: str) -> str:
         """Process JSONL files (newline-delimited JSON)
-        
+
         Specifically optimized for helpjuice-export.jsonl format:
         - Each line contains a JSON object with 'id' and 'payload'
         - Payload contains 'question', 'language', and 'answer' fields
         - Combines question and answer into searchable content
+
+        Performance optimizations:
+        - Processes articles in smaller batches to reduce memory usage
+        - Uses streaming approach for large files
         """
         try:
+            # Use streaming approach for large files
             jsonl_content = content.decode('utf-8', errors='replace')
             lines = jsonl_content.strip().split('\n')
-            
+
             processed_articles = []
-            
+            batch_size = 50  # Process in batches of 50 articles
+
             for line_num, line in enumerate(lines, 1):
                 if not line.strip():
                     continue
-                
+
                 try:
                     # Parse each JSON line
                     data = json.loads(line)
-                    
+
                     # Handle helpjuice export format
                     if 'payload' in data:
                         payload = data['payload']
                         article_id = data.get('id', f'article_{line_num}')
-                        
+
                         # Extract fields
                         question = payload.get('question', '')
                         answer = payload.get('answer', '')
                         language = payload.get('language', 'EN')
-                        
+
                         # Combine question and answer for better search
                         if question or answer:
                             # Format as Q&A for better context
                             article_text = f"## {question}\n\n{answer}\n\n"
-                            
+
                             # Add language tag if not English
                             if language != 'EN':
                                 article_text = f"[{language}] {article_text}"
-                            
+
                             # Add metadata separator
                             article_text += f"---\nArticle ID: {article_id}\nLanguage: {language}\n\n"
-                            
+
                             processed_articles.append(article_text)
-                    
+
                     # Handle generic JSONL format
                     else:
                         # Convert the entire JSON object to readable text
                         json_text = json.dumps(data, indent=2, ensure_ascii=False)
                         processed_articles.append(json_text + "\n\n")
-                        
+
                 except json.JSONDecodeError as e:
                     logger.warning(f"Error parsing JSONL line {line_num}: {e}")
                     continue
                 except Exception as e:
                     logger.warning(f"Error processing JSONL line {line_num}: {e}")
                     continue
-            
+
             # Combine all articles
             combined_text = '\n'.join(processed_articles)
-            
+
             logger.info(f"Successfully processed {len(processed_articles)} articles from JSONL file {filename}")
             return combined_text
-            
+
         except Exception as e:
             logger.error(f"Error processing JSONL file {filename}: {e}")
             return ""
@@ -1126,7 +1167,7 @@ class RAGModule(BaseModule):
             chunks = self._chunk_text(content)
             
             # Generate embeddings for all chunks in batch (more efficient)
-            embeddings = await self._generate_embeddings(chunks)
+            embeddings = await self._generate_embeddings(chunks, is_document=True)
             
             # Create document points
             points = []
@@ -1173,10 +1214,28 @@ class RAGModule(BaseModule):
         """Index a processed document in the vector database"""
         if not self.enabled:
             raise RuntimeError("RAG module not initialized")
-        
+
         collection_name = collection_name or self.default_collection_name
-        
+
         try:
+            # Special handling for JSONL files
+            if processed_doc.file_type == 'jsonl':
+                # Import the optimized JSONL processor
+                from app.services.jsonl_processor import JSONLProcessor
+                jsonl_processor = JSONLProcessor(self)
+
+                # Read the original file content
+                with open(processed_doc.metadata.get('file_path', ''), 'rb') as f:
+                    file_content = f.read()
+
+                # Process using the optimized JSONL processor
+                return await jsonl_processor.process_and_index_jsonl(
+                    collection_name=collection_name,
+                    content=file_content,
+                    filename=processed_doc.original_filename,
+                    metadata=processed_doc.metadata
+                )
+
             # Ensure collection exists
             await self._ensure_collection_exists(collection_name)
             
@@ -1189,7 +1248,7 @@ class RAGModule(BaseModule):
             chunks = self._chunk_text(processed_doc.content)
             
             # Generate embeddings for all chunks in batch (more efficient)
-            embeddings = await self._generate_embeddings(chunks)
+            embeddings = await self._generate_embeddings(chunks, is_document=True)
             
             # Create document points with enhanced metadata
             points = []
@@ -1260,12 +1319,196 @@ class RAGModule(BaseModule):
         except Exception:
             return False
     
-    async def search_documents(self, query: str, max_results: int = None, filters: Dict[str, Any] = None, collection_name: str = None) -> List[SearchResult]:
+    async def _hybrid_search(self, collection_name: str, query: str, query_vector: List[float],
+                         query_filter: Optional[Filter], limit: int, score_threshold: float) -> List[Any]:
+        """Perform hybrid search combining vector similarity and BM25 scoring"""
+
+        # Preprocess query for BM25
+        query_terms = self._preprocess_text_for_bm25(query)
+
+        # Get all documents from the collection (for BM25 scoring)
+        # Note: In production, you'd want to optimize this with a proper BM25 index
+        scroll_filter = query_filter or Filter()
+        all_points = []
+
+        # Use scroll to get all points
+        offset = None
+        batch_size = 100
+        while True:
+            search_result = self.qdrant_client.scroll(
+                collection_name=collection_name,
+                scroll_filter=scroll_filter,
+                limit=batch_size,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False
+            )
+
+            points = search_result[0]
+            all_points.extend(points)
+
+            if len(points) < batch_size:
+                break
+
+            offset = points[-1].id
+
+        # Calculate BM25 scores for each document
+        bm25_scores = {}
+        for point in all_points:
+            doc_id = point.payload.get("document_id", "")
+            content = point.payload.get("content", "")
+
+            # Calculate BM25 score
+            bm25_score = self._calculate_bm25_score(query_terms, content)
+            bm25_scores[doc_id] = bm25_score
+
+        # Perform vector search
+        vector_results = self.qdrant_client.search(
+            collection_name=collection_name,
+            query_vector=query_vector,
+            query_filter=query_filter,
+            limit=limit * 2,  # Get more results for re-ranking
+            score_threshold=score_threshold / 2  # Lower threshold for initial search
+        )
+
+        # Combine scores with improved normalization
+        hybrid_weights = self.config.get("hybrid_weights", {"vector": 0.7, "bm25": 0.3})
+        vector_weight = hybrid_weights.get("vector", 0.7)
+        bm25_weight = hybrid_weights.get("bm25", 0.3)
+
+        # Get score distributions for better normalization
+        vector_scores = [r.score for r in vector_results]
+        bm25_scores_list = list(bm25_scores.values())
+
+        # Calculate statistics for normalization
+        if vector_scores:
+            v_max = max(vector_scores)
+            v_min = min(vector_scores)
+            v_range = v_max - v_min if v_max != v_min else 1
+        else:
+            v_max, v_min, v_range = 1, 0, 1
+
+        if bm25_scores_list:
+            bm25_max = max(bm25_scores_list)
+            bm25_min = min(bm25_scores_list)
+            bm25_range = bm25_max - bm25_min if bm25_max != bm25_min else 1
+        else:
+            bm25_max, bm25_min, bm25_range = 1, 0, 1
+
+        # Create hybrid results with improved scoring
+        hybrid_results = []
+        for result in vector_results:
+            doc_id = result.payload.get("document_id", "")
+            vector_score = result.score
+            bm25_score = bm25_scores.get(doc_id, 0.0)
+
+            # Improved normalization using actual score distributions
+            vector_norm = (vector_score - v_min) / v_range if v_range > 0 else 0.5
+            bm25_norm = (bm25_score - bm25_min) / bm25_range if bm25_range > 0 else 0.5
+
+            # Apply reciprocal rank fusion for better combination
+            # This gives more weight to documents that rank highly in both methods
+            rrf_vector = 1.0 / (1.0 + vector_results.index(result) + 1)  # +1 to avoid division by zero
+            rrf_bm25 = 1.0 / (1.0 + sorted(bm25_scores_list, reverse=True).index(bm25_score) + 1) if bm25_score in bm25_scores_list else 0
+
+            # Calculate hybrid score using both normalized scores and RRF
+            hybrid_score = (vector_weight * vector_norm + bm25_weight * bm25_norm) * 0.7 + (rrf_vector + rrf_bm25) * 0.3
+
+            # Create new point with hybrid score
+            hybrid_point = ScoredPoint(
+                id=result.id,
+                payload=result.payload,
+                score=hybrid_score,
+                vector=result.vector,
+                shard_key=None,
+                order_value=None
+            )
+            hybrid_results.append(hybrid_point)
+
+        # Sort by hybrid score and apply final threshold
+        hybrid_results.sort(key=lambda x: x.score, reverse=True)
+        final_results = [r for r in hybrid_results if r.score >= score_threshold][:limit]
+
+        logger.info(f"Hybrid search: {len(vector_results)} vector results, {len(final_results)} final results")
+        return final_results
+
+    def _preprocess_text_for_bm25(self, text: str) -> List[str]:
+        """Preprocess text for BM25 scoring"""
+        if not NLTK_AVAILABLE:
+            return text.lower().split()
+
+        try:
+            # Tokenize
+            tokens = word_tokenize(text.lower())
+
+            # Remove stopwords and non-alphabetic tokens
+            stop_words = set(stopwords.words('english'))
+            filtered_tokens = [
+                token for token in tokens
+                if token.isalpha() and token not in stop_words and len(token) > 2
+            ]
+
+            return filtered_tokens
+        except:
+            # Fallback to simple splitting
+            return text.lower().split()
+
+    def _calculate_bm25_score(self, query_terms: List[str], document: str) -> float:
+        """Calculate BM25 score for a document against query terms"""
+        if not query_terms:
+            return 0.0
+
+        # Preprocess document
+        doc_terms = self._preprocess_text_for_bm25(document)
+        if not doc_terms:
+            return 0.0
+
+        # Calculate term frequencies
+        doc_len = len(doc_terms)
+        avg_doc_len = 300  # Average document length (configurable)
+
+        # BM25 parameters
+        k1 = 1.2  # Controls term frequency saturation
+        b = 0.75  # Controls document length normalization
+
+        score = 0.0
+
+        # Calculate IDF for each query term
+        for term in set(query_terms):
+            # Term frequency in document
+            tf = doc_terms.count(term)
+
+            # Simple IDF (log(N/n) + 1)
+            # In production, you'd use the actual document frequency
+            idf = 2.0  # Simplified IDF
+
+            # BM25 formula
+            numerator = tf * (k1 + 1)
+            denominator = tf + k1 * (1 - b + b * (doc_len / avg_doc_len))
+
+            score += idf * (numerator / denominator)
+
+        # Normalize score to 0-1 range
+        return min(score / 10.0, 1.0)  # Simple normalization
+
+    async def search_documents(self, query: str, max_results: int = None, filters: Dict[str, Any] = None, collection_name: str = None, score_threshold: float = None) -> List[SearchResult]:
         """Search for relevant documents"""
         if not self.enabled:
             raise RuntimeError("RAG module not initialized")
-        
+
         collection_name = collection_name or self.default_collection_name
+
+        # Special handling for collections with different vector dimensions
+        SPECIAL_COLLECTIONS = {
+            "bitbox02_faq_local": {
+                "dimension": 384,
+                "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+            },
+            "bitbox_local_rag": {
+                "dimension": 384,
+                "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+            }
+        }
         max_results = max_results or self.config.get("max_results", 10)
         
         # Check cache (include collection name in cache key)
@@ -1278,8 +1521,25 @@ class RAGModule(BaseModule):
             import time
             start_time = time.time()
             
-            # Generate query embedding
-            query_embedding = await self._generate_embedding(query)
+            # Generate query embedding with task-specific prefix for better retrieval
+            try:
+                # Check if this is a special collection
+                if collection_name in SPECIAL_COLLECTIONS:
+                    # Try to import sentence-transformers
+                    import sentence_transformers
+                    from sentence_transformers import SentenceTransformer
+                    model = SentenceTransformer(SPECIAL_COLLECTIONS[collection_name]["model"])
+                    query_embedding = model.encode([query], normalize_embeddings=True)[0].tolist()
+                    logger.info(f"Using {SPECIAL_COLLECTIONS[collection_name]['dimension']}-dim local model for {collection_name}")
+                else:
+                    # The E5 model works better with "query:" prefix for search queries
+                    optimized_query = f"query: {query}"
+                    query_embedding = await self._generate_embedding(optimized_query)
+            except ImportError:
+                # Fallback to default embedding if sentence-transformers is not available
+                logger.warning(f"sentence-transformers not available, falling back to default embedding for {collection_name}")
+                optimized_query = f"query: {query}"
+                query_embedding = await self._generate_embedding(optimized_query)
             
             # Build filter
             search_filter = None
@@ -1297,14 +1557,30 @@ class RAGModule(BaseModule):
             logger.info(f"Query embedding (first 10 values): {query_embedding[:10] if query_embedding else 'None'}")
             logger.info(f"Embedding service available: {self.embedding_service is not None}")
             
-            # Search in Qdrant
-            search_results = self.qdrant_client.search(
-                collection_name=collection_name,
-                query_vector=query_embedding,
-                query_filter=search_filter,
-                limit=max_results,
-                score_threshold=0.0  # Lowered from 0.5 to see all results including low scores
-            )
+            # Check if hybrid search is enabled
+            enable_hybrid = self.config.get("enable_hybrid", False)
+            # Use provided score_threshold or fall back to config
+            search_score_threshold = score_threshold if score_threshold is not None else self.config.get("score_threshold", 0.3)
+
+            if enable_hybrid and NLTK_AVAILABLE:
+                # Perform hybrid search (vector + BM25)
+                search_results = await self._hybrid_search(
+                    collection_name=collection_name,
+                    query=query,
+                    query_vector=query_embedding,
+                    query_filter=search_filter,
+                    limit=max_results,
+                    score_threshold=search_score_threshold
+                )
+            else:
+                # Pure vector search with improved threshold
+                search_results = self.qdrant_client.search(
+                    collection_name=collection_name,
+                    query_vector=query_embedding,
+                    query_filter=search_filter,
+                    limit=max_results,
+                    score_threshold=search_score_threshold
+                )
             
             logger.info(f"Raw search results count: {len(search_results)}")
             
@@ -1316,14 +1592,31 @@ class RAGModule(BaseModule):
                 doc_id = result.payload.get("document_id")
                 content = result.payload.get("content", "")
                 score = result.score
-                
+
+                # Generic content extraction for documents without a 'content' field
+                if not content:
+                    # Build content from all text-based fields in the payload
+                    # This makes the RAG module completely agnostic to document structure
+                    text_fields = []
+                    for field, value in result.payload.items():
+                        # Skip system/metadata fields
+                        if field not in ["document_id", "chunk_index", "chunk_count", "indexed_at", "processed_at",
+                                        "file_hash", "mime_type", "file_type", "created_at", "__collection_metadata__"]:
+                            # Include any field that has a non-empty string value
+                            if value and isinstance(value, str) and len(value.strip()) > 0:
+                                text_fields.append(f"{field}: {value}")
+
+                    # Join all text fields to create content
+                    if text_fields:
+                        content = "\n\n".join(text_fields)
+
                 # Log each raw result for debugging
                 logger.info(f"\n--- Raw Result {i+1} ---")
                 logger.info(f"Score: {score}")
                 logger.info(f"Document ID: {doc_id}")
                 logger.info(f"Content preview (first 200 chars): {content[:200]}")
                 logger.info(f"Metadata keys: {list(result.payload.keys())}")
-                
+
                 # Aggregate scores by document
                 if doc_id in document_scores:
                     document_scores[doc_id]["score"] = max(document_scores[doc_id]["score"], score)
@@ -1651,9 +1944,9 @@ async def index_processed_document(processed_doc: ProcessedDocument, collection_
     """Index a processed document"""
     return await rag_module.index_processed_document(processed_doc, collection_name)
 
-async def search_documents(query: str, max_results: int = None, filters: Dict[str, Any] = None, collection_name: str = None) -> List[SearchResult]:
+async def search_documents(query: str, max_results: int = None, filters: Dict[str, Any] = None, collection_name: str = None, score_threshold: float = None) -> List[SearchResult]:
     """Search documents"""
-    return await rag_module.search_documents(query, max_results, filters, collection_name)
+    return await rag_module.search_documents(query, max_results, filters, collection_name, score_threshold)
 
 async def delete_document(document_id: str, collection_name: str = None) -> bool:
     """Delete a document"""

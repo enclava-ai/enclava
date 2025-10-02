@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     
     // Make request to backend auth endpoint without requiring existing auth
     const baseUrl = process.env.INTERNAL_API_URL || `http://enclava-backend:${process.env.BACKEND_INTERNAL_PORT || '8000'}`
-    const url = `${baseUrl}/api/auth/login`
+    const url = `${baseUrl}/api-internal/v1/auth/login`
     
     const response = await fetch(url, {
       method: 'POST',

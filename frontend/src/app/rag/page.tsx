@@ -85,8 +85,31 @@ function RAGPageContent() {
   const loadStats = async () => {
     try {
       const data = await apiClient.get('/api-internal/v1/rag/stats')
-      setStats(data.stats)
+      console.log('Stats API response:', data)
+
+      // Check if the response has the expected structure
+      if (data && data.stats && data.stats.collections) {
+        console.log('✓ Stats has collections property')
+        setStats(data.stats)
+      } else {
+        console.error('✗ Invalid stats structure:', data)
+        // Set default empty stats to prevent error
+        setStats({
+          collections: { total: 0, active: 0 },
+          documents: { total: 0, processing: 0, processed: 0 },
+          storage: { total_size_bytes: 0, total_size_mb: 0 },
+          vectors: { total: 0 }
+        })
+      }
     } catch (error) {
+      console.error('Error loading stats:', error)
+      // Set default empty stats on error
+      setStats({
+        collections: { total: 0, active: 0 },
+        documents: { total: 0, processing: 0, processed: 0 },
+        storage: { total_size_bytes: 0, total_size_mb: 0 },
+        vectors: { total: 0 }
+      })
     }
   }
 

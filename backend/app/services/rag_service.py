@@ -755,10 +755,11 @@ class RAGService:
                     
                     # Process with RAG module
                     try:
+                        # Pass file_path in metadata so JSONL indexing can reopen the source file
                         processed_doc = await rag_module.process_document(
-                            file_content, 
-                            document.original_filename, 
-                            {}
+                            file_content,
+                            document.original_filename,
+                            {"file_path": document.file_path}
                         )
                         
                         # Success case - update document with processed content

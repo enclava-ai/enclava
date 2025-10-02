@@ -162,6 +162,7 @@ class DocumentProcessor:
     
     async def _process_document(self, task: ProcessingTask) -> bool:
         """Process a single document"""
+        from datetime import datetime
         from app.db.database import async_session_factory
         async with async_session_factory() as session:
             try:
@@ -182,16 +183,24 @@ class DocumentProcessor:
                 document.status = ProcessingStatus.PROCESSING
                 await session.commit()
                 
-                # Get RAG module for processing (now includes content processing)
+                # Get RAG module for processing
                 try:
-                    from app.services.module_manager import module_manager
-                    rag_module = module_manager.get_module('rag')
+                    # Import RAG module and initialize it properly
+                    from modules.rag.main import RAGModule
+                    from app.core.config import settings
+
+                    # Create and initialize RAG module instance
+                    rag_module = RAGModule(settings)
+                    init_result = await rag_module.initialize()
+                    if not rag_module.enabled:
+                        raise Exception("Failed to enable RAG module")
+
                 except Exception as e:
                     logger.error(f"Failed to get RAG module: {e}")
                     raise Exception(f"RAG module not available: {e}")
-                
-                if not rag_module:
-                    raise Exception("RAG module not available")
+
+                if not rag_module or not rag_module.enabled:
+                    raise Exception("RAG module not available or not enabled")
                 
                 logger.info(f"RAG module loaded successfully for document {task.document_id}")
                 
@@ -204,31 +213,45 @@ class DocumentProcessor:
                 
                 # Process with RAG module
                 logger.info(f"Starting document processing for document {task.document_id} with RAG module")
-                try:
-                    # Add timeout to prevent hanging
-                    processed_doc = await asyncio.wait_for(
-                        rag_module.process_document(
-                            file_content, 
-                            document.original_filename, 
-                            {}
-                        ),
-                        timeout=300.0  # 5 minute timeout
-                    )
-                    logger.info(f"Document processing completed for document {task.document_id}")
-                except asyncio.TimeoutError:
-                    logger.error(f"Document processing timed out for document {task.document_id}")
-                    raise Exception("Document processing timed out after 5 minutes")
-                except Exception as e:
-                    logger.error(f"Document processing failed for document {task.document_id}: {e}")
-                    raise
-                
-                # Update document with processed content
-                document.converted_content = processed_doc.content
-                document.word_count = processed_doc.word_count
-                document.character_count = len(processed_doc.content)
-                document.document_metadata = processed_doc.metadata
-                document.status = ProcessingStatus.PROCESSED
-                document.processed_at = datetime.utcnow()
+
+                # Special handling for JSONL files - skip processing phase
+                if document.file_type == 'jsonl':
+                    # For JSONL files, we don't need to process content here
+                    # The optimized JSONL processor will handle everything during indexing
+                    document.converted_content = f"JSONL file with {len(file_content)} bytes"
+                    document.word_count = 0  # Will be updated during indexing
+                    document.character_count = len(file_content)
+                    document.document_metadata = {"file_path": document.file_path, "processed": "jsonl"}
+                    document.status = ProcessingStatus.PROCESSED
+                    document.processed_at = datetime.utcnow()
+                    logger.info(f"JSONL document {task.document_id} marked for optimized processing")
+                else:
+                    # Standard processing for other file types
+                    try:
+                        # Add timeout to prevent hanging
+                        processed_doc = await asyncio.wait_for(
+                            rag_module.process_document(
+                                file_content,
+                                document.original_filename,
+                                {"file_path": document.file_path}
+                            ),
+                            timeout=300.0  # 5 minute timeout
+                        )
+                        logger.info(f"Document processing completed for document {task.document_id}")
+
+                        # Update document with processed content
+                        document.converted_content = processed_doc.content
+                        document.word_count = processed_doc.word_count
+                        document.character_count = len(processed_doc.content)
+                        document.document_metadata = processed_doc.metadata
+                        document.status = ProcessingStatus.PROCESSED
+                        document.processed_at = datetime.utcnow()
+                    except asyncio.TimeoutError:
+                        logger.error(f"Document processing timed out for document {task.document_id}")
+                        raise Exception("Document processing timed out after 5 minutes")
+                    except Exception as e:
+                        logger.error(f"Document processing failed for document {task.document_id}: {e}")
+                        raise
                 
                 # Index in RAG system using same RAG module
                 if rag_module and document.converted_content:
@@ -245,14 +268,57 @@ class DocumentProcessor:
                         }
                         
                         # Use the correct Qdrant collection name for this document
-                        await asyncio.wait_for(
-                            rag_module.index_document(
-                                content=document.converted_content,
-                                metadata=doc_metadata,
-                                collection_name=document.collection.qdrant_collection_name
-                            ),
-                            timeout=120.0  # 2 minute timeout for indexing
-                        )
+                        # For JSONL files, we need to use the processed document flow
+                        if document.file_type == 'jsonl':
+                            # Create a ProcessedDocument for the JSONL processor
+                            from app.modules.rag.main import ProcessedDocument
+                            from datetime import datetime
+                            import hashlib
+
+                            # Calculate file hash
+                            processed_at = datetime.utcnow()
+                            file_hash = hashlib.md5(str(document.id).encode()).hexdigest()
+
+                            processed_doc = ProcessedDocument(
+                                id=str(document.id),
+                                content="",  # Will be filled by JSONL processor
+                                extracted_text="",  # Will be filled by JSONL processor
+                                metadata={
+                                    **doc_metadata,
+                                    "file_path": document.file_path
+                                },
+                                original_filename=document.original_filename,
+                                file_type=document.file_type,
+                                mime_type=document.mime_type,
+                                language=document.document_metadata.get('language', 'EN'),
+                                word_count=0,  # Will be updated during processing
+                                sentence_count=0,  # Will be updated during processing
+                                entities=[],
+                                keywords=[],
+                                processing_time=0.0,
+                                processed_at=processed_at,
+                                file_hash=file_hash,
+                                file_size=document.file_size
+                            )
+
+                            # The JSONL processor will read the original file
+                            await asyncio.wait_for(
+                                rag_module.index_processed_document(
+                                    processed_doc=processed_doc,
+                                    collection_name=document.collection.qdrant_collection_name
+                                ),
+                                timeout=300.0  # 5 minute timeout for JSONL processing
+                            )
+                        else:
+                            # Use standard indexing for other file types
+                            await asyncio.wait_for(
+                                rag_module.index_document(
+                                    content=document.converted_content,
+                                    metadata=doc_metadata,
+                                    collection_name=document.collection.qdrant_collection_name
+                                ),
+                                timeout=120.0  # 2 minute timeout for indexing
+                            )
                         
                         logger.info(f"Document {task.document_id} indexed successfully in collection {document.collection.qdrant_collection_name}")
                         
@@ -271,7 +337,9 @@ class DocumentProcessor:
                         
                     except Exception as e:
                         logger.error(f"Failed to index document {task.document_id} in RAG: {e}")
-                        # Keep as processed even if indexing fails
+                        # Mark as error since indexing failed
+                        document.status = ProcessingStatus.ERROR
+                        document.processing_error = f"Indexing failed: {str(e)}"
                         # Don't raise the exception to avoid retries on indexing failures
                 
                 await session.commit()

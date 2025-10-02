@@ -32,10 +32,26 @@ class ChatbotCreateRequest(BaseModel):
     use_rag: bool = False
     rag_collection: Optional[str] = None
     rag_top_k: int = 5
+    rag_score_threshold: float = 0.02  # Lowered from default 0.3 to allow more results
     temperature: float = 0.7
     max_tokens: int = 1000
     memory_length: int = 10
     fallback_responses: List[str] = []
+
+
+class ChatbotUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    chatbot_type: Optional[str] = None
+    model: Optional[str] = None
+    system_prompt: Optional[str] = None
+    use_rag: Optional[bool] = None
+    rag_collection: Optional[str] = None
+    rag_top_k: Optional[int] = None
+    rag_score_threshold: Optional[float] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    memory_length: Optional[int] = None
+    fallback_responses: Optional[List[str]] = None
 
 
 class ChatRequest(BaseModel):
@@ -190,7 +206,7 @@ async def create_chatbot(
 @router.put("/update/{chatbot_id}")
 async def update_chatbot(
     chatbot_id: str,
-    request: ChatbotCreateRequest,
+    request: ChatbotUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -214,28 +230,23 @@ async def update_chatbot(
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found or access denied")
         
-        # Update chatbot configuration
-        config = {
-            "name": request.name,
-            "chatbot_type": request.chatbot_type,
-            "model": request.model,
-            "system_prompt": request.system_prompt,
-            "use_rag": request.use_rag,
-            "rag_collection": request.rag_collection,
-            "rag_top_k": request.rag_top_k,
-            "temperature": request.temperature,
-            "max_tokens": request.max_tokens,
-            "memory_length": request.memory_length,
-            "fallback_responses": request.fallback_responses
-        }
-        
+        # Get existing config
+        existing_config = chatbot.config.copy() if chatbot.config else {}
+
+        # Update only the fields that are provided in the request
+        update_data = request.dict(exclude_unset=True)
+
+        # Merge with existing config, preserving unset values
+        for key, value in update_data.items():
+            existing_config[key] = value
+
         # Update the chatbot
         await db.execute(
             update(ChatbotInstance)
             .where(ChatbotInstance.id == chatbot_id)
             .values(
-                name=request.name,
-                config=config,
+                name=existing_config.get("name", chatbot.name),
+                config=existing_config,
                 updated_at=datetime.utcnow()
             )
         )
@@ -275,14 +286,14 @@ async def chat_with_chatbot(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Send a message to a chatbot and get a response"""
+    """Send a message to a chatbot and get a response (without persisting conversation)"""
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
     log_api_request("chat_with_chatbot", {
         "user_id": user_id,
         "chatbot_id": chatbot_id,
         "message_length": len(request.message)
     })
-    
+
     try:
         # Get the chatbot instance
         result = await db.execute(
@@ -291,74 +302,40 @@ async def chat_with_chatbot(
             .where(ChatbotInstance.created_by == str(user_id))
         )
         chatbot = result.scalar_one_or_none()
-        
+
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found")
-        
+
         if not chatbot.is_active:
             raise HTTPException(status_code=400, detail="Chatbot is not active")
-        
-        # Initialize conversation service
-        conversation_service = ConversationService(db)
-        
-        # Get or create conversation
-        conversation = await conversation_service.get_or_create_conversation(
-            chatbot_id=chatbot_id,
-            user_id=str(user_id),
-            conversation_id=request.conversation_id
-        )
-        
-        # Add user message to conversation
-        await conversation_service.add_message(
-            conversation_id=conversation.id,
-            role="user",
-            content=request.message,
-            metadata={}
-        )
-        
+
         # Get chatbot module and generate response
         try:
             chatbot_module = module_manager.modules.get("chatbot")
             if not chatbot_module:
                 raise HTTPException(status_code=500, detail="Chatbot module not available")
-            
-            # Load conversation history for context
-            conversation_history = await conversation_service.get_conversation_history(
-                conversation_id=conversation.id,
-                limit=chatbot.config.get('memory_length', 10),
-                include_system=False
-            )
-            
-            # Use the chatbot module to generate a response
+
+            # Use the chatbot module to generate a response (without persisting)
             response_data = await chatbot_module.chat(
                 chatbot_config=chatbot.config,
                 message=request.message,
-                conversation_history=conversation_history,
+                conversation_history=[],  # Empty history for test chat
                 user_id=str(user_id)
             )
-            
+
             response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
-            
+
         except Exception as e:
             # Use fallback response
             fallback_responses = chatbot.config.get("fallback_responses", [
                 "I'm sorry, I'm having trouble processing your request right now."
             ])
             response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
-        
-        # Save assistant message using conversation service
-        assistant_message = await conversation_service.add_message(
-            conversation_id=conversation.id,
-            role="assistant",
-            content=response_content,
-            metadata={},
-            sources=response_data.get("sources")
-        )
-        
+
+        # Return response without conversation ID (since we're not persisting)
         return {
-            "conversation_id": conversation.id,
             "response": response_content,
-            "timestamp": assistant_message.timestamp.isoformat()
+            "sources": response_data.get("sources")
         }
         
     except HTTPException:

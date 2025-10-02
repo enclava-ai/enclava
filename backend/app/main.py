@@ -124,10 +124,18 @@ async def lifespan(app: FastAPI):
     
     # Initialize config manager
     await init_config_manager()
-    
+
+    # Initialize LLM service (needed by RAG module)
+    from app.services.llm.service import llm_service
+    try:
+        await llm_service.initialize()
+        logger.info("LLM service initialized successfully")
+    except Exception as e:
+        logger.warning(f"LLM service initialization failed: {e}")
+
     # Initialize analytics service
     init_analytics_service()
-    
+
     # Initialize module manager with FastAPI app for router registration
     logger.info("Initializing module manager...")
     await module_manager.initialize(app)
@@ -215,13 +223,9 @@ app.add_middleware(
 # Add analytics middleware
 setup_analytics_middleware(app)
 
-# Add debugging middleware for detailed request/response logging
-from app.middleware.debugging import setup_debugging_middleware
-setup_debugging_middleware(app)
+# Security middleware disabled - handled externally
 
-# Add security middleware
-from app.middleware.security import setup_security_middleware
-setup_security_middleware(app, enabled=settings.API_SECURITY_ENABLED)
+# Rate limiting middleware disabled - handled externally
 
 
 # Exception handlers

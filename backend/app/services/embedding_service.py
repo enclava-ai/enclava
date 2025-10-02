@@ -28,9 +28,19 @@ class EmbeddingService:
                 await llm_service.initialize()
             
             # Test LLM service health
-            health_summary = llm_service.get_health_summary()
-            if health_summary.get("service_status") != "healthy":
-                logger.error(f"LLM service unhealthy: {health_summary}")
+            if not llm_service._initialized:
+                logger.error("LLM service not initialized")
+                return False
+
+            # Check if PrivateMode provider is available
+            try:
+                provider_status = await llm_service.get_provider_status()
+                privatemode_status = provider_status.get("privatemode")
+                if not privatemode_status or privatemode_status.status != "healthy":
+                    logger.error(f"PrivateMode provider not available: {privatemode_status}")
+                    return False
+            except Exception as e:
+                logger.error(f"Failed to check provider status: {e}")
                 return False
             
             self.initialized = True
@@ -75,6 +85,12 @@ class EmbeddingService:
                         else:
                             truncated_text = text
                         
+                        # Guard: skip empty inputs (validator rejects empty strings)
+                        if not truncated_text.strip():
+                            logger.debug("Empty input for embedding; using fallback vector")
+                            batch_embeddings.append(self._generate_fallback_embedding(text))
+                            continue
+
                         # Call LLM service embedding endpoint
                         from app.services.llm.service import llm_service
                         from app.services.llm.models import EmbeddingRequest

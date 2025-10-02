@@ -484,7 +484,7 @@ async def seed_default_templates(
                 select(PromptTemplate).where(PromptTemplate.type_key == type_key)
             )
             existing_template = existing.scalar_one_or_none()
-            
+
             if existing_template:
                 # Only update if it's still the default (version 1)
                 if existing_template.version == 1 and existing_template.is_default:
@@ -494,21 +494,40 @@ async def seed_default_templates(
                     existing_template.updated_at = datetime.utcnow()
                     updated_templates.append(type_key)
             else:
-                # Create new template
-                new_template = PromptTemplate(
-                    id=str(uuid.uuid4()),
-                    name=template_data["name"],
-                    type_key=type_key,
-                    description=template_data["description"],
-                    system_prompt=template_data["prompt"],
-                    is_default=True,
-                    is_active=True,
-                    version=1,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                # Check if any inactive template exists with this type_key
+                inactive_result = await db.execute(
+                    select(PromptTemplate)
+                    .where(PromptTemplate.type_key == type_key)
+                    .where(PromptTemplate.is_active == False)
                 )
-                db.add(new_template)
-                created_templates.append(type_key)
+                inactive_template = inactive_result.scalar_one_or_none()
+
+                if inactive_template:
+                    # Reactivate the inactive template
+                    inactive_template.is_active = True
+                    inactive_template.name = template_data["name"]
+                    inactive_template.description = template_data["description"]
+                    inactive_template.system_prompt = template_data["prompt"]
+                    inactive_template.is_default = True
+                    inactive_template.version = 1
+                    inactive_template.updated_at = datetime.utcnow()
+                    updated_templates.append(type_key)
+                else:
+                    # Create new template
+                    new_template = PromptTemplate(
+                        id=str(uuid.uuid4()),
+                        name=template_data["name"],
+                        type_key=type_key,
+                        description=template_data["description"],
+                        system_prompt=template_data["prompt"],
+                        is_default=True,
+                        is_active=True,
+                        version=1,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    db.add(new_template)
+                    created_templates.append(type_key)
         
         await db.commit()
         

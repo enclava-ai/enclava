@@ -138,6 +138,7 @@ export function ChatbotManager() {
   const [editingChatbot, setEditingChatbot] = useState<ChatbotInstance | null>(null)
   const [showChatInterface, setShowChatInterface] = useState(false)
   const [testingChatbot, setTestingChatbot] = useState<ChatbotInstance | null>(null)
+  const [chatbotApiKeys, setChatbotApiKeys] = useState<Record<string, string>>({})
   const { toast } = useToast()
 
   // New chatbot form state

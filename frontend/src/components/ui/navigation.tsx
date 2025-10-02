@@ -67,12 +67,13 @@ const Navigation = () => {
   // Core navigation items that are always visible
   const coreNavItems = [
     { href: "/dashboard", label: "Dashboard" },
-    { 
-      href: "/llm", 
+    {
+      href: "/llm",
       label: "LLM",
       children: [
         { href: "/llm", label: "Models & Config" },
         { href: "/playground", label: "Playground" },
+        { href: "/rag-demo", label: "RAG Demo" },
       ]
     },
     { 
