@@ -61,8 +61,15 @@ class UserRegisterRequest(BaseModel):
 
 
 class UserLoginRequest(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
     password: str
+
+    @validator('email')
+    def validate_email_or_username(cls, v, values):
+        if v is None and not values.get('username'):
+            raise ValueError('Either email or username must be provided')
+        return v
 
 
 class TokenResponse(BaseModel):
@@ -161,33 +168,40 @@ async def login(
 ):
     """Login user and return access tokens"""
     
+    # Determine identifier for logging and user lookup
+    identifier = user_data.email if user_data.email else user_data.username
     logger.info(
         "LOGIN_DEBUG_START",
         request_time=datetime.utcnow().isoformat(),
-        email=user_data.email,
+        identifier=identifier,
         database_url="SET" if settings.DATABASE_URL else "NOT SET",
         jwt_secret="SET" if settings.JWT_SECRET else "NOT SET",
         admin_email=settings.ADMIN_EMAIL,
         bcrypt_rounds=settings.BCRYPT_ROUNDS,
     )
-    
+
     start_time = datetime.utcnow()
 
-    # Get user by email
+    # Get user by email or username
     logger.info("LOGIN_USER_QUERY_START")
     query_start = datetime.utcnow()
-    stmt = select(User).where(User.email == user_data.email)
+
+    if user_data.email:
+        stmt = select(User).where(User.email == user_data.email)
+    else:
+        stmt = select(User).where(User.username == user_data.username)
+
     result = await db.execute(stmt)
     query_end = datetime.utcnow()
     logger.info(
         "LOGIN_USER_QUERY_END",
         duration_seconds=(query_end - query_start).total_seconds(),
     )
-    
+
     user = result.scalar_one_or_none()
-    
+
     if not user:
-        logger.warning("LOGIN_USER_NOT_FOUND", email=user_data.email)
+        logger.warning("LOGIN_USER_NOT_FOUND", identifier=identifier)
         # List available users for debugging
         try:
             all_users_stmt = select(User).limit(5)
