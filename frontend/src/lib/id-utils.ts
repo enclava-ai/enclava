@@ -1,36 +1,15 @@
-export function generateId(): string {
-  return Math.random().toString(36).substr(2, 9);
+export function generateId(prefix = "id"): string {
+  const rand = Math.random().toString(36).slice(2, 10)
+  return `${prefix}_${rand}`
 }
 
-export function generateUniqueId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+export function generateShortId(prefix = "id"): string {
+  const rand = Math.random().toString(36).slice(2, 7)
+  return `${prefix}_${rand}`
 }
 
-export function generateMessageId(): string {
-  return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-export function generateChatId(): string {
-  return `chat_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-}
-
-export function generateSessionId(): string {
-  return `sess_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-}
-
-export function generateShortId(): string {
-  return Math.random().toString(36).substr(2, 6);
-}
-
-export function generateTimestampId(): string {
-  return `ts_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-}
-
-export function isValidId(id: string): boolean {
-  return typeof id === 'string' && id.length > 0;
-}
-
-export function extractIdFromUrl(url: string): string | null {
-  const match = url.match(/\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})$/);
-  return match ? match[1] : null;
+export function generateTimestampId(prefix = "id"): string {
+  const ts = Date.now()
+  const rand = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+  return `${prefix}_${ts}_${rand}`
 }

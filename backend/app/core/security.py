@@ -2,6 +2,8 @@
 Security utilities for authentication and authorization
 """
 
+import asyncio
+import concurrent.futures
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -33,19 +35,29 @@ security = HTTPBearer()
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
     import time
+    
     start_time = time.time()
     logger.info(f"=== PASSWORD VERIFICATION START === BCRYPT_ROUNDS: {settings.BCRYPT_ROUNDS}")
     
     try:
-        result = pwd_context.verify(plain_password, hashed_password)
+        # Run password verification in a thread with timeout
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(pwd_context.verify, plain_password, hashed_password)
+            result = future.result(timeout=5.0)  # 5 second timeout
+            
         end_time = time.time()
         duration = end_time - start_time
         logger.info(f"=== PASSWORD VERIFICATION END === Duration: {duration:.3f}s, Result: {result}")
         
-        if duration > 5:
+        if duration > 1:
             logger.warning(f"PASSWORD VERIFICATION TOOK TOO LONG: {duration:.3f}s")
             
         return result
+    except concurrent.futures.TimeoutError:
+        end_time = time.time()
+        duration = end_time - start_time
+        logger.error(f"=== PASSWORD VERIFICATION TIMEOUT === Duration: {duration:.3f}s")
+        return False  # Treat timeout as verification failure
     except Exception as e:
         end_time = time.time()
         duration = end_time - start_time

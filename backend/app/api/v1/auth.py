@@ -1,6 +1,4 @@
-"""
-Authentication API endpoints
-"""
+"""Authentication API endpoints"""
 
 import logging
 from datetime import datetime, timedelta
@@ -13,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.core.security import (
     verify_password,
     get_password_hash,
@@ -26,7 +25,7 @@ from app.db.database import get_db
 from app.models.user import User
 from app.utils.exceptions import AuthenticationError, ValidationError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
@@ -162,88 +161,70 @@ async def login(
 ):
     """Login user and return access tokens"""
     
-    logger.info(f"==================================================")
-    logger.info(f"=== LOGIN ENDPOINT REACHED ===")
-    logger.info(f"==================================================")
-    logger.info(f"=== LOGIN DEBUG ===")
-    logger.info(f"Login attempt for email: {user_data.email}")
-    logger.info(f"Current UTC time: {datetime.utcnow().isoformat()}")
-    logger.info(f"Settings check - DATABASE_URL: {'SET' if settings.DATABASE_URL else 'NOT SET'}")
-    logger.info(f"Settings check - JWT_SECRET: {'SET' if settings.JWT_SECRET else 'NOT SET'}")
-    logger.info(f"Settings check - ADMIN_EMAIL: {settings.ADMIN_EMAIL}")
-    logger.info(f"Settings check - BCRYPT_ROUNDS: {settings.BCRYPT_ROUNDS}")
-    
-    # DEBUG: Check Redis connection
-    try:
-        logger.info("Testing Redis connection...")
-        import redis.asyncio as redis
-        redis_url = settings.REDIS_URL
-        logger.info(f"Redis URL: {redis_url}")
-        redis_client = redis.from_url(redis_url)
-        test_start = datetime.utcnow()
-        await redis_client.ping()
-        test_end = datetime.utcnow()
-        logger.info(f"Redis connection test successful. Time: {(test_end - test_start).total_seconds()} seconds")
-        await redis_client.close()
-    except Exception as e:
-        logger.error(f"Redis connection test failed: {e}")
-    
-    # DEBUG: Check database connection with timeout
-    try:
-        logger.info("Testing database connection...")
-        test_start = datetime.utcnow()
-        await db.execute(select(1))
-        test_end = datetime.utcnow()
-        logger.info(f"Database connection test successful. Time: {(test_end - test_start).total_seconds()} seconds")
-    except Exception as e:
-        logger.error(f"Database connection test failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database connection error"
-        )
+    logger.info(
+        "LOGIN_DEBUG_START",
+        request_time=datetime.utcnow().isoformat(),
+        email=user_data.email,
+        database_url="SET" if settings.DATABASE_URL else "NOT SET",
+        jwt_secret="SET" if settings.JWT_SECRET else "NOT SET",
+        admin_email=settings.ADMIN_EMAIL,
+        bcrypt_rounds=settings.BCRYPT_ROUNDS,
+    )
     
     start_time = datetime.utcnow()
-    
+
     # Get user by email
-    logger.info("Querying user by email...")
+    logger.info("LOGIN_USER_QUERY_START")
     query_start = datetime.utcnow()
     stmt = select(User).where(User.email == user_data.email)
     result = await db.execute(stmt)
     query_end = datetime.utcnow()
-    logger.info(f"User query completed. Time: {(query_end - query_start).total_seconds()} seconds")
+    logger.info(
+        "LOGIN_USER_QUERY_END",
+        duration_seconds=(query_end - query_start).total_seconds(),
+    )
     
     user = result.scalar_one_or_none()
     
     if not user:
-        logger.warning(f"User not found: {user_data.email}")
+        logger.warning("LOGIN_USER_NOT_FOUND", email=user_data.email)
         # List available users for debugging
         try:
             all_users_stmt = select(User).limit(5)
             all_users_result = await db.execute(all_users_stmt)
             all_users = all_users_result.scalars().all()
-            logger.info(f"Available users (first 5): {[u.email for u in all_users]}")
+            logger.info(
+                "LOGIN_USER_LIST",
+                users=[u.email for u in all_users],
+            )
         except Exception as e:
-            logger.error(f"Could not list users: {e}")
+            logger.error("LOGIN_USER_LIST_FAILURE", error=str(e))
         
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
     
-    logger.info(f"User found: {user.email}, is_active: {user.is_active}")
-    logger.info(f"User found, starting password verification...")
+    logger.info("LOGIN_USER_FOUND", email=user.email, is_active=user.is_active)
+    logger.info("LOGIN_PASSWORD_VERIFY_START")
     verify_start = datetime.utcnow()
     
     if not verify_password(user_data.password, user.hashed_password):
         verify_end = datetime.utcnow()
-        logger.warning(f"Password verification failed. Time taken: {(verify_end - verify_start).total_seconds()} seconds")
+        logger.warning(
+            "LOGIN_PASSWORD_VERIFY_FAILURE",
+            duration_seconds=(verify_end - verify_start).total_seconds(),
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
     
     verify_end = datetime.utcnow()
-    logger.info(f"Password verification successful. Time taken: {(verify_end - verify_start).total_seconds()} seconds")
+    logger.info(
+        "LOGIN_PASSWORD_VERIFY_SUCCESS",
+        duration_seconds=(verify_end - verify_start).total_seconds(),
+    )
     
     if not user.is_active:
         raise HTTPException(
@@ -252,20 +233,21 @@ async def login(
         )
     
     # Update last login
-    logger.info("Updating last login...")
+    logger.info("LOGIN_LAST_LOGIN_UPDATE_START")
     update_start = datetime.utcnow()
     user.update_last_login()
     await db.commit()
     update_end = datetime.utcnow()
-    logger.info(f"Last login updated. Time: {(update_end - update_start).total_seconds()} seconds")
-    
+    logger.info(
+        "LOGIN_LAST_LOGIN_UPDATE_SUCCESS",
+        duration_seconds=(update_end - update_start).total_seconds(),
+    )
+
     # Create tokens
-    logger.info("Creating tokens...")
+    logger.info("LOGIN_TOKEN_CREATE_START")
     token_start = datetime.utcnow()
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    logger.info(f"Creating access token with expiration: {access_token_expires}")
-    logger.info(f"ACCESS_TOKEN_EXPIRE_MINUTES from settings: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}")
-    
+
     access_token = create_access_token(
         data={
             "sub": str(user.id),
@@ -275,15 +257,21 @@ async def login(
         },
         expires_delta=access_token_expires
     )
-    
+
     refresh_token = create_refresh_token(
         data={"sub": str(user.id), "type": "refresh"}
     )
     token_end = datetime.utcnow()
-    logger.info(f"Tokens created. Time: {(token_end - token_start).total_seconds()} seconds")
-    
+    logger.info(
+        "LOGIN_TOKEN_CREATE_SUCCESS",
+        duration_seconds=(token_end - token_start).total_seconds(),
+    )
+
     total_time = datetime.utcnow() - start_time
-    logger.info(f"=== LOGIN COMPLETED === Total time: {total_time.total_seconds()} seconds")
+    logger.info(
+        "LOGIN_DEBUG_COMPLETE",
+        total_duration_seconds=total_time.total_seconds(),
+    )
     
     return TokenResponse(
         access_token=access_token,

@@ -16,6 +16,7 @@ from .models import ResilienceConfig
 class ProviderConfig(BaseModel):
     """Configuration for an LLM provider"""
     name: str = Field(..., description="Provider name")
+    provider_type: str = Field(..., description="Provider type (e.g., 'openai', 'privatemode')")
     enabled: bool = Field(True, description="Whether provider is enabled")
     base_url: str = Field(..., description="Provider base URL")
     api_key_env_var: str = Field(..., description="Environment variable for API key")
@@ -53,9 +54,6 @@ class LLMServiceConfig(BaseModel):
     enable_security_checks: bool = Field(True, description="Enable security validation")
     enable_metrics_collection: bool = Field(True, description="Enable metrics collection")
     
-    # Security settings
-    security_risk_threshold: float = Field(0.8, ge=0.0, le=1.0, description="Risk threshold for blocking")
-    security_warning_threshold: float = Field(0.6, ge=0.0, le=1.0, description="Risk threshold for warnings")
     max_prompt_length: int = Field(50000, ge=1000, description="Maximum prompt length")
     max_response_length: int = Field(32000, ge=1000, description="Maximum response length")
     
@@ -65,16 +63,19 @@ class LLMServiceConfig(BaseModel):
     
     # Provider configurations
     providers: Dict[str, ProviderConfig] = Field(default_factory=dict, description="Provider configurations")
-    
+
+    # Token rate limiting (organization-wide)
+    token_limits_per_minute: Dict[str, int] = Field(
+        default_factory=lambda: {
+            "prompt_tokens": 20000,    # PrivateMode Standard tier
+            "completion_tokens": 10000  # PrivateMode Standard tier
+        },
+        description="Token rate limits per minute (organization-wide)"
+    )
+
     # Model routing (model_name -> provider_name)
     model_routing: Dict[str, str] = Field(default_factory=dict, description="Model to provider routing")
     
-    @validator('security_risk_threshold')
-    def validate_risk_threshold(cls, v, values):
-        warning_threshold = values.get('security_warning_threshold', 0.6)
-        if v <= warning_threshold:
-            raise ValueError("Risk threshold must be greater than warning threshold")
-        return v
 
 
 def create_default_config() -> LLMServiceConfig:
@@ -84,6 +85,7 @@ def create_default_config() -> LLMServiceConfig:
     # Models will be fetched dynamically from proxy /models endpoint
     privatemode_config = ProviderConfig(
         name="privatemode",
+        provider_type="privatemode",
         enabled=True,
         base_url=settings.PRIVATEMODE_PROXY_URL,
         api_key_env_var="PRIVATEMODE_API_KEY",
@@ -91,8 +93,8 @@ def create_default_config() -> LLMServiceConfig:
         supported_models=[],  # Will be populated dynamically from proxy
         capabilities=["chat", "embeddings", "tee"],
         priority=1,
-        max_requests_per_minute=100,
-        max_requests_per_hour=2000,
+        max_requests_per_minute=20,    # PrivateMode Standard tier limit: 20 req/min
+        max_requests_per_hour=1200,   # 20 req/min * 60 min
         supports_streaming=True,
         supports_function_calling=True,
         max_context_window=128000,
@@ -110,9 +112,6 @@ def create_default_config() -> LLMServiceConfig:
     config = LLMServiceConfig(
         default_provider="privatemode",
         enable_detailed_logging=settings.LOG_LLM_PROMPTS,
-        enable_security_checks=settings.API_SECURITY_ENABLED,
-        security_risk_threshold=settings.API_SECURITY_RISK_THRESHOLD,
-        security_warning_threshold=settings.API_SECURITY_WARNING_THRESHOLD,
         providers={
             "privatemode": privatemode_config
         },

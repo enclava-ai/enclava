@@ -1,0 +1,126 @@
+{
+  "title": "Chatbot Configuration",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "Chatbot Name",
+      "description": "Display name for this chatbot instance",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "chatbot_type": {
+      "type": "string",
+      "title": "Chatbot Type",
+      "description": "Select the type of chatbot personality",
+      "enum": ["assistant", "customer_support", "teacher", "researcher", "creative_writer", "custom"],
+      "enumNames": ["General Assistant", "Customer Support", "Teacher", "Researcher", "Creative Writer", "Custom"],
+      "default": "assistant"
+    },
+    "model": {
+      "type": "string",
+      "title": "AI Model",
+      "description": "Choose the LLM model for responses",
+      "enum": ["gpt-4", "gpt-3.5-turbo", "claude-3-sonnet", "claude-3-opus", "llama-70b"],
+      "default": "gpt-3.5-turbo"
+    },
+    "system_prompt": {
+      "type": "string",
+      "title": "System Prompt",
+      "description": "Define the chatbot's personality and behavior instructions",
+      "ui:widget": "textarea",
+      "ui:options": {
+        "rows": 6,
+        "placeholder": "You are a helpful AI assistant..."
+      }
+    },
+    "use_rag": {
+      "type": "boolean",
+      "title": "Enable Knowledge Base",
+      "description": "Use RAG to search knowledge base for context",
+      "default": false
+    },
+    "rag_collection": {
+      "type": "string",
+      "title": "Knowledge Base Collection",
+      "description": "Select which document collection to search",
+      "ui:widget": "rag-collection-selector",
+      "ui:condition": "use_rag === true"
+    },
+    "rag_top_k": {
+      "type": "integer",
+      "title": "Knowledge Base Results",
+      "description": "Number of relevant documents to include",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 5,
+      "ui:condition": "use_rag === true"
+    },
+    "temperature": {
+      "type": "number",
+      "title": "Response Creativity",
+      "description": "Controls randomness (0.0 = focused, 1.0 = creative)",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.7,
+      "ui:widget": "range",
+      "ui:options": {
+        "step": 0.1
+      }
+    },
+    "max_tokens": {
+      "type": "integer",
+      "title": "Maximum Response Length",
+      "description": "Maximum number of tokens in response",
+      "minimum": 50,
+      "maximum": 4000,
+      "default": 1000,
+      "ui:widget": "range",
+      "ui:options": {
+        "step": 50
+      }
+    },
+    "memory_length": {
+      "type": "integer",
+      "title": "Conversation Memory",
+      "description": "Number of previous message pairs to remember",
+      "minimum": 1,
+      "maximum": 50,
+      "default": 10,
+      "ui:widget": "range"
+    },
+    "fallback_responses": {
+      "type": "array",
+      "title": "Fallback Responses",
+      "description": "Responses to use when the AI cannot answer",
+      "items": {
+        "type": "string",
+        "title": "Fallback Response"
+      },
+      "default": [
+        "I'm not sure how to help with that. Could you please rephrase your question?",
+        "I don't have enough information to answer that question accurately.",
+        "That's outside my knowledge area. Is there something else I can help you with?"
+      ],
+      "ui:options": {
+        "orderable": true,
+        "addable": true,
+        "removable": true
+      }
+    }
+  },
+  "required": ["name", "chatbot_type", "model"],
+  "ui:order": [
+    "name", 
+    "chatbot_type", 
+    "model", 
+    "system_prompt", 
+    "use_rag", 
+    "rag_collection", 
+    "rag_top_k", 
+    "temperature", 
+    "max_tokens", 
+    "memory_length", 
+    "fallback_responses"
+  ]
+}

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 export const dynamic = 'force-dynamic'
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,7 +95,8 @@ const PERMISSION_OPTIONS = [
   { value: "llm:embeddings", label: "LLM Embeddings" },
 ];
 
-function ApiKeysPageContent() {
+function ApiKeysContent() {
+
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -910,8 +912,9 @@ function ApiKeysPageContent() {
 
 export default function ApiKeysPage() {
   return (
-    <Suspense fallback={<div className="container mx-auto p-6">Loading...</div>}>
-      <ApiKeysPageContent />
+    <Suspense fallback={<div>Loading API keys...</div>}>
+      <ApiKeysContent />
     </Suspense>
   );
 }
+

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Search, FileText, Trash2, Eye, Download, Calendar, Hash, FileIcon, Filter } from "lucide-react"
+import { Search, FileText, Trash2, Eye, Download, Calendar, Hash, FileIcon, Filter, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api-client"
 import { config } from "@/lib/config"
@@ -56,6 +56,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
   const [filterStatus, setFilterStatus] = useState("all")
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [reprocessing, setReprocessing] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -154,6 +155,43 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
         description: "Failed to download document",
         variant: "destructive",
       })
+    }
+  }
+
+  const handleReprocessDocument = async (documentId: string) => {
+    setReprocessing(documentId)
+
+    try {
+      await apiClient.post(`/api-internal/v1/rag/documents/${documentId}/reprocess`)
+
+      // Update the document status to processing in the UI
+      setDocuments(prev => prev.map(doc =>
+        doc.id === documentId
+          ? { ...doc, status: 'processing' as const, processed_at: new Date().toISOString() }
+          : doc
+      ))
+
+      toast({
+        title: "Success",
+        description: "Document reprocessing started",
+      })
+
+      // Reload documents after a short delay to see status updates
+      setTimeout(() => {
+        loadDocuments()
+      }, 2000)
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to reprocess document"
+      toast({
+        title: "Error",
+        description: errorMessage.includes("Cannot reprocess document with status 'processed'")
+          ? "Cannot reprocess documents that are already processed"
+          : errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setReprocessing(null)
     }
   }
 
@@ -430,6 +468,21 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                       onClick={() => handleDownloadDocument(document)}
                     >
                       <Download className="h-4 w-4" />
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 hover:bg-blue-100"
+                      onClick={() => handleReprocessDocument(document.id)}
+                      disabled={reprocessing === document.id || document.status === 'processed'}
+                      title={document.status === 'processed' ? "Document already processed" : "Reprocess document"}
+                    >
+                      {reprocessing === document.id ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className={`h-4 w-4 ${document.status === 'processed' ? 'text-gray-400' : ''}`} />
+                      )}
                     </Button>
 
                     <AlertDialog>

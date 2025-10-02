@@ -124,7 +124,6 @@ class MetricsCollector:
         total_requests = len(self._metrics)
         successful_requests = sum(1 for m in self._metrics if m.success)
         failed_requests = total_requests - successful_requests
-        security_blocked = sum(1 for m in self._metrics if not m.success and m.security_risk_score > 0.8)
         
         # Calculate averages
         latencies = [m.latency_ms for m in self._metrics if m.latency_ms > 0]
@@ -143,7 +142,6 @@ class MetricsCollector:
             total_requests=total_requests,
             successful_requests=successful_requests,
             failed_requests=failed_requests,
-            security_blocked_requests=security_blocked,
             average_latency_ms=avg_latency,
             average_risk_score=avg_risk_score,
             provider_metrics=provider_metrics,

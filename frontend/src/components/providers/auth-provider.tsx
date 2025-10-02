@@ -20,7 +20,7 @@ interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (username: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => void
   register: (username: string, email: string, password: string) => Promise<void>
   refreshToken: () => Promise<void>
@@ -62,9 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     try {
-      const data = await apiClient.post("/api-internal/v1/auth/login", { username, password })
+      const data = await apiClient.post("/api-internal/v1/auth/login", { email, password })
       
       // Store tokens using tokenManager
       tokenManager.setTokens(data.access_token, data.refresh_token)

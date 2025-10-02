@@ -69,6 +69,7 @@ class ChatbotConfig:
     memory_length: int = 10  # Number of previous messages to remember
     use_rag: bool = False
     rag_top_k: int = 5
+    rag_score_threshold: float = 0.02  # Lowered from default 0.3 to allow more results
     fallback_responses: List[str] = None
     
     def __post_init__(self):
@@ -386,7 +387,8 @@ class ChatbotModule(BaseModule):
                     rag_results = await self.rag_module.search_documents(
                         query=message,
                         max_results=config.rag_top_k,
-                        collection_name=qdrant_collection_name
+                        collection_name=qdrant_collection_name,
+                        score_threshold=config.rag_score_threshold
                     )
                     
                     if rag_results:
@@ -395,8 +397,8 @@ class ChatbotModule(BaseModule):
                                   for i, result in enumerate(rag_results)]
                         
                         # Build full RAG context from all results
-                        rag_context = "\\n\\nRelevant information from knowledge base:\\n" + "\\n\\n".join([
-                            f"[Document {i+1}]:\\n{result.document.content}" for i, result in enumerate(rag_results)
+                        rag_context = "\n\nRelevant information from knowledge base:\n" + "\n\n".join([
+                            f"[Document {i+1}]:\n{result.document.content}" for i, result in enumerate(rag_results)
                         ])
                         
                         # Detailed RAG logging - ALWAYS log for debugging
@@ -405,14 +407,14 @@ class ChatbotModule(BaseModule):
                         logger.info(f"Collection: {qdrant_collection_name}")
                         logger.info(f"Number of results: {len(rag_results)}")
                         for i, result in enumerate(rag_results):
-                            logger.info(f"\\n--- RAG Result {i+1} ---")
+                            logger.info(f"\n--- RAG Result {i+1} ---")
                             logger.info(f"Score: {getattr(result, 'score', 'N/A')}")
                             logger.info(f"Document ID: {getattr(result.document, 'id', 'N/A')}")
                             logger.info(f"Full Content ({len(result.document.content)} chars):")
                             logger.info(f"{result.document.content}")
                             if hasattr(result.document, 'metadata'):
                                 logger.info(f"Metadata: {result.document.metadata}")
-                        logger.info(f"\\n=== RAG CONTEXT BEING ADDED TO PROMPT ({len(rag_context)} chars) ===")
+                        logger.info(f"\n=== RAG CONTEXT BEING ADDED TO PROMPT ({len(rag_context)} chars) ===")
                         logger.info(rag_context)
                         logger.info("=== END RAG SEARCH RESULTS ===")
                     else:
@@ -445,9 +447,9 @@ class ChatbotModule(BaseModule):
         if config.use_rag and rag_context:
             logger.info(f"RAG context added: {len(rag_context)} characters")
             logger.info(f"RAG sources: {len(sources) if sources else 0} documents")
-        logger.info("\\n=== COMPLETE MESSAGES SENT TO LLM ===")
+        logger.info("\n=== COMPLETE MESSAGES SENT TO LLM ===")
         for i, msg in enumerate(messages):
-            logger.info(f"\\n--- Message {i+1} ---")
+            logger.info(f"\n--- Message {i+1} ---")
             logger.info(f"Role: {msg['role']}")
             logger.info(f"Content ({len(msg['content'])} chars):")
             # Truncate long content for logging (full RAG context can be very long)
@@ -520,9 +522,11 @@ class ChatbotModule(BaseModule):
         # System prompt
         system_prompt = config.system_prompt
         if rag_context:
-            system_prompt += rag_context
+            # Add explicit instruction to use RAG context
+            system_prompt += "\n\nIMPORTANT: Use the following information from the knowledge base to answer the user's question. " \
+                           "This information is directly relevant to their query and should be your primary source:\n" + rag_context
         if context and context.get('additional_instructions'):
-            system_prompt += f"\\n\\nAdditional instructions: {context['additional_instructions']}"
+            system_prompt += f"\n\nAdditional instructions: {context['additional_instructions']}"
             
         messages.append({"role": "system", "content": system_prompt})
         
@@ -709,9 +713,21 @@ class ChatbotModule(BaseModule):
                     fallback_responses=chatbot_config.get("fallback_responses", [])
                 )
                 
-                # Generate response using internal method with empty message history
+                # Generate response using internal method
+                # Create a temporary message object for the current user message
+                temp_messages = [
+                    DBMessage(
+                        id=0,
+                        conversation_id=0,
+                        role="user",
+                        content=message,
+                        timestamp=datetime.utcnow(),
+                        metadata={}
+                    )
+                ]
+
                 response_content, sources = await self._generate_response(
-                    message, [], config, None, db
+                    message, temp_messages, config, None, db
                 )
                 
                 return {

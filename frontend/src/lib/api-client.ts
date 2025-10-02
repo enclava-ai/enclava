@@ -1,119 +1,117 @@
-import axios from 'axios';
-import Cookies from 'js-cookie';
 
-// Dynamic base URL with protocol detection
-const getApiBaseUrl = (): string => {
-  if (typeof window !== 'undefined') {
-    // Client-side: use the same protocol as the current page
-    const protocol = window.location.protocol.slice(0, -1); // Remove ':' from 'https:'
-    const host = window.location.hostname;
-    return `${protocol}://${host}`;
+export interface AppError extends Error {
+  code: 'UNAUTHORIZED' | 'NETWORK_ERROR' | 'VALIDATION_ERROR' | 'NOT_FOUND' | 'FORBIDDEN' | 'TIMEOUT' | 'UNKNOWN'
+  status?: number
+  details?: any
+}
+
+function makeError(message: string, code: AppError['code'], status?: number, details?: any): AppError {
+  const err = new Error(message) as AppError
+  err.code = code
+  err.status = status
+  err.details = details
+  return err
+}
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { tokenManager } = await import('./token-manager')
+    const token = await tokenManager.getAccessToken()
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
   }
+}
 
-  // Server-side: use environment variable or default to localhost
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'localhost';
-  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-  return `${protocol}://${baseUrl}`;
-};
-
-const axiosInstance = axios.create({
-  baseURL: getApiBaseUrl(),
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor to add auth token
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = Cookies.get('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor to handle token refresh
-axiosInstance.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = Cookies.get('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post(`${getApiBaseUrl()}/api-internal/v1/auth/refresh`, {
-            refresh_token: refreshToken,
-          });
-
-          const { access_token } = response.data;
-          Cookies.set('access_token', access_token, { expires: 7 });
-
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
-          return axiosInstance(originalRequest);
-        }
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        Cookies.remove('access_token');
-        Cookies.remove('refresh_token');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
+async function request<T = any>(method: string, url: string, body?: any, extraInit?: RequestInit): Promise<T> {
+  try {
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      ...(method !== 'GET' && method !== 'HEAD' ? { 'Content-Type': 'application/json' } : {}),
+      ...(await getAuthHeader()),
+      ...(extraInit?.headers as Record<string, string> | undefined),
     }
 
-    return Promise.reject(error);
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: body != null && method !== 'GET' && method !== 'HEAD' ? JSON.stringify(body) : undefined,
+      ...extraInit,
+    })
+
+    if (!res.ok) {
+      let details: any = undefined
+      try { details = await res.json() } catch { details = await res.text() }
+      const status = res.status
+      if (status === 401) throw makeError('Unauthorized', 'UNAUTHORIZED', status, details)
+      if (status === 403) throw makeError('Forbidden', 'FORBIDDEN', status, details)
+      if (status === 404) throw makeError('Not found', 'NOT_FOUND', status, details)
+      if (status === 400) throw makeError('Validation error', 'VALIDATION_ERROR', status, details)
+      throw makeError('Request failed', 'UNKNOWN', status, details)
+    }
+
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      return (await res.json()) as T
+    }
+    // @ts-expect-error allow non-json generic
+    return (await res.text()) as T
+  } catch (e: any) {
+    if (e?.code) throw e
+    if (e?.name === 'AbortError') throw makeError('Request timed out', 'TIMEOUT')
+    throw makeError(e?.message || 'Network error', 'NETWORK_ERROR')
   }
-);
+}
 
 export const apiClient = {
-  get: async <T = any>(url: string, config?: any): Promise<T> => {
-    const response = await axiosInstance.get(url, config);
-    return response.data;
-  },
+  get: <T = any>(url: string, init?: RequestInit) => request<T>('GET', url, undefined, init),
+  post: <T = any>(url: string, body?: any, init?: RequestInit) => request<T>('POST', url, body, init),
+  put: <T = any>(url: string, body?: any, init?: RequestInit) => request<T>('PUT', url, body, init),
+  delete: <T = any>(url: string, init?: RequestInit) => request<T>('DELETE', url, undefined, init),
+}
 
-  post: async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
-    const response = await axiosInstance.post(url, data, config);
-    return response.data;
-  },
-
-  put: async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
-    const response = await axiosInstance.put(url, data, config);
-    return response.data;
-  },
-
-  delete: async <T = any>(url: string, config?: any): Promise<T> => {
-    const response = await axiosInstance.delete(url, config);
-    return response.data;
-  },
-
-  patch: async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
-    const response = await axiosInstance.patch(url, data, config);
-    return response.data;
-  },
-};
-
-// Chatbot specific API methods
 export const chatbotApi = {
-  create: async (data: any) => apiClient.post('/api-internal/v1/chatbot/create', data),
-  list: async () => apiClient.get('/api-internal/v1/chatbot/list'),
-  update: async (id: string, data: any) => apiClient.put(`/api-internal/v1/chatbot/update/${id}`, data),
-  delete: async (id: string) => apiClient.delete(`/api-internal/v1/chatbot/delete/${id}`),
-  chat: async (id: string, message: string, config?: any) => {
-    // For OpenAI-compatible chat completions
-    const messages = [
-      ...(config?.messages || []),
-      { role: 'user', content: message }
-    ]
-    return apiClient.post(`/api-internal/v1/chatbot/${id}/chat/completions`, {
-      messages,
-      ...config
-    })
+  async listChatbots() {
+    try {
+      return await apiClient.get('/api-internal/v1/chatbot/list')
+    } catch {
+      return await apiClient.get('/api-internal/v1/chatbot/instances')
+    }
   },
-};
+  createChatbot(config: any) {
+    return apiClient.post('/api-internal/v1/chatbot/create', config)
+  },
+  updateChatbot(id: string, config: any) {
+    return apiClient.put(`/api-internal/v1/chatbot/update/${encodeURIComponent(id)}`, config)
+  },
+  deleteChatbot(id: string) {
+    return apiClient.delete(`/api-internal/v1/chatbot/delete/${encodeURIComponent(id)}`)
+  },
+  // Legacy method with JWT auth (to be deprecated)
+  sendMessage(chatbotId: string, message: string, conversationId?: string, history?: Array<{role: string; content: string}>) {
+    const body: any = { message }
+    if (conversationId) body.conversation_id = conversationId
+    if (history) body.history = history
+    return apiClient.post(`/api-internal/v1/chatbot/chat/${encodeURIComponent(chatbotId)}`, body)
+  },
+  // OpenAI-compatible chatbot API with API key auth
+  sendOpenAIChatMessage(chatbotId: string, messages: Array<{role: string; content: string}>, apiKey: string, options?: {
+    temperature?: number
+    max_tokens?: number
+    stream?: boolean
+  }) {
+    const body: any = {
+      messages,
+      ...options
+    }
+    return fetch(`/api/v1/chatbot/external/${encodeURIComponent(chatbotId)}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(body)
+    }).then(res => res.json())
+  }
+}
+
