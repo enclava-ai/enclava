@@ -11,11 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Settings, 
-  Save, 
+import {
+  Settings,
+  Save,
   RefreshCw,
-  Shield,
   Globe,
   Database,
   Mail,
@@ -36,30 +35,9 @@ import { useModules, triggerModuleRefresh } from '@/contexts/ModulesContext';
 import { Badge } from '@/components/ui/badge';
 
 interface SystemSettings {
-  // Security Settings
-  security: {
-    password_min_length: number;
-    password_require_uppercase: boolean;
-    password_require_lowercase: boolean;
-    password_require_numbers: boolean;
-    password_require_symbols: boolean;
-    session_timeout_minutes: number;
-    max_login_attempts: number;
-    lockout_duration_minutes: number;
-    require_2fa: boolean;
-    allowed_domains: string[];
-  };
 
   // API Settings
   api: {
-    // Security Settings
-    security_enabled: boolean;
-    threat_detection_enabled: boolean;
-    rate_limiting_enabled: boolean;
-    ip_reputation_enabled: boolean;
-    anomaly_detection_enabled: boolean;
-    security_headers_enabled: boolean;
-    
     // Rate Limiting by Authentication Level
     rate_limit_authenticated_per_minute: number;
     rate_limit_authenticated_per_hour: number;
@@ -67,23 +45,13 @@ interface SystemSettings {
     rate_limit_api_key_per_hour: number;
     rate_limit_premium_per_minute: number;
     rate_limit_premium_per_hour: number;
-    
-    // Security Thresholds
-    security_risk_threshold: number;
-    security_warning_threshold: number;
-    anomaly_threshold: number;
-    
+
     // Request Settings
     max_request_size_mb: number;
     max_request_size_premium_mb: number;
     enable_cors: boolean;
     cors_origins: string[];
     api_key_expiry_days: number;
-    
-    // IP Security
-    blocked_ips: string[];
-    allowed_ips: string[];
-    csp_header: string;
   };
 
   // Notification Settings
@@ -95,7 +63,6 @@ interface SystemSettings {
     smtp_use_tls: boolean;
     from_address: string;
     budget_alerts: boolean;
-    security_alerts: boolean;
     system_alerts: boolean;
   };
 }
@@ -180,13 +147,16 @@ function SettingsPageContent() {
       
       // Transform backend format to frontend format
       const transformedSettings = {} as SystemSettings;
-      
-      // Transform each category from backend format {key: {value, type, description}} 
+
+      // Transform each category from backend format {key: {value, type, description}}
       // to frontend format {key: value}
+      // Skip security category as it has been removed from the UI
       for (const [categoryName, categorySettings] of Object.entries(data)) {
+        if (categoryName === 'security') continue; // Skip security settings
+
         if (typeof categorySettings === 'object' && categorySettings !== null) {
           transformedSettings[categoryName as keyof SystemSettings] = {} as any;
-          
+
           for (const [key, setting] of Object.entries(categorySettings as any)) {
             if (typeof setting === 'object' && setting !== null && 'value' in setting) {
               transformedSettings[categoryName as keyof SystemSettings][key] = setting.value;
@@ -384,214 +354,27 @@ function SettingsPageContent() {
         </Alert>
       )}
 
-      <Tabs defaultValue="security" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="security">Security</TabsTrigger>
+      <Tabs defaultValue="api" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="api">API</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="modules">Modules</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="security" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="mr-2 h-5 w-5" />
-                Security Settings
-              </CardTitle>
-              <CardDescription>
-                Configure password policies, session management, and authentication settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Password Policy</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="password-min-length">Minimum Password Length</Label>
-                      <Input
-                        id="password-min-length"
-                        type="number"
-                        min="6"
-                        max="50"
-                        value={settings.security.password_min_length}
-                        onChange={(e) => updateSetting("security", "password_min_length", parseInt(e.target.value))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={settings.security.password_require_uppercase}
-                          onCheckedChange={(checked) => updateSetting("security", "password_require_uppercase", checked)}
-                        />
-                        <Label>Require uppercase letters</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={settings.security.password_require_lowercase}
-                          onCheckedChange={(checked) => updateSetting("security", "password_require_lowercase", checked)}
-                        />
-                        <Label>Require lowercase letters</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={settings.security.password_require_numbers}
-                          onCheckedChange={(checked) => updateSetting("security", "password_require_numbers", checked)}
-                        />
-                        <Label>Require numbers</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={settings.security.password_require_symbols}
-                          onCheckedChange={(checked) => updateSetting("security", "password_require_symbols", checked)}
-                        />
-                        <Label>Require special characters</Label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Session & Authentication</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="session-timeout">Session Timeout (minutes)</Label>
-                      <Input
-                        id="session-timeout"
-                        type="number"
-                        min="5"
-                        max="1440"
-                        value={settings.security.session_timeout_minutes}
-                        onChange={(e) => updateSetting("security", "session_timeout_minutes", parseInt(e.target.value))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="max-login-attempts">Max Login Attempts</Label>
-                      <Input
-                        id="max-login-attempts"
-                        type="number"
-                        min="3"
-                        max="10"
-                        value={settings.security.max_login_attempts}
-                        onChange={(e) => updateSetting("security", "max_login_attempts", parseInt(e.target.value))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="lockout-duration">Lockout Duration (minutes)</Label>
-                      <Input
-                        id="lockout-duration"
-                        type="number"
-                        min="5"
-                        max="60"
-                        value={settings.security.lockout_duration_minutes}
-                        onChange={(e) => updateSetting("security", "lockout_duration_minutes", parseInt(e.target.value))}
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={settings.security.require_2fa}
-                        onCheckedChange={(checked) => updateSetting("security", "require_2fa", checked)}
-                      />
-                      <Label>Require Two-Factor Authentication</Label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="allowed-domains">Allowed Email Domains (one per line)</Label>
-                <Textarea
-                  id="allowed-domains"
-                  value={settings.security.allowed_domains.join('\n')}
-                  onChange={(e) => updateSetting("security", "allowed_domains", e.target.value.split('\n').filter(d => d.trim()))}
-                  placeholder="example.com&#10;company.org"
-                  rows={3}
-                />
-              </div>
-
-              <Button
-                onClick={() => handleSaveSection("security")}
-                disabled={saving === "security"}
-              >
-                <Save className="mr-2 h-4 w-4" />
-                {saving === "security" ? "Saving..." : "Save Security Settings"}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="api" className="space-y-6">
+<TabsContent value="api" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Globe className="mr-2 h-5 w-5" />
-                API & Security Settings
+                API Settings
               </CardTitle>
               <CardDescription>
-                Configure API security, rate limits, threat detection, and request handling
+                Configure API rate limits and request handling
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Security Features */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium flex items-center">
-                  <Shield className="mr-2 h-5 w-5" />
-                  Security Features
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={settings.api.security_enabled}
-                        onCheckedChange={(checked) => updateSetting("api", "security_enabled", checked)}
-                      />
-                      <Label>Enable API Security</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={settings.api.threat_detection_enabled}
-                        onCheckedChange={(checked) => updateSetting("api", "threat_detection_enabled", checked)}
-                      />
-                      <Label>Threat Detection</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={settings.api.rate_limiting_enabled}
-                        onCheckedChange={(checked) => updateSetting("api", "rate_limiting_enabled", checked)}
-                      />
-                      <Label>Rate Limiting</Label>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={settings.api.ip_reputation_enabled}
-                        onCheckedChange={(checked) => updateSetting("api", "ip_reputation_enabled", checked)}
-                      />
-                      <Label>IP Reputation Checking</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={settings.api.anomaly_detection_enabled}
-                        onCheckedChange={(checked) => updateSetting("api", "anomaly_detection_enabled", checked)}
-                      />
-                      <Label>Anomaly Detection</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={settings.api.security_headers_enabled}
-                        onCheckedChange={(checked) => updateSetting("api", "security_headers_enabled", checked)}
-                      />
-                      <Label>Security Headers</Label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Rate Limiting by Authentication Level */}
-              {settings.api.rate_limiting_enabled && (
-                <div className="space-y-4">
+              <div className="space-y-4">
                   <h3 className="text-lg font-medium">Rate Limiting by Authentication Level</h3>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -677,84 +460,6 @@ function SettingsPageContent() {
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* Security Thresholds */}
-              {settings.api.security_enabled && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Security Thresholds</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="risk-threshold">Risk Threshold (Block)</Label>
-                      <Input
-                        id="risk-threshold"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={settings.api.security_risk_threshold}
-                        onChange={(e) => updateSetting("api", "security_risk_threshold", parseFloat(e.target.value))}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Requests above this score are blocked</p>
-                    </div>
-                    <div>
-                      <Label htmlFor="warning-threshold">Warning Threshold</Label>
-                      <Input
-                        id="warning-threshold"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={settings.api.security_warning_threshold}
-                        onChange={(e) => updateSetting("api", "security_warning_threshold", parseFloat(e.target.value))}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Requests above this score generate warnings</p>
-                    </div>
-                    <div>
-                      <Label htmlFor="anomaly-threshold">Anomaly Threshold</Label>
-                      <Input
-                        id="anomaly-threshold"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={settings.api.anomaly_threshold}
-                        onChange={(e) => updateSetting("api", "anomaly_threshold", parseFloat(e.target.value))}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Anomalies above this threshold are flagged</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* IP Security */}
-              {settings.api.security_enabled && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">IP Security</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label htmlFor="blocked-ips">Blocked IPs (one per line)</Label>
-                      <Textarea
-                        id="blocked-ips"
-                        value={settings.api.blocked_ips.join('\n')}
-                        onChange={(e) => updateSetting("api", "blocked_ips", e.target.value.split('\n').filter(ip => ip.trim()))}
-                        placeholder="192.168.1.100&#10;10.0.0.50"
-                        rows={3}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="allowed-ips">Allowed IPs (empty = allow all)</Label>
-                      <Textarea
-                        id="allowed-ips"
-                        value={settings.api.allowed_ips.join('\n')}
-                        onChange={(e) => updateSetting("api", "allowed_ips", e.target.value.split('\n').filter(ip => ip.trim()))}
-                        placeholder="192.168.1.0/24&#10;10.0.0.1"
-                        rows={3}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Request Settings */}
               <div className="space-y-4">
@@ -823,28 +528,12 @@ function SettingsPageContent() {
                 </div>
               )}
 
-              {/* Security Headers */}
-              {settings.api.security_headers_enabled && (
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="csp-header">Content Security Policy Header</Label>
-                    <Textarea
-                      id="csp-header"
-                      value={settings.api.csp_header}
-                      onChange={(e) => updateSetting("api", "csp_header", e.target.value)}
-                      placeholder="default-src 'self'; script-src 'self' 'unsafe-inline';"
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              )}
-
               <Button
                 onClick={() => handleSaveSection("api")}
                 disabled={saving === "api"}
               >
                 <Save className="mr-2 h-4 w-4" />
-                {saving === "api" ? "Saving..." : "Save API & Security Settings"}
+                {saving === "api" ? "Saving..." : "Save API Settings"}
               </Button>
             </CardContent>
           </Card>
@@ -932,13 +621,6 @@ function SettingsPageContent() {
                               onCheckedChange={(checked) => updateSetting("notifications", "budget_alerts", checked)}
                             />
                             <Label>Budget Alerts</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              checked={settings.notifications.security_alerts}
-                              onCheckedChange={(checked) => updateSetting("notifications", "security_alerts", checked)}
-                            />
-                            <Label>Security Alerts</Label>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Switch

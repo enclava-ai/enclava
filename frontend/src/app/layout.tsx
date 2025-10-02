@@ -4,9 +4,10 @@ import './globals.css'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as HotToaster } from 'react-hot-toast'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { AuthProvider } from '@/components/providers/auth-provider'
 import { ModulesProvider } from '@/contexts/ModulesContext'
 import { PluginProvider } from '@/contexts/PluginContext'
+import { ToastProvider } from '@/contexts/ToastContext'
 import { Navigation } from '@/components/ui/navigation'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -16,8 +17,21 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
+// Function to determine the base URL with proper protocol
+const getBaseUrl = () => {
+  // In production, we need to detect if we're behind HTTPS
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http'
+    const host = process.env.NEXT_PUBLIC_BASE_URL || window.location.hostname
+    return `${protocol}://${host}`
+  }
+  // For build time/server side, default to HTTP for dev, HTTPS for production
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+  return `${protocol}://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(`http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`),
+  metadataBase: new URL(getBaseUrl()),
   title: 'Enclava Platform',
   description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
   keywords: ['AI', 'Enclava', 'Confidential Computing', 'LLM', 'TEE'],
@@ -26,7 +40,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: `http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`,
+    url: getBaseUrl(),
     title: 'Enclava Platform',
     description: 'Secure AI processing platform with plugin-based architecture and confidential computing',
     siteName: 'Enclava',
@@ -55,13 +69,15 @@ export default function RootLayout({
           <AuthProvider>
             <ModulesProvider>
               <PluginProvider>
-                <div className="min-h-screen bg-background">
-                  <Navigation />
-                  <main className="container mx-auto px-4 py-8">
-                    {children}
-                  </main>
-                </div>
-                <Toaster />
+                <ToastProvider>
+                  <div className="min-h-screen bg-background">
+                    <Navigation />
+                    <main className="container mx-auto px-4 py-8">
+                      {children}
+                    </main>
+                  </div>
+                  <Toaster />
+                </ToastProvider>
                 <HotToaster />
               </PluginProvider>
             </ModulesProvider>

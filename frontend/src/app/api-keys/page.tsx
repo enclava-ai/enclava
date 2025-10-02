@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+export const dynamic = 'force-dynamic'
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,6 +96,7 @@ const PERMISSION_OPTIONS = [
 ];
 
 function ApiKeysContent() {
+
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -915,3 +917,4 @@ export default function ApiKeysPage() {
     </Suspense>
   );
 }
+

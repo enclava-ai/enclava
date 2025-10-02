@@ -2,6 +2,8 @@
 Security utilities for authentication and authorization
 """
 
+import asyncio
+import concurrent.futures
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -20,14 +22,47 @@ from app.utils.exceptions import AuthenticationError, AuthorizationError
 logger = logging.getLogger(__name__)
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use a lower work factor for better performance in production
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=settings.BCRYPT_ROUNDS
+)
 
 # JWT token handling
 security = HTTPBearer()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+    import time
+    
+    start_time = time.time()
+    logger.info(f"=== PASSWORD VERIFICATION START === BCRYPT_ROUNDS: {settings.BCRYPT_ROUNDS}")
+    
+    try:
+        # Run password verification in a thread with timeout
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(pwd_context.verify, plain_password, hashed_password)
+            result = future.result(timeout=5.0)  # 5 second timeout
+            
+        end_time = time.time()
+        duration = end_time - start_time
+        logger.info(f"=== PASSWORD VERIFICATION END === Duration: {duration:.3f}s, Result: {result}")
+        
+        if duration > 1:
+            logger.warning(f"PASSWORD VERIFICATION TOOK TOO LONG: {duration:.3f}s")
+            
+        return result
+    except concurrent.futures.TimeoutError:
+        end_time = time.time()
+        duration = end_time - start_time
+        logger.error(f"=== PASSWORD VERIFICATION TIMEOUT === Duration: {duration:.3f}s")
+        return False  # Treat timeout as verification failure
+    except Exception as e:
+        end_time = time.time()
+        duration = end_time - start_time
+        logger.error(f"=== PASSWORD VERIFICATION FAILED === Duration: {duration:.3f}s, Error: {e}")
+        raise
 
 def get_password_hash(password: str) -> str:
     """Generate password hash"""
@@ -43,15 +78,42 @@ def get_api_key_hash(api_key: str) -> str:
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """Create JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    import time
+    start_time = time.time()
+    logger.info(f"=== CREATE ACCESS TOKEN START ===")
     
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
-    return encoded_jwt
+    try:
+        to_encode = data.copy()
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        to_encode.update({"exp": expire})
+        logger.info(f"JWT encode start...")
+        encode_start = time.time()
+        encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+        encode_end = time.time()
+        encode_duration = encode_end - encode_start
+        
+        end_time = time.time()
+        total_duration = end_time - start_time
+        
+        # Log token creation details
+        logger.info(f"Created access token for user {data.get('sub')}")
+        logger.info(f"Token expires at: {expire.isoformat()} (UTC)")
+        logger.info(f"Current UTC time: {datetime.utcnow().isoformat()}")
+        logger.info(f"ACCESS_TOKEN_EXPIRE_MINUTES setting: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}")
+        logger.info(f"JWT encode duration: {encode_duration:.3f}s")
+        logger.info(f"Total token creation duration: {total_duration:.3f}s")
+        logger.info(f"=== CREATE ACCESS TOKEN END ===")
+        
+        return encoded_jwt
+    except Exception as e:
+        end_time = time.time()
+        total_duration = end_time - start_time
+        logger.error(f"=== CREATE ACCESS TOKEN FAILED === Duration: {total_duration:.3f}s, Error: {e}")
+        raise
 
 def create_refresh_token(data: Dict[str, Any]) -> str:
     """Create JWT refresh token"""
@@ -64,10 +126,27 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
 def verify_token(token: str) -> Dict[str, Any]:
     """Verify JWT token and return payload"""
     try:
+        # Log current time before verification
+        current_time = datetime.utcnow()
+        logger.info(f"Verifying token at: {current_time.isoformat()} (UTC)")
+        
+        # Decode without verification first to check expiration
+        try:
+            unverified_payload = jwt.get_unverified_claims(token)
+            exp_timestamp = unverified_payload.get('exp')
+            if exp_timestamp:
+                exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=None)
+                logger.info(f"Token expiration time: {exp_datetime.isoformat()} (UTC)")
+                logger.info(f"Time until expiration: {(exp_datetime - current_time).total_seconds()} seconds")
+        except Exception as decode_error:
+            logger.warning(f"Could not decode token for expiration check: {decode_error}")
+        
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        logger.info(f"Token verified successfully for user {payload.get('sub')}")
         return payload
     except JWTError as e:
         logger.warning(f"Token verification failed: {e}")
+        logger.warning(f"Current UTC time: {datetime.utcnow().isoformat()}")
         raise AuthenticationError("Invalid token")
 
 async def get_current_user(
@@ -76,6 +155,10 @@ async def get_current_user(
 ) -> Dict[str, Any]:
     """Get current user from JWT token"""
     try:
+        # Log server time for debugging clock sync issues
+        server_time = datetime.utcnow()
+        logger.info(f"get_current_user called at: {server_time.isoformat()} (UTC)")
+        
         payload = verify_token(credentials.credentials)
         user_id: str = payload.get("sub")
         if user_id is None:

@@ -17,6 +17,7 @@ from .models import (
 )
 from .config import config_manager, ProviderConfig
 from ...core.config import settings
+
 from .resilience import ResilienceManagerFactory
 # from .metrics import metrics_collector
 from .providers import BaseLLMProvider, PrivateModeProvider
@@ -149,7 +150,6 @@ class LLMService:
         if not request.messages:
             raise ValidationError("Messages cannot be empty", field="messages")
         
-        # Security validation disabled - always allow requests
         risk_score = 0.0
         
         # Get provider for model
@@ -159,7 +159,6 @@ class LLMService:
         if not provider:
             raise ProviderError(f"No available provider for model '{request.model}'", provider=provider_name)
         
-        # Security logging disabled
         
         # Execute with resilience
         resilience_manager = ResilienceManagerFactory.get_manager(provider_name)
@@ -170,28 +169,15 @@ class LLMService:
                 provider.create_chat_completion,
                 request,
                 retryable_exceptions=(ProviderError, TimeoutError),
-                non_retryable_exceptions=(SecurityError, ValidationError)
+                non_retryable_exceptions=(ValidationError,)
             )
             
-            # Security features disabled
-            
-            # Security logging disabled
+
+
             
             # Record successful request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
-            # metrics_collector.record_request(
-            #     provider=provider_name,
-            #     model=request.model,
-            #     request_type="chat_completion",
-            #     success=True,
-            #     latency_ms=total_latency,
-            #     token_usage=response.usage.model_dump() if response.usage else None,
-            #     security_risk_score=risk_score,
-            #     user_id=request.user_id,
-            #     api_key_id=request.api_key_id
-            # )
-            
-            # Security audit logging disabled
+      
             
             return response
         
@@ -200,19 +186,6 @@ class LLMService:
             total_latency = (time.time() - start_time) * 1000
             error_code = getattr(e, 'error_code', e.__class__.__name__)
 
-            # metrics_collector.record_request(
-            #     provider=provider_name,
-            #     model=request.model,
-            #     request_type="chat_completion",
-            #     success=False,
-            #     latency_ms=total_latency,
-            #     security_risk_score=risk_score,
-            #     error_code=error_code,
-            #     user_id=request.user_id,
-            #     api_key_id=request.api_key_id
-            # )
-            
-            # Security audit logging disabled
             
             raise
     
@@ -223,6 +196,7 @@ class LLMService:
         
         # Security validation disabled - always allow streaming requests
         risk_score = 0.0
+
         
         # Get provider
         provider_name = self._get_provider_for_model(request.model)
@@ -239,24 +213,13 @@ class LLMService:
                 provider.create_chat_completion_stream,
                 request,
                 retryable_exceptions=(ProviderError, TimeoutError),
-                non_retryable_exceptions=(SecurityError, ValidationError)
+                non_retryable_exceptions=(ValidationError,)
             ):
                 yield chunk
         
         except Exception as e:
             # Record streaming failure - metrics disabled
             error_code = getattr(e, 'error_code', e.__class__.__name__)
-            # metrics_collector.record_request(
-            #     provider=provider_name,
-            #     model=request.model,
-            #     request_type="chat_completion_stream",
-            #     success=False,
-            #     latency_ms=0,
-            #     security_risk_score=risk_score,
-            #     error_code=error_code,
-            #     user_id=request.user_id,
-            #     api_key_id=request.api_key_id
-            # )
             raise
     
     async def create_embedding(self, request: EmbeddingRequest) -> EmbeddingResponse:
@@ -266,6 +229,7 @@ class LLMService:
         
         # Security validation disabled - always allow embedding requests
         risk_score = 0.0
+
         
         # Get provider
         provider_name = self._get_provider_for_model(request.model)
@@ -283,44 +247,20 @@ class LLMService:
                 provider.create_embedding,
                 request,
                 retryable_exceptions=(ProviderError, TimeoutError),
-                non_retryable_exceptions=(SecurityError, ValidationError)
+                non_retryable_exceptions=(ValidationError,)
             )
             
-            # Security features disabled
             
             # Record successful request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
-            # metrics_collector.record_request(
-            #     provider=provider_name,
-            #     model=request.model,
-            #     request_type="embedding",
-            #     success=True,
-            #     latency_ms=total_latency,
-            #     token_usage=response.usage.model_dump() if response.usage else None,
-            #     security_risk_score=risk_score,
-            #     user_id=request.user_id,
-            #     api_key_id=request.api_key_id
-            # )
+
             
             return response
         
         except Exception as e:
             # Record failed request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
-            error_code = getattr(e, 'error_code', e.__class__.__name__)
-
-            # metrics_collector.record_request(
-            #     provider=provider_name,
-            #     model=request.model,
-            #     request_type="embedding",
-            #     success=False,
-            #     latency_ms=total_latency,
-            #     security_risk_score=risk_score,
-            #     error_code=error_code,
-            #     user_id=request.user_id,
-            #     api_key_id=request.api_key_id
-            # )
-            
+            error_code = getattr(e, 'error_code', e.__class__.__name__)            
             raise
     
     async def get_models(self, provider_name: Optional[str] = None) -> List[ModelInfo]:

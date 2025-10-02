@@ -24,22 +24,23 @@ class Settings(BaseSettings):
     LOG_LLM_PROMPTS: bool = os.getenv("LOG_LLM_PROMPTS", "False").lower() == "true"  # Set to True to log prompts and context sent to LLM
     
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://empire_user:empire_pass@localhost:5432/empire_db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL")
     
     # Redis
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     
     # Security
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-here")
+    JWT_SECRET: str = os.getenv("JWT_SECRET")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 hours
     REFRESH_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days
     SESSION_EXPIRE_MINUTES: int = int(os.getenv("SESSION_EXPIRE_MINUTES", "1440"))  # 24 hours
     API_KEY_PREFIX: str = os.getenv("API_KEY_PREFIX", "en_")
+    BCRYPT_ROUNDS: int = int(os.getenv("BCRYPT_ROUNDS", "6"))  # Bcrypt work factor - lower for production performance
     
     # Admin user provisioning (used only on first startup)
-    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
-    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "admin123")
+    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL")
+    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD")
     
     # Base URL for deriving CORS origins
     BASE_URL: str = os.getenv("BASE_URL", "localhost")
@@ -50,7 +51,8 @@ class Settings(BaseSettings):
         """Derive CORS origins from BASE_URL if not explicitly set"""
         if v is None:
             base_url = info.data.get('BASE_URL', 'localhost')
-            return [f"http://{base_url}"]
+            # Support both HTTP and HTTPS for production environments
+            return [f"http://{base_url}", f"https://{base_url}"]
         return v if isinstance(v, list) else [v]
     
     # CORS origins (derived from BASE_URL)
@@ -152,3 +154,4 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+

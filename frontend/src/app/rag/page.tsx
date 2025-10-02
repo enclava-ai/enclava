@@ -11,7 +11,7 @@ import { Plus, Database, Upload, Search, Trash2, FileText, AlertCircle } from "l
 import { CollectionManager } from "@/components/rag/collection-manager"
 import { DocumentUpload } from "@/components/rag/document-upload"
 import { DocumentBrowser } from "@/components/rag/document-browser"
-import { useAuth } from "@/contexts/AuthContext"
+import { useAuth } from "@/components/providers/auth-provider"
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { apiClient } from '@/lib/api-client'
 

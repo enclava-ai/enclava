@@ -1,3 +1,4 @@
+
 export interface AppError extends Error {
   code: 'UNAUTHORIZED' | 'NETWORK_ERROR' | 'VALIDATION_ERROR' | 'NOT_FOUND' | 'FORBIDDEN' | 'TIMEOUT' | 'UNKNOWN'
   status?: number

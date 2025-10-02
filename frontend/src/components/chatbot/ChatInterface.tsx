@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { MessageCircle, Send, Bot, User, Loader2, Copy, ThumbsUp, ThumbsDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { generateTimestampId } from "@/lib/id-utils"
-import { chatbotApi, type AppError } from "@/lib/api-client"
+import { chatbotApi } from "@/lib/api-client"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeHighlight from "rehype-highlight"
@@ -118,6 +118,16 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
     setInput("")
     setIsLoading(true)
 
+    // Enhanced logging for debugging
+    const debugInfo = {
+      chatbotId,
+      messageLength: messageToSend.length,
+      conversationId,
+      timestamp: new Date().toISOString(),
+      messagesCount: messages.length
+    }
+    console.log('=== CHAT REQUEST DEBUG ===', debugInfo)
+
     try {
       let data: any
 
@@ -135,9 +145,9 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       )
 
       const assistantMessage: ChatMessage = {
-        id: data.message_id || generateTimestampId('msg'),
+        id: data.id || generateTimestampId('msg'),
         role: 'assistant',
-        content: data.response,
+        content: data.choices?.[0]?.message?.content || data.response || 'No response',
         timestamp: new Date(),
         sources: data.sources
       }

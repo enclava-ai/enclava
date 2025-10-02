@@ -4,7 +4,7 @@
  * Plugin Context - Manages plugin state and UI integration
  */
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '@/components/providers/auth-provider';
 import { apiClient } from '@/lib/api-client';
 
 export interface PluginInfo {

@@ -28,7 +28,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { usePlugin, type PluginInfo, type AvailablePlugin } from '../../contexts/PluginContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@/components/providers/auth-provider';
 import { PluginConfigurationDialog } from './PluginConfigurationDialog';
 
 interface PluginCardProps {

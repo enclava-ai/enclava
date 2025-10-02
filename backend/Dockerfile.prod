@@ -4,6 +4,8 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app
+ENV NODE_ENV=production
+ENV APP_ENV=production
 
 # Set work directory
 WORKDIR /app
@@ -17,18 +19,13 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install CPU-only PyTorch and compatible numpy first (faster download)
-RUN pip install --no-cache-dir torch==2.5.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu -f https://download.pytorch.org/whl/torch_stable.html
-
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-COPY tests/requirements-test.txt ./tests/
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r tests/requirements-test.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Optional: Download spaCy English model for NLP processing (commented out for faster builds)
-# Uncomment if you install requirements-nlp.txt and need entity extraction
-# RUN python -m spacy download en_core_web_sm
+# Optional: Install NLP requirements if needed
+# COPY requirements-nlp.txt .
+# RUN pip install --no-cache-dir -r requirements-nlp.txt
 
 # Copy application code
 COPY . .
@@ -36,6 +33,11 @@ COPY . .
 # Copy and make migration script executable
 COPY scripts/migrate.sh /usr/local/bin/migrate.sh
 RUN chmod +x /usr/local/bin/migrate.sh
+
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app
+USER app
 
 # Create logs directory
 RUN mkdir -p logs
@@ -47,5 +49,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Run the application in production mode
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

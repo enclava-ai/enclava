@@ -3,11 +3,13 @@
 import * as React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api-client"
+import { tokenManager } from "@/lib/token-manager"
 
 interface User {
   id: string
   username: string
   email: string
+  name?: string
   role: string
   permissions: string[]
   created_at: string
@@ -17,7 +19,8 @@ interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  login: (username: string, password: string) => Promise<void>
+  isAuthenticated: boolean
+  login: (email: string, password: string) => Promise<void>
   logout: () => void
   register: (username: string, email: string, password: string) => Promise<void>
   refreshToken: () => Promise<void>
@@ -39,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for existing token on mount
-    const token = localStorage.getItem("access_token")
+    const token = tokenManager.getAccessToken()
     if (token) {
       // Validate token and get user info
       validateToken(token)
@@ -50,33 +53,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const validateToken = async (token: string) => {
     try {
-      // Temporarily set token in localStorage for apiClient to use
-      const previousToken = localStorage.getItem('token')
-      localStorage.setItem('token', token)
-      
       const userData = await apiClient.get("/api-internal/v1/auth/me")
       setUser(userData)
-      
-      // Restore previous token if different
-      if (previousToken && previousToken !== token) {
-        localStorage.setItem('token', previousToken)
-      }
     } catch (error) {
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("refresh_token")
+      tokenManager.clearTokens()
     } finally {
       setIsLoading(false)
     }
   }
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     try {
-      const data = await apiClient.post("/api-internal/v1/auth/login", { username, password })
+      const data = await apiClient.post("/api-internal/v1/auth/login", { email, password })
       
-      // Store tokens
-      localStorage.setItem("access_token", data.access_token)
-      localStorage.setItem("refresh_token", data.refresh_token)
-      localStorage.setItem("token", data.access_token) // Also set token for apiClient
+      // Store tokens using tokenManager
+      tokenManager.setTokens(data.access_token, data.refresh_token)
       
       // Get user info
       await validateToken(data.access_token)
@@ -89,10 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await apiClient.post("/api-internal/v1/auth/register", { username, email, password })
       
-      // Store tokens
-      localStorage.setItem("access_token", data.access_token)
-      localStorage.setItem("refresh_token", data.refresh_token)
-      localStorage.setItem("token", data.access_token) // Also set token for apiClient
+      // Store tokens using tokenManager
+      tokenManager.setTokens(data.access_token, data.refresh_token)
       
       // Get user info
       await validateToken(data.access_token)
@@ -102,22 +91,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = () => {
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
-    localStorage.removeItem("token") // Also clear token for apiClient
+    tokenManager.clearTokens()
     setUser(null)
   }
 
   const refreshToken = async () => {
     try {
-      const refresh_token = localStorage.getItem("refresh_token")
+      const refresh_token = tokenManager.getRefreshToken()
       if (!refresh_token) {
         throw new Error("No refresh token available")
       }
 
       const data = await apiClient.post("/api-internal/v1/auth/refresh", { refresh_token })
-      localStorage.setItem("access_token", data.access_token)
-      localStorage.setItem("token", data.access_token) // Also set token for apiClient
+      tokenManager.setTokens(data.access_token, refresh_token)
       
       return data.access_token
     } catch (error) {
@@ -130,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     isLoading,
+    isAuthenticated: !!user,
     login,
     logout,
     register,

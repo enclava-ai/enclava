@@ -1,9 +1,9 @@
-"""
-Main FastAPI application entry point
-"""
+"""Main FastAPI application entry point"""
 
+import asyncio
 import logging
 import sys
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,10 +14,13 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.security import get_current_user
-from app.db.database import init_db
+from app.db.database import init_db, async_session_factory
 from app.api.internal_v1 import internal_api_router
 from app.api.public_v1 import public_api_router
 from app.utils.exceptions import CustomHTTPException
@@ -30,6 +33,68 @@ from app.services.config_manager import init_config_manager
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+async def _check_redis_startup():
+    """Validate Redis connectivity during startup."""
+    if not settings.REDIS_URL:
+        logger.info("Startup Redis check skipped: REDIS_URL not configured")
+        return
+
+    try:
+        import redis.asyncio as redis
+    except ModuleNotFoundError:
+        logger.warning("Startup Redis check skipped: redis library not installed")
+        return
+
+    client = redis.from_url(
+        settings.REDIS_URL,
+        socket_connect_timeout=1.0,
+        socket_timeout=1.0,
+    )
+
+    start = time.perf_counter()
+    try:
+        await asyncio.wait_for(client.ping(), timeout=3.0)
+        duration = time.perf_counter() - start
+        logger.info(
+            "Startup Redis check succeeded",
+            extra={"redis_url": settings.REDIS_URL, "duration_seconds": round(duration, 3)},
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Startup Redis check failed",
+            extra={"error": str(exc), "redis_url": settings.REDIS_URL},
+        )
+    finally:
+        await client.close()
+
+
+async def _check_database_startup():
+    """Validate database connectivity during startup."""
+    start = time.perf_counter()
+    try:
+        async with async_session_factory() as session:
+            await asyncio.wait_for(session.execute(select(1)), timeout=3.0)
+        duration = time.perf_counter() - start
+        logger.info(
+            "Startup database check succeeded",
+            extra={"duration_seconds": round(duration, 3)},
+        )
+    except (asyncio.TimeoutError, SQLAlchemyError) as exc:
+        logger.error(
+            "Startup database check failed",
+            extra={"error": str(exc)},
+        )
+        raise
+
+
+async def run_startup_dependency_checks():
+    """Run dependency checks once during application startup."""
+    logger.info("Running startup dependency checks...")
+    await _check_redis_startup()
+    await _check_database_startup()
+    logger.info("Startup dependency checks complete")
 
 
 @asynccontextmanager
@@ -46,7 +111,14 @@ async def lifespan(app: FastAPI):
         logger.info("Core cache service initialized successfully")
     except Exception as e:
         logger.warning(f"Core cache service initialization failed: {e}")
-    
+
+    # Run one-time dependency checks (non-blocking for auth requests)
+    try:
+        await run_startup_dependency_checks()
+    except Exception:
+        logger.error("Critical dependency check failed during startup")
+        raise
+
     # Initialize database
     await init_db()
     
@@ -65,8 +137,16 @@ async def lifespan(app: FastAPI):
     init_analytics_service()
 
     # Initialize module manager with FastAPI app for router registration
+    logger.info("Initializing module manager...")
     await module_manager.initialize(app)
     app.state.module_manager = module_manager
+    logger.info("Module manager initialized successfully")
+    
+    # Initialize permission registry
+    logger.info("Initializing permission registry...")
+    from app.services.permission_manager import permission_registry
+    permission_registry.register_platform_permissions()
+    logger.info("Permission registry initialized successfully")
     
     # Initialize document processor
     from app.services.document_processor import document_processor

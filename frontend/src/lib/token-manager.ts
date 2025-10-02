@@ -138,4 +138,3 @@ class TokenManager extends SimpleEmitter {
 }
 
 export const tokenManager = new TokenManager()
-

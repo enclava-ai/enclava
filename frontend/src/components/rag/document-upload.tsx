@@ -91,8 +91,9 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
       updateProgress(60)
 
       await uploadFile(
-        '/api-internal/v1/rag/documents',
         uploadingFile.file,
+        '/api-internal/v1/rag/documents',
+        (progress) => updateProgress(progress),
         { collection_id: targetCollection }
       )
 

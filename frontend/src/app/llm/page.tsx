@@ -18,7 +18,6 @@ import {
   Plus, 
   Settings, 
   Trash2, 
-  Copy,
   Calendar, 
   Lock, 
   Unlock,
@@ -187,15 +186,6 @@ function LLMPageContent() {
     }
   }
 
-  const copyToClipboard = (text: string, type: string = "API key") => {
-    navigator.clipboard.writeText(text)
-    toast({
-      title: "Copied!",
-      description: `${type} copied to clipboard`
-    })
-  }
-
-
   const formatCurrency = (cents: number) => {
     return `$${(cents / 100).toFixed(4)}`
   }
@@ -205,21 +195,6 @@ function LLMPageContent() {
     return new Date(dateStr).toLocaleDateString()
   }
 
-
-  // Get the public API URL from the current window location
-  const getPublicApiUrl = () => {
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol
-      const hostname = window.location.hostname
-      const port = window.location.port || (protocol === 'https:' ? '443' : '80')
-      const portSuffix = (protocol === 'https:' && port === '443') || (protocol === 'http:' && port === '80') ? '' : `:${port}`
-      return `${protocol}//${hostname}${portSuffix}/api/v1`
-    }
-    return 'http://localhost/api/v1'
-  }
-
-  const publicApiUrl = getPublicApiUrl()
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -228,77 +203,6 @@ function LLMPageContent() {
           Manage API keys and model access for your LLM integrations.
         </p>
       </div>
-
-      {/* Public API URL Display */}
-      <Card className="mb-6 border-blue-200 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-700">
-            <Settings className="h-5 w-5" />
-            OpenAI-Compatible API Configuration
-          </CardTitle>
-          <CardDescription className="text-blue-600">
-            Use this endpoint URL to configure external tools like Open WebUI, Continue.dev, or any OpenAI-compatible client.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium text-blue-700">API Base URL</Label>
-              <div className="mt-1 flex items-center gap-2">
-                <code className="flex-1 p-3 bg-white border border-blue-200 rounded-md text-sm font-mono">
-                  {publicApiUrl}
-                </code>
-                <Button
-                  onClick={() => copyToClipboard(publicApiUrl, "API URL")}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1 border-blue-300 text-blue-700 hover:bg-blue-100"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy
-                </Button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="space-y-2">
-                <h4 className="font-medium text-blue-700">Available Endpoints:</h4>
-                <ul className="space-y-1 text-blue-600">
-                  <li>• <code>GET /v1/models</code> - List available models</li>
-                  <li>• <code>POST /v1/chat/completions</code> - Chat completions</li>
-                  <li>• <code>POST /v1/embeddings</code> - Text embeddings</li>
-                </ul>
-              </div>
-              
-              <div className="space-y-2">
-                <h4 className="font-medium text-blue-700">Configuration Example:</h4>
-                <div className="bg-white border border-blue-200 rounded p-2 text-xs font-mono">
-                  <div>Base URL: {publicApiUrl}</div>
-                  <div>API Key: ce_your_api_key</div>
-                  <div>Model: gpt-3.5-turbo</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-blue-100 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-blue-700">
-                  <span className="font-medium">Setup Instructions:</span>
-                  <br />
-                  1. Copy the API Base URL above
-                  <br />
-                  2. Create an API key in the "API Keys" tab below
-                  <br />
-                  3. Use both in your OpenAI-compatible client configuration
-                  <br />
-                  4. Do NOT append additional paths like "/models" - clients handle this automatically
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">

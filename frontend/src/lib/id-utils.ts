@@ -13,4 +13,3 @@ export function generateTimestampId(prefix = "id"): string {
   const rand = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
   return `${prefix}_${ts}_${rand}`
 }
-

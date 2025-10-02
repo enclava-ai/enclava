@@ -31,7 +31,7 @@ import { Edit3, RotateCcw, Loader2, Save, AlertTriangle, Plus, Sparkles } from '
 import toast from 'react-hot-toast'
 import { apiClient } from '@/lib/api-client'
 import { config } from '@/lib/config'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/components/providers/auth-provider'
 
 interface PromptTemplate {
   id: string

@@ -1,7 +1,6 @@
-"""
-Authentication API endpoints
-"""
+"""Authentication API endpoints"""
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -12,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.core.security import (
     verify_password,
     get_password_hash,
@@ -24,6 +24,8 @@ from app.core.security import (
 from app.db.database import get_db
 from app.models.user import User
 from app.utils.exceptions import AuthenticationError, ValidationError
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
@@ -159,16 +161,70 @@ async def login(
 ):
     """Login user and return access tokens"""
     
+    logger.info(
+        "LOGIN_DEBUG_START",
+        request_time=datetime.utcnow().isoformat(),
+        email=user_data.email,
+        database_url="SET" if settings.DATABASE_URL else "NOT SET",
+        jwt_secret="SET" if settings.JWT_SECRET else "NOT SET",
+        admin_email=settings.ADMIN_EMAIL,
+        bcrypt_rounds=settings.BCRYPT_ROUNDS,
+    )
+    
+    start_time = datetime.utcnow()
+
     # Get user by email
+    logger.info("LOGIN_USER_QUERY_START")
+    query_start = datetime.utcnow()
     stmt = select(User).where(User.email == user_data.email)
     result = await db.execute(stmt)
+    query_end = datetime.utcnow()
+    logger.info(
+        "LOGIN_USER_QUERY_END",
+        duration_seconds=(query_end - query_start).total_seconds(),
+    )
+    
     user = result.scalar_one_or_none()
     
-    if not user or not verify_password(user_data.password, user.hashed_password):
+    if not user:
+        logger.warning("LOGIN_USER_NOT_FOUND", email=user_data.email)
+        # List available users for debugging
+        try:
+            all_users_stmt = select(User).limit(5)
+            all_users_result = await db.execute(all_users_stmt)
+            all_users = all_users_result.scalars().all()
+            logger.info(
+                "LOGIN_USER_LIST",
+                users=[u.email for u in all_users],
+            )
+        except Exception as e:
+            logger.error("LOGIN_USER_LIST_FAILURE", error=str(e))
+        
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
+    
+    logger.info("LOGIN_USER_FOUND", email=user.email, is_active=user.is_active)
+    logger.info("LOGIN_PASSWORD_VERIFY_START")
+    verify_start = datetime.utcnow()
+    
+    if not verify_password(user_data.password, user.hashed_password):
+        verify_end = datetime.utcnow()
+        logger.warning(
+            "LOGIN_PASSWORD_VERIFY_FAILURE",
+            duration_seconds=(verify_end - verify_start).total_seconds(),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    
+    verify_end = datetime.utcnow()
+    logger.info(
+        "LOGIN_PASSWORD_VERIFY_SUCCESS",
+        duration_seconds=(verify_end - verify_start).total_seconds(),
+    )
     
     if not user.is_active:
         raise HTTPException(
@@ -177,11 +233,21 @@ async def login(
         )
     
     # Update last login
+    logger.info("LOGIN_LAST_LOGIN_UPDATE_START")
+    update_start = datetime.utcnow()
     user.update_last_login()
     await db.commit()
-    
+    update_end = datetime.utcnow()
+    logger.info(
+        "LOGIN_LAST_LOGIN_UPDATE_SUCCESS",
+        duration_seconds=(update_end - update_start).total_seconds(),
+    )
+
     # Create tokens
+    logger.info("LOGIN_TOKEN_CREATE_START")
+    token_start = datetime.utcnow()
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
     access_token = create_access_token(
         data={
             "sub": str(user.id),
@@ -191,9 +257,20 @@ async def login(
         },
         expires_delta=access_token_expires
     )
-    
+
     refresh_token = create_refresh_token(
         data={"sub": str(user.id), "type": "refresh"}
+    )
+    token_end = datetime.utcnow()
+    logger.info(
+        "LOGIN_TOKEN_CREATE_SUCCESS",
+        duration_seconds=(token_end - token_start).total_seconds(),
+    )
+
+    total_time = datetime.utcnow() - start_time
+    logger.info(
+        "LOGIN_DEBUG_COMPLETE",
+        total_duration_seconds=total_time.total_seconds(),
     )
     
     return TokenResponse(
@@ -234,6 +311,10 @@ async def refresh_token(
         
         # Create new access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        logger.info(f"REFRESH: Creating new access token with expiration: {access_token_expires}")
+        logger.info(f"REFRESH: ACCESS_TOKEN_EXPIRE_MINUTES from settings: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}")
+        logger.info(f"REFRESH: Current UTC time: {datetime.utcnow().isoformat()}")
+        
         access_token = create_access_token(
             data={
                 "sub": str(user.id),

@@ -18,6 +18,7 @@ from ..v1.plugin_registry import router as plugin_registry_router
 from ..v1.platform import router as platform_router
 from ..v1.llm_internal import router as llm_internal_router
 from ..v1.chatbot import router as chatbot_router
+from .debugging import router as debugging_router
 
 # Create internal API router
 internal_api_router = APIRouter()
@@ -67,3 +68,6 @@ internal_api_router.include_router(llm_internal_router, prefix="/llm", tags=["in
 
 # Include chatbot routes (frontend chatbot management)
 internal_api_router.include_router(chatbot_router, prefix="/chatbot", tags=["internal-chatbot"])
+
+# Include debugging routes (troubleshooting and diagnostics)
+internal_api_router.include_router(debugging_router, prefix="/debugging", tags=["internal-debugging"])

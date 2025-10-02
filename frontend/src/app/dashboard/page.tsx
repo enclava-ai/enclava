@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@/contexts/AuthContext"
+import { useAuth } from "@/components/providers/auth-provider"
 import { useState, useEffect } from "react"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
 import { useToast } from "@/hooks/use-toast"
