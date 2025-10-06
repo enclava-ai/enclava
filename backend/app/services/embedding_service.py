@@ -175,6 +175,15 @@ class EmbeddingService:
     
     async def cleanup(self):
         """Cleanup resources"""
+        # Cleanup LLM service to prevent memory leaks
+        try:
+            from .llm.service import llm_service
+            if llm_service._initialized:
+                await llm_service.cleanup()
+                logger.info("Cleaned up LLM service from embedding service")
+        except Exception as e:
+            logger.error(f"Error cleaning up LLM service: {e}")
+
         self.initialized = False
 
 

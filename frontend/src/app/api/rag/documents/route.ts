@@ -42,34 +42,57 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData()
-    
+    console.log('=== Document Upload API Route Called ===')
+
     // Get auth token from request headers
     const authHeader = request.headers.get('authorization')
+    console.log('Auth header present:', !!authHeader)
 
-    // Forward the FormData directly to backend
-    const backendResponse = await fetch(`${BACKEND_URL}/api/rag/documents`, {
-      method: 'POST',
-      headers: {
-        ...(authHeader && { 'Authorization': authHeader }),
-        // Don't set Content-Type for FormData - let the browser set it with boundary
-      },
-      body: formData,
-    })
+    // Get the original content type (includes multipart boundary)
+    const contentType = request.headers.get('content-type')
+    console.log('Original content type:', contentType)
 
-    if (!backendResponse.ok) {
-      const errorData = await backendResponse.json().catch(() => ({ error: 'Unknown error' }))
-      return NextResponse.json(
-        { success: false, error: errorData.detail || errorData.error || 'Failed to upload document' },
-        { status: backendResponse.status }
-      )
+    // Try to forward the original request body directly
+    try {
+      console.log('Request body type:', typeof request.body)
+      console.log('Request body:', request.body)
+
+      // Forward directly to backend with original body stream
+      console.log('Sending request to backend:', `${BACKEND_URL}/api/rag/documents`)
+      const backendResponse = await fetch(`${BACKEND_URL}/api/rag/documents`, {
+        method: 'POST',
+        headers: {
+          ...(authHeader && { 'Authorization': authHeader }),
+          ...(contentType && { 'Content-Type': contentType }),
+        },
+        body: request.body,
+      })
+
+      console.log('Backend response status:', backendResponse.status, backendResponse.statusText)
+
+      if (!backendResponse.ok) {
+        const errorData = await backendResponse.json().catch(() => ({ error: 'Unknown error' }))
+        console.log('Backend error response:', errorData)
+        return NextResponse.json(
+          { success: false, error: errorData.detail || errorData.error || 'Failed to upload document' },
+          { status: backendResponse.status }
+        )
+      }
+
+      const data = await backendResponse.json()
+      console.log('Backend success response:', data)
+      return NextResponse.json(data)
+
+    } catch (bodyError) {
+      console.error('Error reading request body:', bodyError)
+      throw bodyError
     }
 
-    const data = await backendResponse.json()
-    return NextResponse.json(data)
   } catch (error) {
+    console.error('Document upload error:', error)
+    console.error('Error stack:', error.stack)
     return NextResponse.json(
-      { success: false, error: 'Failed to upload document' },
+      { success: false, error: 'Failed to upload document: ' + error.message },
       { status: 500 }
     )
   }

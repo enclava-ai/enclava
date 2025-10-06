@@ -478,5 +478,11 @@ class PrivateModeProvider(BaseLLMProvider):
     
     async def cleanup(self):
         """Cleanup PrivateMode provider resources"""
+        # Close HTTP session to prevent memory leaks
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+            logger.debug("Closed PrivateMode HTTP session")
+
         await super().cleanup()
         logger.debug("PrivateMode provider cleanup completed")

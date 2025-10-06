@@ -664,28 +664,36 @@ class RAGModule(BaseModule):
         chunk_size = chunk_size or self.config.get("chunk_size", 300)
         chunk_overlap = self.config.get("chunk_overlap", 50)
 
-        # Tokenize text
+        # Ensure sane values to avoid infinite loops on very short docs
+        chunk_size = max(1, chunk_size)
+        if chunk_overlap >= chunk_size:
+            chunk_overlap = max(0, chunk_size - 1)
+
         tokens = self.tokenizer.encode(text)
+        if not tokens:
+            return []
 
-        # Split into chunks with overlap
-        chunks = []
+        chunks: List[str] = []
+        len_tokens = len(tokens)
         start_idx = 0
+        step = max(1, chunk_size - chunk_overlap)
 
-        while start_idx < len(tokens):
-            end_idx = min(start_idx + chunk_size, len(tokens))
+        while start_idx < len_tokens:
+            end_idx = min(start_idx + chunk_size, len_tokens)
             chunk_tokens = tokens[start_idx:end_idx]
+
+            if not chunk_tokens:
+                break
+
             chunk_text = self.tokenizer.decode(chunk_tokens)
 
-            # Only add non-empty chunks
             if chunk_text.strip():
                 chunks.append(chunk_text)
 
-            # Move to next chunk with overlap
-            start_idx = end_idx - chunk_overlap
+            if end_idx >= len_tokens:
+                break
 
-            # Ensure progress (in case overlap >= chunk_size)
-            if start_idx >= end_idx:
-                start_idx = end_idx
+            start_idx += step
 
         return chunks
     

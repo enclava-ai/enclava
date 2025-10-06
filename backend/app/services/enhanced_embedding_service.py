@@ -146,8 +146,8 @@ class EnhancedEmbeddingService(EmbeddingService):
                         self._dimension_confirmed = True
                 else:
                     raise ValueError("Empty embedding in response")
-                else:
-                    raise ValueError("Invalid response structure")
+            else:
+                raise ValueError("Invalid response structure")
 
             # Count this successful request and optionally delay between requests
             self._update_rate_limit_tracker(success=True)

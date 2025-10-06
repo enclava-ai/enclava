@@ -345,7 +345,12 @@ async def refresh_token(
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
         
+    except HTTPException:
+        # Re-raise HTTPException without modification
+        raise
     except Exception as e:
+        # Log the actual error for debugging
+        logger.error(f"Refresh token error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"

@@ -81,7 +81,55 @@ class RAGService:
             RagCollection.is_active == True
         )
         return await self.db.scalar(stmt)
-    
+
+    async def get_collection_by_qdrant_name(self, qdrant_collection_name: str) -> Optional[RagCollection]:
+        """Get a collection using its Qdrant collection name"""
+        stmt = select(RagCollection).where(
+            RagCollection.qdrant_collection_name == qdrant_collection_name
+        )
+        return await self.db.scalar(stmt)
+
+    async def ensure_collection_record(self, qdrant_collection_name: str) -> RagCollection:
+        """Ensure we have a managed record for a given Qdrant collection"""
+        existing = await self.get_collection_by_qdrant_name(qdrant_collection_name)
+        if existing:
+            return existing
+
+        # Create a friendly name from the Qdrant collection identifier
+        friendly_name = qdrant_collection_name
+        try:
+            if qdrant_collection_name.startswith("rag_"):
+                trimmed = qdrant_collection_name[4:]
+                parts = [part for part in trimmed.split("_") if part]
+                if parts:
+                    friendly_name = " ".join(parts).title()
+        except Exception:
+            # Fall back to original identifier on any parsing issues
+            friendly_name = qdrant_collection_name
+
+        collection = RagCollection(
+            name=friendly_name,
+            description=f"Synced from Qdrant collection '{qdrant_collection_name}'",
+            qdrant_collection_name=qdrant_collection_name,
+            status='active',
+            is_active=True
+        )
+
+        self.db.add(collection)
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            # Another request might have created the collection concurrently; fetch again
+            existing = await self.get_collection_by_qdrant_name(qdrant_collection_name)
+            if existing:
+                return existing
+            raise
+
+        await self.db.refresh(collection)
+        return collection
+
     async def get_all_collections(self, skip: int = 0, limit: int = 100) -> List[dict]:
         """Get all collections from Qdrant (source of truth) with additional metadata from PostgreSQL."""
         logger.info("Getting all RAG collections from Qdrant (source of truth)")

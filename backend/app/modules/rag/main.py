@@ -682,10 +682,13 @@ class RAGModule(BaseModule):
                 chunks.append(chunk_text)
 
             # Move to next chunk with overlap
-            start_idx = end_idx - chunk_overlap
+            # Ensure we make progress and don't loop infinitely
+            start_idx += chunk_size - chunk_overlap
+            if start_idx >= len(tokens):
+                break
 
-            # Ensure progress (in case overlap >= chunk_size)
-            if start_idx >= end_idx:
+            # Safety check to prevent infinite loop
+            if start_idx <= end_idx - chunk_size:
                 start_idx = end_idx
 
         return chunks

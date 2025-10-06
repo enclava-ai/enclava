@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,8 @@ import { uploadFile } from "@/lib/file-download"
 interface Collection {
   id: string
   name: string
+  is_managed?: boolean
+  source?: string
 }
 
 interface DocumentUploadProps {
@@ -39,13 +41,31 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
+  const isUploadableCollection = (collectionId: string | null) => {
+    if (!collectionId) return false
+    return collections.some(collection => collection.id === collectionId)
+  }
+
+  useEffect(() => {
+    if (selectedCollection && isUploadableCollection(selectedCollection)) {
+      setTargetCollection(selectedCollection)
+      return
+    }
+
+    if (!targetCollection || !isUploadableCollection(targetCollection)) {
+      setTargetCollection(collections[0]?.id || "")
+    }
+  }, [selectedCollection, collections, targetCollection])
+
   const supportedTypes = [
     ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".txt", ".md", ".html", ".json", ".csv"
   ]
 
   const handleFileSelect = (files: FileList | null) => {
+    console.log('handleFileSelect called with:', files)
+
     if (!files || files.length === 0) return
-    
+
     if (!targetCollection) {
       toast({
         title: "Error",
@@ -62,23 +82,25 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
       id: Math.random().toString(36).substr(2, 9)
     }))
 
+    console.log('Processing files:', newFiles.map(f => ({ name: f.file.name, size: f.file.size })))
+
     setUploadingFiles(prev => [...prev, ...newFiles])
 
-    // Process each file
-    newFiles.forEach(uploadFile => {
-      uploadDocument(uploadFile)
-    })
+    // Process files sequentially to avoid body consumption conflicts
+    processFilesSequentially(newFiles)
+  }
+
+  const processFilesSequentially = async (files: UploadingFile[]) => {
+    for (const uploadingFile of files) {
+      await uploadDocument(uploadingFile)
+    }
   }
 
   const uploadDocument = async (uploadingFile: UploadingFile) => {
     try {
-      const formData = new FormData()
-      formData.append('file', uploadingFile.file)
-      formData.append('collection_id', targetCollection)
-
       // Simulate upload progress
       const updateProgress = (progress: number) => {
-        setUploadingFiles(prev => 
+        setUploadingFiles(prev =>
           prev.map(f => f.id === uploadingFile.id ? { ...f, progress } : f)
         )
       }
@@ -90,12 +112,9 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
       await new Promise(resolve => setTimeout(resolve, 200))
       updateProgress(60)
 
-      await uploadFile(
-        uploadingFile.file,
-        '/api-internal/v1/rag/documents',
-        (progress) => updateProgress(progress),
-        { collection_id: targetCollection }
-      )
+      await uploadFile('/api-internal/v1/rag/documents', uploadingFile.file, {
+        collection_id: targetCollection,
+      })
 
       updateProgress(80)
       updateProgress(90)
@@ -211,6 +230,7 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
                 {collections.map((collection) => (
                   <SelectItem key={collection.id} value={collection.id}>
                     {collection.name}
+                    {collection.is_managed === false ? ' (external)' : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
