@@ -87,6 +87,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const { success: toastSuccess, error: toastError } = useToast()
 
@@ -102,6 +103,12 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    // Reset conversation when switching chatbots
+    setMessages([])
+    setConversationId(undefined)
+  }, [chatbotId])
 
   const sendMessage = useCallback(async () => {
     if (!input.trim() || isLoading) return
@@ -119,12 +126,13 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
     setIsLoading(true)
 
     // Enhanced logging for debugging
+    const currentConversationId = conversationId
     const debugInfo = {
       chatbotId,
       messageLength: messageToSend.length,
-      conversationId,
+      conversationId: currentConversationId ?? null,
       timestamp: new Date().toISOString(),
-      messagesCount: messages.length
+      messagesCount: messages.length + 1
     }
     console.log('=== CHAT REQUEST DEBUG ===', debugInfo)
 
@@ -132,7 +140,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       let data: any
 
       // Use internal API
-      const conversationHistory = messages.map(msg => ({
+      const conversationHistory = [...messages, userMessage].map(msg => ({
         role: msg.role,
         content: msg.content
       }))
@@ -140,7 +148,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       data = await chatbotApi.sendMessage(
         chatbotId,
         messageToSend,
-        undefined, // No conversation ID
+        currentConversationId,
         conversationHistory
       )
 
@@ -153,6 +161,11 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
       }
 
       setMessages(prev => [...prev, assistantMessage])
+
+      const newConversationId = data?.conversation_id || currentConversationId
+      if (newConversationId !== conversationId) {
+        setConversationId(newConversationId)
+      }
 
     } catch (error) {
       const appError = error as AppError
@@ -168,7 +181,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, chatbotId, messages, toastError])
+  }, [input, isLoading, chatbotId, messages, toastError, conversationId])
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

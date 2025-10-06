@@ -566,10 +566,14 @@ class RAGService:
                 logger.warning(f"Could not check existing collections: {e}")
                 
             # Create collection with proper vector configuration  
+            from app.services.embedding_service import embedding_service
+
+            vector_dimension = getattr(embedding_service, 'dimension', 384) or 384
+
             client.create_collection(
                 collection_name=collection_name,
                 vectors_config=VectorParams(
-                    size=1024,  # Updated for multilingual-e5-large-instruct model
+                    size=vector_dimension,
                     distance=Distance.COSINE
                 ),
                 optimizers_config=models.OptimizersConfigDiff(

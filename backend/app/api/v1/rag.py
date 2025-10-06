@@ -7,6 +7,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel
 import io
 import asyncio
@@ -15,6 +16,7 @@ from datetime import datetime
 from app.db.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
+from app.models.rag_collection import RagCollection
 from app.services.rag_service import RAGService
 from app.utils.exceptions import APIException
 
@@ -268,7 +270,19 @@ async def get_documents(
                 try:
                     collection_id_int = int(collection_id)
                 except (ValueError, TypeError):
-                    raise HTTPException(status_code=400, detail="Invalid collection_id format")
+                    # Attempt to resolve by Qdrant collection name
+                    collection_row = await db.scalar(
+                        select(RagCollection).where(RagCollection.qdrant_collection_name == collection_id)
+                    )
+                    if collection_row:
+                        collection_id_int = collection_row.id
+                    else:
+                        # Unknown collection identifier; return empty result instead of erroring out
+                        return {
+                            "success": True,
+                            "documents": [],
+                            "total": 0
+                        }
         
         rag_service = RAGService(db)
         documents = await rag_service.get_documents(
