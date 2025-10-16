@@ -87,6 +87,30 @@ const PluginContext = createContext<PluginContextType | undefined>(undefined);
 export const usePlugin = () => {
   const context = useContext(PluginContext);
   if (context === undefined) {
+    // During SSR/SSG, return default values instead of throwing
+    if (typeof window === "undefined") {
+      return {
+        installedPlugins: [],
+        availablePlugins: [],
+        pluginConfigurations: {},
+        loading: false,
+        error: null,
+        refreshInstalledPlugins: async () => {},
+        searchAvailablePlugins: async () => {},
+        installPlugin: async () => false,
+        uninstallPlugin: async () => false,
+        enablePlugin: async () => false,
+        disablePlugin: async () => false,
+        loadPlugin: async () => false,
+        unloadPlugin: async () => false,
+        getPluginConfiguration: async () => null,
+        savePluginConfiguration: async () => false,
+        getPluginSchema: async () => null,
+        getPluginPages: () => [],
+        isPluginPageAuthorized: () => false,
+        getPluginComponent: () => null,
+      };
+    }
     throw new Error('usePlugin must be used within a PluginProvider');
   }
   return context;
