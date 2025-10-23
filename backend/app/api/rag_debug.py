@@ -55,8 +55,11 @@ async def debug_search(
         # Get configuration
         app_config = settings
 
-        # Initialize RAG module
-        rag_module = RAGModule(app_config)
+        # Initialize RAG module with BGE-M3 configuration
+        rag_config = {
+            "embedding_model": "BAAI/bge-m3"
+        }
+        rag_module = RAGModule(app_config, config=rag_config)
 
         # Get available collections if none specified
         if not collection_name:

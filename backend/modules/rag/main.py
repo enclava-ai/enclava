@@ -148,8 +148,8 @@ class RAGModule(BaseModule):
         if config:
             self.config.update(config)
 
-        # Ensure embedding model configured (defaults to local BGE small)
-        default_embedding_model = getattr(settings, 'RAG_EMBEDDING_MODEL', 'BAAI/bge-small-en')
+        # Ensure embedding model configured (defaults to local BGE-M3)
+        default_embedding_model = getattr(settings, 'RAG_EMBEDDING_MODEL', 'bge-m3')
         self.config.setdefault("embedding_model", default_embedding_model)
         self.default_embedding_model = default_embedding_model
         
@@ -431,20 +431,20 @@ class RAGModule(BaseModule):
     
     async def _initialize_embedding_model(self):
         """Initialize embedding model"""
-        from app.services.embedding_service import embedding_service
-        
+        from app.services.ollama_embedding_service import ollama_embedding_service
+
         model_name = self.config.get("embedding_model", self.default_embedding_model)
-        embedding_service.model_name = model_name
-        
+        ollama_embedding_service.model_name = model_name
+
         # Initialize the embedding service
-        success = await embedding_service.initialize()
-        
+        success = await ollama_embedding_service.initialize()
+
         if success:
-            self.embedding_service = embedding_service
+            self.embedding_service = ollama_embedding_service
             logger.info(f"Successfully initialized embedding service with {model_name}")
             return {
                 "model_name": model_name,
-                "dimension": embedding_service.dimension or 384
+                "dimension": ollama_embedding_service.dimension or 1024
             }
         else:
             # Fallback to mock implementation
@@ -452,7 +452,7 @@ class RAGModule(BaseModule):
             self.embedding_service = None
             return {
                 "model_name": model_name,
-                "dimension": 384  # Default dimension matching local bge-small embeddings
+                "dimension": 1024  # Default dimension matching BGE-M3 embeddings
             }
     
     async def _initialize_content_processing(self):
@@ -596,7 +596,7 @@ class RAGModule(BaseModule):
                 # Create collection with the current embedding dimension
                 vector_dimension = self.embedding_model.get(
                     "dimension",
-                    getattr(self.embedding_service, "dimension", 384) or 384
+                    getattr(self.embedding_service, "dimension", 1024) or 1024
                 )
 
                 self.qdrant_client.create_collection(
@@ -664,7 +664,7 @@ class RAGModule(BaseModule):
         else:
             # Fallback to deterministic random embedding for consistency
             np.random.seed(hash(text) % 2**32)
-            fallback_dim = self.embedding_model.get("dimension", getattr(self.embedding_service, "dimension", 384) or 384)
+            fallback_dim = self.embedding_model.get("dimension", getattr(self.embedding_service, "dimension", 1024) or 1024)
             return np.random.random(fallback_dim).tolist()
     
     async def _generate_embeddings(self, texts: List[str], is_document: bool = True) -> List[List[float]]:
@@ -1617,11 +1617,11 @@ class RAGModule(BaseModule):
         # Special handling for collections with different vector dimensions
         SPECIAL_COLLECTIONS = {
             "bitbox02_faq_local": {
-                "dimension": 384,
+                "dimension": 1024,
                 "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
             },
             "bitbox_local_rag": {
-                "dimension": 384,
+                "dimension": 1024,
                 "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
             }
         }

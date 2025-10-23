@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from "react";
 export const dynamic = 'force-dynamic'
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

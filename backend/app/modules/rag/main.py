@@ -148,8 +148,8 @@ class RAGModule(BaseModule):
         if config:
             self.config.update(config)
 
-        # Ensure embedding model configured (defaults to local BGE small)
-        default_embedding_model = getattr(settings, 'RAG_EMBEDDING_MODEL', 'BAAI/bge-small-en')
+        # Ensure embedding model configured (defaults to local BGE-M3)
+        default_embedding_model = getattr(settings, 'RAG_EMBEDDING_MODEL', 'BAAI/bge-m3')
         self.config.setdefault("embedding_model", default_embedding_model)
         self.default_embedding_model = default_embedding_model
         

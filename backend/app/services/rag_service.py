@@ -568,7 +568,7 @@ class RAGService:
             # Create collection with proper vector configuration  
             from app.services.embedding_service import embedding_service
 
-            vector_dimension = getattr(embedding_service, 'dimension', 384) or 384
+            vector_dimension = getattr(embedding_service, 'dimension', 1024) or 1024
 
             client.create_collection(
                 collection_name=collection_name,
