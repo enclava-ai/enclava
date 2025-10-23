@@ -778,53 +778,170 @@ async def external_chat_with_chatbot(
         raise HTTPException(status_code=500, detail=f"Failed to process chat: {str(e)}")
 
 
-@router.post("/external/{chatbot_id}/chat/completions", response_model=ChatbotChatCompletionResponse)
-async def external_chatbot_chat_completions(
+# OpenAI-compatible models response for chatbot
+class ChatbotModelsResponse(BaseModel):
+    object: str = "list"
+    data: List[Dict[str, Any]]
+
+
+# Implementation functions for OpenAI compatibility (called by v1 endpoints)
+async def external_chatbot_models(
     chatbot_id: str,
-    request: ChatbotChatCompletionRequest,
-    api_key: APIKey = Depends(get_api_key_auth),
-    db: AsyncSession = Depends(get_db)
+    api_key: APIKey,
+    db: AsyncSession
 ):
-    """External OpenAI-compatible chat completions endpoint for chatbot with API key authentication"""
-    log_api_request("external_chatbot_chat_completions", {
+    """
+    OpenAI-compatible models endpoint implementation
+    Returns only the model configured for this specific chatbot
+    """
+    log_api_request("external_chatbot_models", {
         "chatbot_id": chatbot_id,
-        "api_key_id": api_key.id,
-        "messages_count": len(request.messages)
+        "api_key_id": api_key.id
     })
-    
+
     try:
         # Check if API key can access this chatbot
         if not api_key.can_access_chatbot(chatbot_id):
             raise HTTPException(status_code=403, detail="API key not authorized for this chatbot")
-        
+
         # Get the chatbot instance
         result = await db.execute(
             select(ChatbotInstance)
             .where(ChatbotInstance.id == chatbot_id)
         )
         chatbot = result.scalar_one_or_none()
-        
+
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found")
-        
+
         if not chatbot.is_active:
             raise HTTPException(status_code=400, detail="Chatbot is not active")
-        
+
+        # Get the configured model from chatbot config
+        model_name = chatbot.config.get("model", "gpt-3.5-turbo")
+
+        # Return OpenAI-compatible models response with just this model
+        return ChatbotModelsResponse(
+            object="list",
+            data=[
+                {
+                    "id": model_name,
+                    "object": "model",
+                    "created": int(time.time()),
+                    "owned_by": "enclava-chatbot"
+                }
+            ]
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_api_request("external_chatbot_models_error", {"error": str(e), "chatbot_id": chatbot_id})
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve models: {str(e)}")
+
+
+async def external_chatbot_retrieve_model(
+    chatbot_id: str,
+    model_id: str,
+    api_key: APIKey,
+    db: AsyncSession
+):
+    """
+    OpenAI-compatible model retrieve endpoint implementation
+    Returns model info if the model matches the chatbot's configured model
+    """
+    log_api_request("external_chatbot_retrieve_model", {
+        "chatbot_id": chatbot_id,
+        "model_id": model_id,
+        "api_key_id": api_key.id
+    })
+
+    try:
+        # Check if API key can access this chatbot
+        if not api_key.can_access_chatbot(chatbot_id):
+            raise HTTPException(status_code=403, detail="API key not authorized for this chatbot")
+
+        # Get the chatbot instance
+        result = await db.execute(
+            select(ChatbotInstance)
+            .where(ChatbotInstance.id == chatbot_id)
+        )
+        chatbot = result.scalar_one_or_none()
+
+        if not chatbot:
+            raise HTTPException(status_code=404, detail="Chatbot not found")
+
+        if not chatbot.is_active:
+            raise HTTPException(status_code=400, detail="Chatbot is not active")
+
+        # Get the configured model from chatbot config
+        configured_model = chatbot.config.get("model", "gpt-3.5-turbo")
+
+        # Check if requested model matches the configured model
+        if model_id != configured_model:
+            raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
+
+        # Return OpenAI-compatible model info
+        return {
+            "id": configured_model,
+            "object": "model",
+            "created": int(time.time()),
+            "owned_by": "enclava-chatbot"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_api_request("external_chatbot_retrieve_model_error", {"error": str(e), "chatbot_id": chatbot_id})
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve model: {str(e)}")
+
+
+async def external_chatbot_chat_completions(
+    chatbot_id: str,
+    request: ChatbotChatCompletionRequest,
+    api_key: APIKey,
+    db: AsyncSession
+):
+    """External OpenAI-compatible chat completions endpoint implementation with API key authentication"""
+    log_api_request("external_chatbot_chat_completions", {
+        "chatbot_id": chatbot_id,
+        "api_key_id": api_key.id,
+        "messages_count": len(request.messages)
+    })
+
+    try:
+        # Check if API key can access this chatbot
+        if not api_key.can_access_chatbot(chatbot_id):
+            raise HTTPException(status_code=403, detail="API key not authorized for this chatbot")
+
+        # Get the chatbot instance
+        result = await db.execute(
+            select(ChatbotInstance)
+            .where(ChatbotInstance.id == chatbot_id)
+        )
+        chatbot = result.scalar_one_or_none()
+
+        if not chatbot:
+            raise HTTPException(status_code=404, detail="Chatbot not found")
+
+        if not chatbot.is_active:
+            raise HTTPException(status_code=400, detail="Chatbot is not active")
+
         # Find the last user message to extract conversation context
         user_messages = [msg for msg in request.messages if msg.role == "user"]
         if not user_messages:
             raise HTTPException(status_code=400, detail="No user message found in conversation")
-        
+
         last_user_message = user_messages[-1].content
-        
+
         # Initialize conversation service
         conversation_service = ConversationService(db)
-        
+
         # For OpenAI format, we'll try to find an existing conversation or create a new one
         # We'll use a simple hash of the conversation messages as the conversation identifier
         import hashlib
         conv_hash = hashlib.md5(str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()).hexdigest()[:16]
-        
+
         # Get or create conversation with API key context
         conversation = await conversation_service.get_or_create_conversation(
             chatbot_id=chatbot_id,
@@ -832,12 +949,12 @@ async def external_chatbot_chat_completions(
             conversation_id=conv_hash,
             title=f"API Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
         )
-        
+
         # Add API key metadata to conversation context if new
         if not conversation.context_data.get("api_key_id"):
             conversation.context_data = {"api_key_id": api_key.id}
             await db.commit()
-        
+
         # Build conversation history from the request messages
         conversation_history = []
         for msg in request.messages:
@@ -846,20 +963,20 @@ async def external_chatbot_chat_completions(
                     "role": msg.role,
                     "content": msg.content
                 })
-        
+
         # Get chatbot module and generate response
         try:
             chatbot_module = module_manager.modules.get("chatbot")
             if not chatbot_module:
                 raise HTTPException(status_code=500, detail="Chatbot module not available")
-            
+
             # Merge chatbot config with request parameters
             effective_config = dict(chatbot.config)
             if request.temperature is not None:
                 effective_config["temperature"] = request.temperature
             if request.max_tokens is not None:
                 effective_config["max_tokens"] = request.max_tokens
-            
+
             # Use the chatbot module to generate a response
             response_data = await chatbot_module.chat(
                 chatbot_config=effective_config,
@@ -867,10 +984,10 @@ async def external_chatbot_chat_completions(
                 conversation_history=conversation_history,
                 user_id=f"api_key_{api_key.id}"
             )
-            
+
             response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
             sources = response_data.get("sources")
-            
+
         except Exception as e:
             # Use fallback response
             fallback_responses = chatbot.config.get("fallback_responses", [
@@ -878,7 +995,7 @@ async def external_chatbot_chat_completions(
             ])
             response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
             sources = None
-        
+
         # Save the conversation messages
         for msg in request.messages:
             if msg.role == "user":  # Only save the new user message
@@ -888,7 +1005,7 @@ async def external_chatbot_chat_completions(
                     content=msg.content,
                     metadata={"api_key_id": api_key.id}
                 )
-        
+
         # Save assistant message using conversation service
         assistant_message = await conversation_service.add_message(
             conversation_id=conversation.id,
@@ -897,18 +1014,18 @@ async def external_chatbot_chat_completions(
             metadata={"api_key_id": api_key.id},
             sources=sources
         )
-        
+
         # Update API key usage stats
         prompt_tokens = sum(len(msg.content.split()) for msg in request.messages)
         completion_tokens = len(response_content.split())
         total_tokens = prompt_tokens + completion_tokens
-        
+
         api_key.update_usage(tokens_used=total_tokens, cost_cents=0)
         await db.commit()
-        
+
         # Create OpenAI-compatible response
         response_id = f"chatbot-{chatbot_id}-{int(time.time())}"
-        
+
         return ChatbotChatCompletionResponse(
             id=response_id,
             object="chat.completion",
@@ -927,10 +1044,48 @@ async def external_chatbot_chat_completions(
                 total_tokens=total_tokens
             )
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
         log_api_request("external_chatbot_chat_completions_error", {"error": str(e), "chatbot_id": chatbot_id})
         raise HTTPException(status_code=500, detail=f"Failed to process chat completions: {str(e)}")
+
+
+
+
+@router.get("/external/{chatbot_id}/v1/models", response_model=ChatbotModelsResponse)
+async def external_chatbot_models_v1(
+    chatbot_id: str,
+    api_key: APIKey = Depends(get_api_key_auth),
+    db: AsyncSession = Depends(get_db)
+):
+    """OpenAI v1 API compatible models endpoint with /v1 prefix"""
+    return await external_chatbot_models(chatbot_id, api_key, db)
+
+
+
+
+@router.get("/external/{chatbot_id}/v1/models/{model_id}")
+async def external_chatbot_retrieve_model_v1(
+    chatbot_id: str,
+    model_id: str,
+    api_key: APIKey = Depends(get_api_key_auth),
+    db: AsyncSession = Depends(get_db)
+):
+    """OpenAI v1 API compatible model retrieve endpoint with /v1 prefix"""
+    return await external_chatbot_retrieve_model(chatbot_id, model_id, api_key, db)
+
+
+
+
+@router.post("/external/{chatbot_id}/v1/chat/completions", response_model=ChatbotChatCompletionResponse)
+async def external_chatbot_chat_completions_v1(
+    chatbot_id: str,
+    request: ChatbotChatCompletionRequest,
+    api_key: APIKey = Depends(get_api_key_auth),
+    db: AsyncSession = Depends(get_db)
+):
+    """OpenAI v1 API compatible chat completions endpoint with /v1 prefix"""
+    return await external_chatbot_chat_completions(chatbot_id, request, api_key, db)

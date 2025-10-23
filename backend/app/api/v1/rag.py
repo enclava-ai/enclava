@@ -7,6 +7,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel
 import io
 import asyncio
@@ -15,6 +16,7 @@ from datetime import datetime
 from app.db.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
+from app.models.rag_collection import RagCollection
 from app.services.rag_service import RAGService
 from app.utils.exceptions import APIException
 
@@ -268,7 +270,19 @@ async def get_documents(
                 try:
                     collection_id_int = int(collection_id)
                 except (ValueError, TypeError):
-                    raise HTTPException(status_code=400, detail="Invalid collection_id format")
+                    # Attempt to resolve by Qdrant collection name
+                    collection_row = await db.scalar(
+                        select(RagCollection).where(RagCollection.qdrant_collection_name == collection_id)
+                    )
+                    if collection_row:
+                        collection_id_int = collection_row.id
+                    else:
+                        # Unknown collection identifier; return empty result instead of erroring out
+                        return {
+                            "success": True,
+                            "documents": [],
+                            "total": 0
+                        }
         
         rag_service = RAGService(db)
         documents = await rag_service.get_documents(
@@ -288,14 +302,18 @@ async def get_documents(
 
 @router.post("/documents", response_model=dict)
 async def upload_document(
-    collection_id: int = Form(...),
+    collection_id: str = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Upload and process a document"""
     try:
-        # Read file content
+        # Validate file can be read before processing
+        filename = file.filename or "unknown"
+        file_extension = filename.split('.')[-1].lower() if '.' in filename else ''
+
+        # Read file content once and use it for all validations
         file_content = await file.read()
 
         if len(file_content) == 0:
@@ -303,10 +321,6 @@ async def upload_document(
 
         if len(file_content) > 50 * 1024 * 1024:  # 50MB limit
             raise HTTPException(status_code=400, detail="File too large (max 50MB)")
-
-        # Validate file can be read before processing
-        filename = file.filename or "unknown"
-        file_extension = filename.split('.')[-1].lower() if '.' in filename else ''
 
         try:
             # Test file readability based on type
@@ -349,8 +363,33 @@ async def upload_document(
             raise HTTPException(status_code=400, detail=f"File validation failed: {str(e)}")
 
         rag_service = RAGService(db)
+
+        # Resolve collection identifier (supports both numeric IDs and Qdrant collection names)
+        collection_identifier = (collection_id or "").strip()
+        if not collection_identifier:
+            raise HTTPException(status_code=400, detail="Collection identifier is required")
+
+        resolved_collection_id: Optional[int] = None
+
+        if collection_identifier.isdigit():
+            resolved_collection_id = int(collection_identifier)
+        else:
+            qdrant_name = collection_identifier
+            if qdrant_name.startswith("ext_"):
+                qdrant_name = qdrant_name[4:]
+
+            try:
+                collection_record = await rag_service.ensure_collection_record(qdrant_name)
+            except Exception as ensure_error:
+                raise HTTPException(status_code=500, detail=str(ensure_error))
+
+            resolved_collection_id = collection_record.id
+
+        if resolved_collection_id is None:
+            raise HTTPException(status_code=400, detail="Invalid collection identifier")
+
         document = await rag_service.upload_document(
-            collection_id=collection_id,
+            collection_id=resolved_collection_id,
             file_content=file_content,
             filename=filename,
             content_type=file.content_type

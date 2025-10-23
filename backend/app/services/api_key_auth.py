@@ -139,26 +139,26 @@ async def get_api_key_context(
 ) -> Optional[Dict[str, Any]]:
     """Dependency to get API key context from request"""
     auth_service = APIKeyAuthService(db)
-    
+
     # Try different auth methods
     api_key = None
-    
+
     # 1. Check Authorization header (Bearer token)
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         api_key = auth_header[7:]
-    
+
     # 2. Check X-API-Key header
     if not api_key:
         api_key = request.headers.get("X-API-Key")
-    
+
     # 3. Check query parameter
     if not api_key:
         api_key = request.query_params.get("api_key")
-    
+
     if not api_key:
         return None
-    
+
     return await auth_service.validate_api_key(api_key, request)
 
 

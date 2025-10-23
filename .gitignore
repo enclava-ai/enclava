@@ -12,7 +12,7 @@ env.bak/
 venv.bak/
 *.sqlite3
 *.db
-
+.env
 # FastAPI logs
 *.log
 
@@ -64,5 +64,5 @@ backend/modules/rag/__pycache__/
 frontend/.next/ 
 frontend/node_modules/
 node_modules/
-venv/ 
-
+venv/
+venv_memory_monitor/

@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.db.database import get_db
 from app.models.rag_document import RagDocument
 from app.models.rag_collection import RagCollection
+from app.services.module_manager import module_manager
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ class DocumentProcessor:
             "queue_size": 0,
             "active_workers": 0
         }
+        self._rag_module = None
+        self._rag_module_lock = asyncio.Lock()
         
     async def start(self):
         """Start the document processor"""
@@ -157,9 +160,33 @@ class DocumentProcessor:
                 self.stats["active_workers"] -= 1
                 logger.error(f"{worker_name}: Unexpected error: {e}")
                 await asyncio.sleep(1)  # Brief pause before continuing
-        
+
         logger.info(f"Worker stopped: {worker_name}")
-    
+
+    async def _get_rag_module(self):
+        """Resolve and cache the RAG module instance"""
+        async with self._rag_module_lock:
+            if self._rag_module and getattr(self._rag_module, 'enabled', False):
+                return self._rag_module
+
+            if not module_manager.initialized:
+                await module_manager.initialize()
+
+            rag_module = module_manager.modules.get('rag')
+
+            if not rag_module or not getattr(rag_module, 'enabled', False):
+                enabled = await module_manager.enable_module('rag')
+                if not enabled:
+                    raise Exception("Failed to enable RAG module")
+                rag_module = module_manager.modules.get('rag')
+
+            if not rag_module or not getattr(rag_module, 'enabled', False):
+                raise Exception("RAG module not available or not enabled")
+
+            self._rag_module = rag_module
+            logger.info("DocumentProcessor cached RAG module instance for reuse")
+            return self._rag_module
+
     async def _process_document(self, task: ProcessingTask) -> bool:
         """Process a single document"""
         from datetime import datetime
@@ -182,19 +209,10 @@ class DocumentProcessor:
                 # Update status to processing
                 document.status = ProcessingStatus.PROCESSING
                 await session.commit()
-                
+
                 # Get RAG module for processing
                 try:
-                    # Import RAG module and initialize it properly
-                    from modules.rag.main import RAGModule
-                    from app.core.config import settings
-
-                    # Create and initialize RAG module instance
-                    rag_module = RAGModule(settings)
-                    init_result = await rag_module.initialize()
-                    if not rag_module.enabled:
-                        raise Exception("Failed to enable RAG module")
-
+                    rag_module = await self._get_rag_module()
                 except Exception as e:
                     logger.error(f"Failed to get RAG module: {e}")
                     raise Exception(f"RAG module not available: {e}")

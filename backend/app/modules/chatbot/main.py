@@ -846,9 +846,9 @@ class ChatbotModule(BaseModule):
             
             logger.info(f"Looking up RAG collection with identifier: '{collection_identifier}'")
             
-            # First check if this might be a direct Qdrant collection name
-            # (e.g., starts with "ext_", "rag_", or contains specific patterns)
-            if collection_identifier.startswith(("ext_", "rag_", "test_")) or "_" in collection_identifier:
+            # First check if this collection exists in Qdrant directly
+            # Qdrant is the source of truth for collections
+            if True:  # Always check Qdrant first
                 # Check if this collection exists in Qdrant directly
                 actual_collection_name = collection_identifier
                 # Remove "ext_" prefix if present
@@ -866,6 +866,10 @@ class ChatbotModule(BaseModule):
                         
                         if actual_collection_name in collection_names:
                             logger.info(f"Found Qdrant collection directly: {actual_collection_name}")
+
+                            # Auto-register the collection in the database if not found
+                            await self._auto_register_collection(actual_collection_name, db)
+
                             return actual_collection_name
                     except Exception as e:
                         logger.warning(f"Error checking Qdrant collections: {e}")
@@ -898,12 +902,49 @@ class ChatbotModule(BaseModule):
             else:
                 logger.warning(f"RAG collection '{collection_identifier}' not found in database (tried both ID and name)")
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error looking up RAG collection '{collection_identifier}': {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
+
+    async def _auto_register_collection(self, collection_name: str, db: Session) -> None:
+        """Automatically register a Qdrant collection in the database"""
+        try:
+            from app.models.rag_collection import RagCollection
+            from sqlalchemy import select
+
+            # Check if already registered
+            stmt = select(RagCollection).where(
+                RagCollection.qdrant_collection_name == collection_name
+            )
+            result = db.execute(stmt)
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                logger.info(f"Collection '{collection_name}' already registered in database")
+                return
+
+            # Create a readable name from collection name
+            display_name = collection_name.replace("-", " ").replace("_", " ").title()
+
+            # Auto-register the collection
+            new_collection = RagCollection(
+                name=display_name,
+                qdrant_collection_name=collection_name,
+                description=f"Auto-discovered collection from Qdrant: {collection_name}",
+                is_active=True
+            )
+
+            db.add(new_collection)
+            db.commit()
+
+            logger.info(f"Auto-registered Qdrant collection '{collection_name}' in database")
+
+        except Exception as e:
+            logger.error(f"Failed to auto-register collection '{collection_name}': {e}")
+            # Don't re-raise - this should not block collection usage
 
     # Required abstract methods from BaseModule
     
