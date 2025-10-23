@@ -175,19 +175,27 @@ async def lifespan(app: FastAPI):
     
     # Cleanup
     logger.info("Shutting down platform...")
-    
+
+    # Cleanup embedding service HTTP sessions
+    from app.services.embedding_service import embedding_service
+    try:
+        await embedding_service.cleanup()
+        logger.info("Embedding service cleaned up successfully")
+    except Exception as e:
+        logger.error(f"Error cleaning up embedding service: {e}")
+
     # Close core cache service
     from app.core.cache import core_cache
     await core_cache.cleanup()
-    
+
     # Close Redis connection for cached API key service
     from app.services.cached_api_key import cached_api_key_service
     await cached_api_key_service.close()
-    
+
     # Stop document processor
     if hasattr(app.state, 'document_processor'):
         await app.state.document_processor.stop()
-    
+
     await module_manager.cleanup()
     logger.info("Platform shutdown complete")
 
