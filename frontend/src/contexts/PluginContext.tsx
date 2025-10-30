@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAuth } from '@/components/providers/auth-provider';
 import { apiClient } from '@/lib/api-client';
+import { useToast } from "@/hooks/use-toast";
 
 export interface PluginInfo {
   id: string;
@@ -122,6 +123,7 @@ interface PluginProviderProps {
 
 export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [installedPlugins, setInstalledPlugins] = useState<PluginInfo[]>([]);
   const [availablePlugins, setAvailablePlugins] = useState<AvailablePlugin[]>([]);
   const [pluginConfigurations, setPluginConfigurations] = useState<Record<string, PluginConfiguration>>({});
@@ -130,6 +132,24 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
   
   // Plugin component registry
   const [pluginComponents, setPluginComponents] = useState<Record<string, Record<string, React.ComponentType>>>({});
+
+  const userPermissions = user?.permissions ?? [];
+
+  const hasPermission = useCallback((required: string) => {
+    if (!required) {
+      return true;
+    }
+    return userPermissions.some(granted => {
+      if (granted === "*" || granted === required) {
+        return true;
+      }
+      if (granted.endsWith(":*")) {
+        const prefix = granted.slice(0, -1);
+        return required.startsWith(prefix);
+      }
+      return false;
+    });
+  }, [userPermissions]);
   
   const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
     if (!isAuthenticated) {
@@ -175,16 +195,23 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
               [plugin.id]: config
             }));
           }
-        } catch (e) {
+        } catch (configError) {
+          console.warn(`Failed to load configuration for plugin ${plugin.id}`, configError);
         }
       }
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load installed plugins');
+      const message = err instanceof Error ? err.message : 'Failed to load installed plugins';
+      setError(message);
+      toast({
+        title: "Plugin load failed",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  }, [user, isAuthenticated]);
+  }, [user, isAuthenticated, toast]);
   
   const searchAvailablePlugins = useCallback(async (query = '', tags: string[] = [], category = '') => {
     if (!user || !isAuthenticated) {
@@ -205,11 +232,17 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       setAvailablePlugins(data.plugins);
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to search plugins');
+      const message = err instanceof Error ? err.message : 'Failed to search plugins';
+      setError(message);
+      toast({
+        title: "Plugin search failed",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  }, [user, isAuthenticated]);
+  }, [user, isAuthenticated, toast]);
   
   const installPlugin = useCallback(async (pluginId: string, version: string): Promise<boolean> => {
     try {
@@ -231,12 +264,18 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Installation failed');
+      const message = err instanceof Error ? err.message : 'Installation failed';
+      setError(message);
+      toast({
+        title: "Plugin installation failed",
+        description: message,
+        variant: "destructive",
+      });
       return false;
     } finally {
       setLoading(false);
     }
-  }, [refreshInstalledPlugins, searchAvailablePlugins]);
+  }, [refreshInstalledPlugins, searchAvailablePlugins, toast]);
   
   const uninstallPlugin = async (pluginId: string, keepData = true): Promise<boolean> => {
     try {
@@ -263,7 +302,13 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Uninstallation failed');
+      const message = err instanceof Error ? err.message : 'Uninstallation failed';
+      setError(message);
+      toast({
+        title: "Plugin uninstall failed",
+        description: message,
+        variant: "destructive",
+      });
       return false;
     } finally {
       setLoading(false);
@@ -281,7 +326,13 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Enable failed');
+      const message = err instanceof Error ? err.message : 'Enable failed';
+      setError(message);
+      toast({
+        title: "Plugin enable failed",
+        description: message,
+        variant: "destructive",
+      });
       return false;
     }
   };
@@ -297,7 +348,13 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Disable failed');
+      const message = err instanceof Error ? err.message : 'Disable failed';
+      setError(message);
+      toast({
+        title: "Plugin disable failed",
+        description: message,
+        variant: "destructive",
+      });
       return false;
     }
   };
@@ -316,7 +373,13 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Load failed');
+      const message = err instanceof Error ? err.message : 'Load failed';
+      setError(message);
+      toast({
+        title: "Plugin load failed",
+        description: message,
+        variant: "destructive",
+      });
       return false;
     }
   };
@@ -338,7 +401,13 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unload failed');
+      const message = err instanceof Error ? err.message : 'Unload failed';
+      setError(message);
+      toast({
+        title: "Plugin unload failed",
+        description: message,
+        variant: "destructive",
+      });
       return false;
     }
   };
@@ -348,6 +417,7 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       const data = await apiRequest(`/${pluginId}/config`);
       return data;
     } catch (err) {
+      console.warn(`Failed to fetch configuration for plugin ${pluginId}`, err);
       return null;
     }
   };
@@ -371,7 +441,13 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save configuration');
+      const message = err instanceof Error ? err.message : 'Failed to save configuration';
+      setError(message);
+      toast({
+        title: "Save failed",
+        description: message,
+        variant: "destructive",
+      });
       return false;
     }
   };
@@ -402,6 +478,7 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
             }));
           }
         } catch (chatbotError) {
+          console.warn(`Failed to populate chatbot options for plugin ${pluginId}`, chatbotError);
         }
 
         // Populate model options for AI settings
@@ -426,6 +503,7 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
             schema.properties.draft_settings.properties.model.options = modelOptions;
           }
         } catch (modelError) {
+          console.warn(`Failed to populate model options for plugin ${pluginId}`, modelError);
         }
       }
       
@@ -442,11 +520,19 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
             }));
           }
         } catch (modelError) {
+          console.warn(`Failed to populate Signal model options for plugin ${pluginId}`, modelError);
         }
       }
       
       return schema;
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load plugin schema';
+      console.error(`Failed to load schema for plugin ${pluginId}`, err);
+      toast({
+        title: "Schema load failed",
+        description: message,
+        variant: "destructive",
+      });
       return null;
     }
   };
@@ -478,6 +564,12 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       }));
       
     } catch (err) {
+      console.error(`Failed to load plugin components for ${pluginId}`, err);
+      toast({
+        title: "Component load failed",
+        description: err instanceof Error ? err.message : 'Unable to load plugin components',
+        variant: "destructive",
+      });
     }
   };
   
@@ -500,9 +592,51 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
   };
   
   const isPluginPageAuthorized = (pluginId: string, pagePath: string): boolean => {
-    // TODO: Implement authorization logic based on user permissions
     const plugin = installedPlugins.find(p => p.id === pluginId);
-    return plugin?.status === 'enabled' && plugin?.loaded;
+    if (!plugin || plugin.status !== 'enabled' || !plugin.loaded) {
+      return false;
+    }
+
+    const manifestPages = plugin.manifest?.spec?.ui_config?.pages ?? plugin.pages ?? [];
+    const page = manifestPages.find((p: any) => p.path === pagePath);
+
+    const requiresAuth = page?.requiresAuth !== false;
+    if (requiresAuth && !isAuthenticated) {
+      return false;
+    }
+
+    const requiredPermissions: string[] =
+      page?.required_permissions ??
+      page?.requiredPermissions ??
+      [];
+
+    if (requiredPermissions.length > 0) {
+      return requiredPermissions.every(perm => hasPermission(perm));
+    }
+
+    if (!requiresAuth) {
+      return true;
+    }
+
+    if (user?.role && ['super_admin', 'admin'].includes(user.role)) {
+      return true;
+    }
+
+    const modulePrefix = `modules:${pluginId}`;
+    const hasModuleAccess = userPermissions.some(granted => {
+      if (granted === 'modules:*') {
+        return true;
+      }
+      if (granted.startsWith(`${modulePrefix}:`)) {
+        return true;
+      }
+      if (granted.endsWith(':*') && granted.startsWith(modulePrefix)) {
+        return true;
+      }
+      return false;
+    });
+
+    return hasModuleAccess;
   };
   
   const getPluginComponent = (pluginId: string, componentName: string): React.ComponentType | null => {

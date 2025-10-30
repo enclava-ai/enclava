@@ -21,7 +21,7 @@ from app.core.security import (
     get_current_user,
     get_current_active_user,
 )
-from app.db.database import get_db
+from app.db.database import get_db, create_default_admin
 from app.models.user import User
 from app.utils.exceptions import AuthenticationError, ValidationError
 
@@ -201,23 +201,45 @@ async def login(
     user = result.scalar_one_or_none()
 
     if not user:
-        logger.warning("LOGIN_USER_NOT_FOUND", identifier=identifier)
-        # List available users for debugging
-        try:
-            all_users_stmt = select(User).limit(5)
-            all_users_result = await db.execute(all_users_stmt)
-            all_users = all_users_result.scalars().all()
-            logger.info(
-                "LOGIN_USER_LIST",
-                users=[u.email for u in all_users],
+        bootstrap_attempted = False
+        identifier_lower = identifier.lower() if identifier else ""
+        admin_email = settings.ADMIN_EMAIL.lower() if settings.ADMIN_EMAIL else None
+
+        if user_data.email and admin_email and identifier_lower == admin_email and settings.ADMIN_PASSWORD:
+            bootstrap_attempted = True
+            logger.info("LOGIN_ADMIN_BOOTSTRAP_START", email=user_data.email)
+            try:
+                await create_default_admin()
+                # Re-run lookup after bootstrap attempt
+                stmt = select(User).where(User.email == user_data.email)
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+                if user:
+                    logger.info("LOGIN_ADMIN_BOOTSTRAP_SUCCESS", email=user.email)
+            except Exception as bootstrap_exc:
+                logger.error("LOGIN_ADMIN_BOOTSTRAP_FAILED", error=str(bootstrap_exc))
+
+        if not user:
+            logger.warning("LOGIN_USER_NOT_FOUND", identifier=identifier)
+            # List available users for debugging
+            try:
+                all_users_stmt = select(User).limit(5)
+                all_users_result = await db.execute(all_users_stmt)
+                all_users = all_users_result.scalars().all()
+                logger.info(
+                    "LOGIN_USER_LIST",
+                    users=[u.email for u in all_users],
+                )
+            except Exception as e:
+                logger.error("LOGIN_USER_LIST_FAILURE", error=str(e))
+            
+            if bootstrap_attempted:
+                logger.warning("LOGIN_ADMIN_BOOTSTRAP_UNSUCCESSFUL", email=user_data.email)
+            
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password"
             )
-        except Exception as e:
-            logger.error("LOGIN_USER_LIST_FAILURE", error=str(e))
-        
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
-        )
     
     logger.info("LOGIN_USER_FOUND", email=user.email, is_active=user.is_active)
     logger.info("LOGIN_PASSWORD_VERIFY_START")

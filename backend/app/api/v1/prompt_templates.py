@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
+from sqlalchemy.dialects.postgresql import insert
 from datetime import datetime
 import uuid
 
@@ -513,21 +514,33 @@ async def seed_default_templates(
                     inactive_template.updated_at = datetime.utcnow()
                     updated_templates.append(type_key)
                 else:
-                    # Create new template
-                    new_template = PromptTemplate(
-                        id=str(uuid.uuid4()),
-                        name=template_data["name"],
-                        type_key=type_key,
-                        description=template_data["description"],
-                        system_prompt=template_data["prompt"],
-                        is_default=True,
-                        is_active=True,
-                        version=1,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow()
+                    # Create new template, gracefully skipping if another request created it first
+                    now = datetime.utcnow()
+                    stmt = (
+                        insert(PromptTemplate)
+                        .values(
+                            id=str(uuid.uuid4()),
+                            name=template_data["name"],
+                            type_key=type_key,
+                            description=template_data["description"],
+                            system_prompt=template_data["prompt"],
+                            is_default=True,
+                            is_active=True,
+                            version=1,
+                            created_at=now,
+                            updated_at=now,
+                        )
+                        .on_conflict_do_nothing(index_elements=[PromptTemplate.type_key])
                     )
-                    db.add(new_template)
-                    created_templates.append(type_key)
+
+                    result = await db.execute(stmt)
+                    if result.rowcount:
+                        created_templates.append(type_key)
+                    else:
+                        log_api_request(
+                            "prompt_template_seed_skipped",
+                            {"type_key": type_key, "reason": "already_exists"},
+                        )
         
         await db.commit()
         

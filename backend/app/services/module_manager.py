@@ -38,26 +38,49 @@ class ModuleConfig:
 class ModuleFileWatcher(FileSystemEventHandler):
     """Watch for changes in module files"""
     
-    def __init__(self, module_manager):
+    def __init__(self, module_manager, modules_root: Path):
         self.module_manager = module_manager
+        self.modules_root = modules_root.resolve()
+        
+    def _resolve_module_name(self, src_path: str) -> Optional[str]:
+        try:
+            relative_path = Path(src_path).resolve().relative_to(self.modules_root)
+        except ValueError:
+            return None
+        
+        parts = relative_path.parts
+        return parts[0] if parts else None
         
     def on_modified(self, event):
         if event.is_directory or not event.src_path.endswith('.py'):
             return
             
-        # Extract module name from path
-        path_parts = Path(event.src_path).parts
-        if 'modules' in path_parts:
-            modules_index = path_parts.index('modules')
-            if modules_index + 1 < len(path_parts):
-                module_name = path_parts[modules_index + 1]
-                if module_name in self.module_manager.modules:
-                    log_module_event("hot_reload", "file_changed", {
-                        "module": module_name,
-                        "file": event.src_path
-                    })
-                    # Schedule reload
-                    asyncio.create_task(self.module_manager.reload_module(module_name))
+        module_name = self._resolve_module_name(event.src_path)
+        if not module_name or module_name not in self.module_manager.modules:
+            return
+        
+        log_module_event("hot_reload", "file_changed", {
+            "module": module_name,
+            "file": event.src_path
+        })
+        
+        loop = self.module_manager.loop
+        if not loop or loop.is_closed():
+            logger.debug("Hot reload skipped for %s; event loop unavailable", module_name)
+            return
+        
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                self.module_manager.reload_module(module_name),
+                loop,
+            )
+            future.add_done_callback(
+                lambda f: f.exception() and logger.warning(
+                    "Module reload error for %s: %s", module_name, f.exception()
+                )
+            )
+        except RuntimeError as exc:
+            logger.debug("Hot reload scheduling failed for %s: %s", module_name, exc)
 
 
 class ModuleManager:
@@ -71,11 +94,15 @@ class ModuleManager:
         self.hot_reload_enabled = True
         self.file_observer = None
         self.fastapi_app = None
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
+        self.modules_root = (Path(__file__).resolve().parent.parent / "modules").resolve()
     
     async def initialize(self, fastapi_app=None):
         """Initialize the module manager and load all modules"""
         if self.initialized:
             return
+        
+        self.loop = asyncio.get_running_loop()
         
         # Store FastAPI app reference for router registration
         self.fastapi_app = fastapi_app
@@ -103,10 +130,15 @@ class ModuleManager:
         """Load module configurations from dynamic discovery"""
         # Initialize permission system
         permission_registry.register_platform_permissions()
+        self.module_configs = {}
         
         # Discover modules dynamically from filesystem
         try:
-            discovered_manifests = await module_config_manager.discover_modules("modules")
+            if not self.modules_root.exists():
+                logger.warning("Modules directory not found at %s", self.modules_root)
+                return
+            
+            discovered_manifests = await module_config_manager.discover_modules(str(self.modules_root))
             
             # Load saved configurations
             await module_config_manager.load_saved_configs()
@@ -206,45 +238,26 @@ class ModuleManager:
         try:
             log_module_event(module_name, "loading", {"config": config.config})
             
-            # Check if module exists in the modules directory
-            # Try multiple possible locations in order of preference
-            possible_paths = [
-                Path(f"modules/{module_name}"),  # Docker container path
-                Path(f"modules/{module_name}"),  # Container path
-                Path(f"app/modules/{module_name}")  # Legacy path
-            ]
+            # Check if module exists in the canonical modules directory
+            module_dir = self.modules_root / module_name
+            modules_base_path = self.modules_root.parent
             
-            module_dir = None
-            modules_base_path = None
+            if not module_dir.exists():
+                raise ModuleLoadError(f"Module {module_name} not found at {module_dir}")
             
-            for path in possible_paths:
-                if path.exists():
-                    module_dir = path
-                    modules_base_path = path.parent
-                    break
+            # Ensure the parent app directory is on sys.path for imports
+            modules_path_str = str(modules_base_path.absolute())
+            if modules_path_str not in sys.path:
+                sys.path.insert(0, modules_path_str)
             
-            if module_dir and module_dir.exists():
-                # Use direct import from modules directory
-                module_path = f"modules.{module_name}.main"
-                
-                # Add modules directory to Python path if not already there
-                modules_path_str = str(modules_base_path.absolute())
-                if modules_path_str not in sys.path:
-                    sys.path.insert(0, modules_path_str)
-                
-                # Force reload if already imported
-                if module_path in sys.modules:
-                    importlib.reload(sys.modules[module_path])
-                    module = sys.modules[module_path]
-                else:
-                    module = importlib.import_module(module_path)
+            module_path = f"app.modules.{module_name}.main"
+            
+            # Force reload if already imported
+            if module_path in sys.modules:
+                importlib.reload(sys.modules[module_path])
+                module = sys.modules[module_path]
             else:
-                # Final fallback - try app.modules path (legacy)
-                try:
-                    module_path = f"app.modules.{module_name}.main"
-                    module = importlib.import_module(module_path)
-                except ImportError:
-                    raise ModuleLoadError(f"Module {module_name} not found in any expected location: {[str(p) for p in possible_paths]}")
+                module = importlib.import_module(module_path)
             
             # Get the module instance - try multiple patterns
             module_instance = None
@@ -484,7 +497,15 @@ class ModuleManager:
                 except Exception as e:
                     log_module_event(module_name, "shutdown_error", {"error": str(e)})
         
+        if self.file_observer:
+            try:
+                self.file_observer.stop()
+                await asyncio.to_thread(self.file_observer.join)
+            finally:
+                self.file_observer = None
+        
         self.initialized = False
+        self.loop = None
         log_module_event("module_manager", "shutdown_complete", {"success": True})
     
     async def cleanup(self):
@@ -494,27 +515,18 @@ class ModuleManager:
     async def _start_file_watcher(self):
         """Start watching module files for changes"""
         try:
-            # Try multiple possible locations for modules directory
-            possible_modules_paths = [
-                Path("modules"),  # Docker container path
-                Path("modules"),  # Container path
-                Path("app/modules")  # Legacy path
-            ]
+            if self.file_observer:
+                return
             
-            modules_path = None
-            for path in possible_modules_paths:
-                if path.exists():
-                    modules_path = path
-                    break
+            if not self.modules_root.exists():
+                log_module_event("hot_reload", "watcher_skipped", {"reason": f"No modules directory at {self.modules_root}"})
+                return
             
-            if modules_path and modules_path.exists():
-                self.file_observer = Observer()
-                event_handler = ModuleFileWatcher(self)
-                self.file_observer.schedule(event_handler, str(modules_path), recursive=True)
-                self.file_observer.start()
-                log_module_event("hot_reload", "watcher_started", {"path": str(modules_path)})
-            else:
-                log_module_event("hot_reload", "watcher_skipped", {"reason": "No modules directory found"})
+            self.file_observer = Observer()
+            event_handler = ModuleFileWatcher(self, self.modules_root)
+            self.file_observer.schedule(event_handler, str(self.modules_root), recursive=True)
+            self.file_observer.start()
+            log_module_event("hot_reload", "watcher_started", {"path": str(self.modules_root)})
         except Exception as e:
             log_module_event("hot_reload", "watcher_failed", {"error": str(e)})
     

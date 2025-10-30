@@ -5,6 +5,7 @@ Database connection and session management
 import logging
 from typing import AsyncGenerator
 from sqlalchemy import create_engine, MetaData
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import StaticPool
@@ -141,21 +142,27 @@ async def create_default_admin():
     from app.core.security import get_password_hash
     from app.core.config import settings
     from sqlalchemy import select
+    from sqlalchemy.exc import SQLAlchemyError
     
     try:
+        admin_email = settings.ADMIN_EMAIL
+        admin_password = settings.ADMIN_PASSWORD
+
+        if not admin_email or not admin_password:
+            logger.info("Admin bootstrap skipped: ADMIN_EMAIL or ADMIN_PASSWORD unset")
+            return
+        
         async with async_session_factory() as session:
             # Check if user with ADMIN_EMAIL exists
-            stmt = select(User).where(User.email == settings.ADMIN_EMAIL)
+            stmt = select(User).where(User.email == admin_email)
             result = await session.execute(stmt)
             existing_user = result.scalar_one_or_none()
             
             if existing_user:
-                logger.info(f"User with email {settings.ADMIN_EMAIL} already exists - skipping admin creation")
+                logger.info(f"User with email {admin_email} already exists - skipping admin creation")
                 return
             
             # Create admin user from environment variables
-            admin_email = settings.ADMIN_EMAIL
-            admin_password = settings.ADMIN_PASSWORD
             # Generate username from email (part before @)
             admin_username = admin_email.split('@')[0]
             
@@ -176,6 +183,10 @@ async def create_default_admin():
             logger.warning("PLEASE CHANGE THE PASSWORD AFTER FIRST LOGIN")
             logger.warning("=" * 60)
             
+    except SQLAlchemyError as e:
+        logger.error(f"Failed to create default admin user due to database error: {e}")
+    except AttributeError as e:
+        logger.error(f"Failed to create default admin user: invalid ADMIN_EMAIL '{settings.ADMIN_EMAIL}'")
     except Exception as e:
         logger.error(f"Failed to create default admin user: {e}")
         # Don't raise here as this shouldn't block the application startup

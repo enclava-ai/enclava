@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass
+from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
@@ -99,12 +100,15 @@ class DocumentProcessor:
         try:
             task = ProcessingTask(document_id=document_id, priority=priority)
             
-            # Check if queue is full
-            if self.processing_queue.full():
-                logger.warning(f"Processing queue is full, dropping task for document {document_id}")
+            try:
+                await asyncio.wait_for(self.processing_queue.put(task), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Processing queue saturated, could not enqueue document %s within timeout",
+                    document_id,
+                )
                 return False
             
-            await self.processing_queue.put(task)
             self.stats["queue_size"] = self.processing_queue.qsize()
             
             logger.info(f"Added processing task for document {document_id} (priority: {priority})")
@@ -119,6 +123,7 @@ class DocumentProcessor:
         logger.info(f"Started worker: {worker_name}")
         
         while self.running:
+            task: Optional[ProcessingTask] = None
             try:
                 # Get task from queue (wait up to 1 second)
                 task = await asyncio.wait_for(
@@ -142,13 +147,20 @@ class DocumentProcessor:
                     if task.retry_count < task.max_retries:
                         task.retry_count += 1
                         await asyncio.sleep(2 ** task.retry_count)  # Exponential backoff
-                        await self.processing_queue.put(task)
+                        try:
+                            await asyncio.wait_for(self.processing_queue.put(task), timeout=5.0)
+                        except asyncio.TimeoutError:
+                            logger.error(
+                                "%s: Failed to requeue document %s due to saturated queue",
+                                worker_name,
+                                task.document_id,
+                            )
+                            self.stats["error_count"] += 1
+                            continue
                         logger.warning(f"{worker_name}: Retrying document {task.document_id} (attempt {task.retry_count})")
                     else:
                         self.stats["error_count"] += 1
                         logger.error(f"{worker_name}: Failed to process document {task.document_id} after {task.max_retries} retries")
-                
-                self.stats["active_workers"] -= 1
                 
             except asyncio.TimeoutError:
                 # No tasks in queue, continue
@@ -157,9 +169,14 @@ class DocumentProcessor:
                 # Worker cancelled, exit
                 break
             except Exception as e:
-                self.stats["active_workers"] -= 1
                 logger.error(f"{worker_name}: Unexpected error: {e}")
                 await asyncio.sleep(1)  # Brief pause before continuing
+            finally:
+                if task is not None:
+                    self.processing_queue.task_done()
+                if self.stats["active_workers"] > 0:
+                    self.stats["active_workers"] -= 1
+                self.stats["queue_size"] = self.processing_queue.qsize()
 
         logger.info(f"Worker stopped: {worker_name}")
 
@@ -172,16 +189,24 @@ class DocumentProcessor:
             if not module_manager.initialized:
                 await module_manager.initialize()
 
-            rag_module = module_manager.modules.get('rag')
+            rag_module = module_manager.get_module('rag')
 
-            if not rag_module or not getattr(rag_module, 'enabled', False):
+            if not rag_module:
                 enabled = await module_manager.enable_module('rag')
                 if not enabled:
-                    raise Exception("Failed to enable RAG module")
-                rag_module = module_manager.modules.get('rag')
+                    raise RuntimeError("Failed to enable RAG module")
+                rag_module = module_manager.get_module('rag')
 
-            if not rag_module or not getattr(rag_module, 'enabled', False):
-                raise Exception("RAG module not available or not enabled")
+            if not rag_module:
+                raise RuntimeError("RAG module not available after enable attempt")
+
+            if not getattr(rag_module, 'enabled', True):
+                enabled = await module_manager.enable_module('rag')
+                if not enabled:
+                    raise RuntimeError("RAG module is disabled and could not be re-enabled")
+                rag_module = module_manager.get_module('rag')
+                if not rag_module or not getattr(rag_module, 'enabled', True):
+                    raise RuntimeError("RAG module is disabled and could not be re-enabled")
 
             self._rag_module = rag_module
             logger.info("DocumentProcessor cached RAG module instance for reuse")
@@ -224,8 +249,21 @@ class DocumentProcessor:
                 
                 # Read file content
                 logger.info(f"Reading file content for document {task.document_id}: {document.file_path}")
-                with open(document.file_path, 'rb') as f:
-                    file_content = f.read()
+                file_path = Path(document.file_path)
+                try:
+                    file_content = await asyncio.to_thread(file_path.read_bytes)
+                except FileNotFoundError:
+                    logger.error(f"File not found for document {task.document_id}: {document.file_path}")
+                    document.status = ProcessingStatus.ERROR
+                    document.processing_error = "Document file not found on disk"
+                    await session.commit()
+                    return False
+                except Exception as exc:
+                    logger.error(f"Failed reading file for document {task.document_id}: {exc}")
+                    document.status = ProcessingStatus.ERROR
+                    document.processing_error = f"Failed to read file: {exc}"
+                    await session.commit()
+                    return False
                 
                 logger.info(f"File content read successfully for document {task.document_id}, size: {len(file_content)} bytes")
                 

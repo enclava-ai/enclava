@@ -78,15 +78,16 @@ class LLMServiceConfig(BaseModel):
     
 
 
-def create_default_config() -> LLMServiceConfig:
+def create_default_config(env_vars=None) -> LLMServiceConfig:
     """Create default LLM service configuration"""
-    
+    env = env_vars or EnvironmentVariables()
+
     # PrivateMode.ai configuration (via proxy)
     # Models will be fetched dynamically from proxy /models endpoint
     privatemode_config = ProviderConfig(
         name="privatemode",
         provider_type="privatemode",
-        enabled=True,
+        enabled=bool(env.PRIVATEMODE_API_KEY),
         base_url=settings.PRIVATEMODE_PROXY_URL,
         api_key_env_var="PRIVATEMODE_API_KEY",
         default_model="privatemode-latest",
@@ -108,13 +109,105 @@ def create_default_config() -> LLMServiceConfig:
         )
     )
     
+    providers: Dict[str, ProviderConfig] = {
+        "privatemode": privatemode_config
+    }
+
+    if env.OPENAI_API_KEY:
+        providers["openai"] = ProviderConfig(
+            name="openai",
+            provider_type="openai",
+            enabled=True,
+            base_url="https://api.openai.com/v1",
+            api_key_env_var="OPENAI_API_KEY",
+            default_model="gpt-4o-mini",
+            supported_models=[
+                "gpt-4o-mini",
+                "gpt-4o",
+                "gpt-3.5-turbo",
+                "text-embedding-3-large",
+                "text-embedding-3-small"
+            ],
+            capabilities=["chat", "embeddings"],
+            priority=2,
+            supports_streaming=True,
+            supports_function_calling=True,
+            max_context_window=128000,
+            max_output_tokens=8192,
+            resilience=ResilienceConfig(
+                max_retries=2,
+                retry_delay_ms=750,
+                timeout_ms=45000,
+                circuit_breaker_threshold=6,
+                circuit_breaker_reset_timeout_ms=60000
+            )
+        )
+    
+    if env.ANTHROPIC_API_KEY:
+        providers["anthropic"] = ProviderConfig(
+            name="anthropic",
+            provider_type="anthropic",
+            enabled=True,
+            base_url="https://api.anthropic.com/v1",
+            api_key_env_var="ANTHROPIC_API_KEY",
+            default_model="claude-3-opus-20240229",
+            supported_models=[
+                "claude-3-opus-20240229",
+                "claude-3-sonnet-20240229",
+                "claude-3-haiku-20240307"
+            ],
+            capabilities=["chat"],
+            priority=3,
+            supports_streaming=True,
+            supports_function_calling=False,
+            max_context_window=200000,
+            max_output_tokens=4096,
+            resilience=ResilienceConfig(
+                max_retries=3,
+                retry_delay_ms=1000,
+                timeout_ms=60000,
+                circuit_breaker_threshold=5,
+                circuit_breaker_reset_timeout_ms=90000
+            )
+        )
+    
+    if env.GOOGLE_API_KEY:
+        providers["google"] = ProviderConfig(
+            name="google",
+            provider_type="google",
+            enabled=True,
+            base_url="https://generativelanguage.googleapis.com/v1beta",
+            api_key_env_var="GOOGLE_API_KEY",
+            default_model="models/gemini-1.5-pro-latest",
+            supported_models=[
+                "models/gemini-1.5-pro-latest",
+                "models/gemini-1.5-flash-latest"
+            ],
+            capabilities=["chat", "multimodal"],
+            priority=4,
+            supports_streaming=True,
+            supports_function_calling=True,
+            max_context_window=200000,
+            max_output_tokens=8192,
+            resilience=ResilienceConfig(
+                max_retries=2,
+                retry_delay_ms=1000,
+                timeout_ms=45000,
+                circuit_breaker_threshold=4,
+                circuit_breaker_reset_timeout_ms=60000
+            )
+        )
+    
+    default_provider = next(
+        (name for name, provider in providers.items() if provider.enabled),
+        "privatemode"
+    )
+    
     # Create main configuration
     config = LLMServiceConfig(
-        default_provider="privatemode",
+        default_provider=default_provider,
         enable_detailed_logging=settings.LOG_LLM_PROMPTS,
-        providers={
-            "privatemode": privatemode_config
-        },
+        providers=providers,
         model_routing={}  # Will be populated dynamically from provider models
     )
     
@@ -174,7 +267,7 @@ class ConfigurationManager:
     def get_config(self) -> LLMServiceConfig:
         """Get current configuration"""
         if self._config is None:
-            self._config = create_default_config()
+            self._config = create_default_config(self._env_vars)
             self._validate_configuration()
         
         return self._config

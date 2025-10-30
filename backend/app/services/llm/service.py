@@ -186,7 +186,13 @@ class LLMService:
             total_latency = (time.time() - start_time) * 1000
             error_code = getattr(e, 'error_code', e.__class__.__name__)
 
-            
+            logger.exception(
+                "Chat completion failed for provider %s (model=%s, latency=%.2fms, error=%s)",
+                provider_name,
+                request.model,
+                total_latency,
+                error_code,
+            )
             raise
     
     async def create_chat_completion_stream(self, request: ChatRequest) -> AsyncGenerator[Dict[str, Any], None]:
@@ -220,6 +226,12 @@ class LLMService:
         except Exception as e:
             # Record streaming failure - metrics disabled
             error_code = getattr(e, 'error_code', e.__class__.__name__)
+            logger.exception(
+                "Streaming chat completion failed for provider %s (model=%s, error=%s)",
+                provider_name,
+                request.model,
+                error_code,
+            )
             raise
     
     async def create_embedding(self, request: EmbeddingRequest) -> EmbeddingResponse:
@@ -261,6 +273,13 @@ class LLMService:
             # Record failed request - metrics disabled
             total_latency = (time.time() - start_time) * 1000
             error_code = getattr(e, 'error_code', e.__class__.__name__)            
+            logger.exception(
+                "Embedding request failed for provider %s (model=%s, latency=%.2fms, error=%s)",
+                provider_name,
+                request.model,
+                total_latency,
+                error_code,
+            )
             raise
     
     async def get_models(self, provider_name: Optional[str] = None) -> List[ModelInfo]:

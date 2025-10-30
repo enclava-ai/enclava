@@ -132,6 +132,7 @@ class ModulePermissionRegistry:
         self.module_permissions: Dict[str, List[Permission]] = {}
         self.role_permissions: Dict[str, List[str]] = {}
         self.default_roles = self._initialize_default_roles()
+        self._platform_permissions_registered = False
     
     def _initialize_default_roles(self) -> Dict[str, List[str]]:
         """Initialize default permission roles"""
@@ -177,6 +178,9 @@ class ModulePermissionRegistry:
     
     def register_platform_permissions(self):
         """Register core platform permissions"""
+        if self._platform_permissions_registered:
+            return
+        
         platform_permissions = [
             Permission("users", "create", "Create users"),
             Permission("users", "read", "View users"),
@@ -232,6 +236,7 @@ class ModulePermissionRegistry:
             self.tree.add_permission(perm_string, perm)
         
         logger.info("Registered platform and LLM permissions")
+        self._platform_permissions_registered = True
     
     def check_permission(self, user_permissions: List[str], required: str, 
                         context: Dict[str, Any] = None) -> bool:

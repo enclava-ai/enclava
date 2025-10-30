@@ -158,7 +158,7 @@ async def create_chatbot(
             raise HTTPException(status_code=500, detail="Chatbot module not available")
         
         # Import needed types
-        from modules.chatbot.main import ChatbotConfig
+        from app.modules.chatbot.main import ChatbotConfig
         
         # Create chatbot config object
         config = ChatbotConfig(

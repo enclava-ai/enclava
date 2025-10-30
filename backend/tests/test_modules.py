@@ -17,19 +17,17 @@ import os
 import sys
 from pathlib import Path
 
-# Add both backend and modules directories to path
+# Add backend directory to Python path for app package imports
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
-sys.path.insert(0, str(backend_path / "modules"))
 
 try:
-    from modules.rag.main import RAGModule
-    from modules.chatbot.main import ChatbotModule
+    from app.modules.rag.main import RAGModule
+    from app.modules.chatbot.main import ChatbotModule
     
     from app.services.module_manager import ModuleManager, ModuleConfig
 except ImportError as e:
     print(f"Import error: {e}")
-    print("Available modules path:", backend_path / "modules")
     # Create mock modules for testing if imports fail
     class MockModule:
         def __init__(self):
