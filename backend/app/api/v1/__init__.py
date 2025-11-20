@@ -17,6 +17,9 @@ from .rag import router as rag_router
 from .chatbot import router as chatbot_router
 from .prompt_templates import router as prompt_templates_router
 from .plugin_registry import router as plugin_registry_router
+from .endpoints.tools import router as tools_router
+from .endpoints.tool_calling import router as tool_calling_router
+from .endpoints.user_management import router as user_management_router
 
 # Create main API router
 api_router = APIRouter()
@@ -58,9 +61,23 @@ api_router.include_router(rag_router, prefix="/rag", tags=["rag"])
 api_router.include_router(chatbot_router, prefix="/chatbot", tags=["chatbot"])
 
 # Include prompt template routes
-api_router.include_router(prompt_templates_router, prefix="/prompt-templates", tags=["prompt-templates"])
-
+api_router.include_router(
+    prompt_templates_router, prefix="/prompt-templates", tags=["prompt-templates"]
+)
 
 
 # Include plugin registry routes
 api_router.include_router(plugin_registry_router, prefix="/plugins", tags=["plugins"])
+
+# Include tool management routes
+api_router.include_router(tools_router, prefix="/tools", tags=["tools"])
+
+# Include tool calling routes
+api_router.include_router(
+    tool_calling_router, prefix="/tool-calling", tags=["tool-calling"]
+)
+
+# Include admin user management routes
+api_router.include_router(
+    user_management_router, prefix="/admin/user-management", tags=["admin", "user-management"]
+)

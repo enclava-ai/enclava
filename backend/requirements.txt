@@ -25,6 +25,12 @@ itsdangerous==2.1.2
 httpx==0.25.2
 aiohttp==3.9.0
 
+# Docker integration (for tool execution)
+docker==7.0.0
+
+# Template engine (for notifications)
+jinja2==3.1.2
+
 # Background tasks
 celery==5.3.4
 flower==2.0.1

@@ -19,6 +19,7 @@ from ..v1.platform import router as platform_router
 from ..v1.llm_internal import router as llm_internal_router
 from ..v1.chatbot import router as chatbot_router
 from .debugging import router as debugging_router
+from ..v1.endpoints.user_management import router as user_management_router
 
 # Create internal API router
 internal_api_router = APIRouter()
@@ -27,47 +28,82 @@ internal_api_router = APIRouter()
 internal_api_router.include_router(auth_router, prefix="/auth", tags=["internal-auth"])
 
 # Include modules routes (frontend management)
-internal_api_router.include_router(modules_router, prefix="/modules", tags=["internal-modules"])
+internal_api_router.include_router(
+    modules_router, prefix="/modules", tags=["internal-modules"]
+)
 
-# Include platform routes (frontend platform management)  
-internal_api_router.include_router(platform_router, prefix="/platform", tags=["internal-platform"])
+# Include platform routes (frontend platform management)
+internal_api_router.include_router(
+    platform_router, prefix="/platform", tags=["internal-platform"]
+)
 
 # Include user management routes (frontend user admin)
-internal_api_router.include_router(users_router, prefix="/users", tags=["internal-users"])
+internal_api_router.include_router(
+    users_router, prefix="/users", tags=["internal-users"]
+)
 
 # Include API key management routes (frontend API key management)
-internal_api_router.include_router(api_keys_router, prefix="/api-keys", tags=["internal-api-keys"])
+internal_api_router.include_router(
+    api_keys_router, prefix="/api-keys", tags=["internal-api-keys"]
+)
 
 # Include budget management routes (frontend budget management)
-internal_api_router.include_router(budgets_router, prefix="/budgets", tags=["internal-budgets"])
+internal_api_router.include_router(
+    budgets_router, prefix="/budgets", tags=["internal-budgets"]
+)
 
 # Include audit log routes (frontend audit viewing)
-internal_api_router.include_router(audit_router, prefix="/audit", tags=["internal-audit"])
+internal_api_router.include_router(
+    audit_router, prefix="/audit", tags=["internal-audit"]
+)
 
 # Include settings management routes (frontend settings)
-internal_api_router.include_router(settings_router, prefix="/settings", tags=["internal-settings"])
+internal_api_router.include_router(
+    settings_router, prefix="/settings", tags=["internal-settings"]
+)
 
 # Include analytics routes (frontend analytics viewing)
-internal_api_router.include_router(analytics_router, prefix="/analytics", tags=["internal-analytics"])
+internal_api_router.include_router(
+    analytics_router, prefix="/analytics", tags=["internal-analytics"]
+)
 
 # Include RAG routes (frontend RAG document management)
 internal_api_router.include_router(rag_router, prefix="/rag", tags=["internal-rag"])
 
 # Include RAG debug routes (for demo and debugging)
-internal_api_router.include_router(rag_debug_router, prefix="/rag/debug", tags=["internal-rag-debug"])
+internal_api_router.include_router(
+    rag_debug_router, prefix="/rag/debug", tags=["internal-rag-debug"]
+)
 
 # Include prompt template routes (frontend prompt template management)
-internal_api_router.include_router(prompt_templates_router, prefix="/prompt-templates", tags=["internal-prompt-templates"])
+internal_api_router.include_router(
+    prompt_templates_router,
+    prefix="/prompt-templates",
+    tags=["internal-prompt-templates"],
+)
 
 
 # Include plugin registry routes (frontend plugin management)
-internal_api_router.include_router(plugin_registry_router, prefix="/plugins", tags=["internal-plugins"])
+internal_api_router.include_router(
+    plugin_registry_router, prefix="/plugins", tags=["internal-plugins"]
+)
 
 # Include internal LLM routes (frontend LLM service access with JWT auth)
-internal_api_router.include_router(llm_internal_router, prefix="/llm", tags=["internal-llm"])
+internal_api_router.include_router(
+    llm_internal_router, prefix="/llm", tags=["internal-llm"]
+)
 
 # Include chatbot routes (frontend chatbot management)
-internal_api_router.include_router(chatbot_router, prefix="/chatbot", tags=["internal-chatbot"])
+internal_api_router.include_router(
+    chatbot_router, prefix="/chatbot", tags=["internal-chatbot"]
+)
 
 # Include debugging routes (troubleshooting and diagnostics)
-internal_api_router.include_router(debugging_router, prefix="/debugging", tags=["internal-debugging"])
+internal_api_router.include_router(
+    debugging_router, prefix="/debugging", tags=["internal-debugging"]
+)
+
+# Include user management routes (advanced user and role management)
+internal_api_router.include_router(
+    user_management_router, prefix="/user-management", tags=["internal-user-management"]
+)

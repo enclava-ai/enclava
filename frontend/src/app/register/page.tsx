@@ -21,6 +21,22 @@ interface RegisterFormData {
   acceptTerms: boolean;
 }
 
+// Helper function to extract error messages
+function getErrorMessage(error: any, defaultMessage: string = "An error occurred"): string {
+  if (error.details?.details && Array.isArray(error.details.details)) {
+    // Extract validation error messages from details array
+    const validationErrors = error.details.details
+      .map((err: any) => err.message)
+      .join(", ");
+    return validationErrors;
+  } else if (error.details?.message) {
+    return error.details.message;
+  } else if (error.message) {
+    return error.message;
+  }
+  return defaultMessage;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -120,10 +136,10 @@ export default function RegisterPage() {
 
       // Redirect to login page
       router.push("/login?message=registration-success");
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Registration failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        description: getErrorMessage(error, "An unexpected error occurred"),
         variant: "destructive",
       });
     } finally {

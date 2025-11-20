@@ -64,6 +64,24 @@ const Navigation = () => {
     })
     .filter(Boolean);
 
+  // Check if user has admin permissions
+  const hasAdminAccess = user?.role === 'admin' ||
+                         user?.role === 'super_admin' ||
+                         user?.permissions?.includes('platform:users:read') ||
+                         user?.permissions?.includes('platform:admin:access');
+
+  // Build settings children based on permissions
+  const settingsChildren = [
+    { href: "/settings", label: "System Settings" },
+    { href: "/plugins", label: "Plugins" },
+    { href: "/prompt-templates", label: "Prompt Templates" },
+  ];
+
+  // Add admin link if user has admin access
+  if (hasAdminAccess) {
+    settingsChildren.push({ href: "/admin", label: "Admin Panel" });
+  }
+
   // Core navigation items that are always visible
   const coreNavItems = [
     { href: "/dashboard", label: "Dashboard" },
@@ -76,14 +94,10 @@ const Navigation = () => {
         { href: "/rag-demo", label: "RAG Demo" },
       ]
     },
-    { 
-      href: "/settings", 
+    {
+      href: "/settings",
       label: "Settings",
-      children: [
-        { href: "/settings", label: "System Settings" },
-        { href: "/plugins", label: "Plugins" },
-        { href: "/prompt-templates", label: "Prompt Templates" },
-      ]
+      children: settingsChildren
     },
   ]
 

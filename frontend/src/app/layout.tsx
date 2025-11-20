@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as HotToaster } from 'react-hot-toast'
+import { Toaster as Sonner } from 'sonner'
 import { AuthProvider } from '@/components/providers/auth-provider'
 import { ModulesProvider } from '@/contexts/ModulesContext'
 import { PluginProvider } from '@/contexts/PluginContext'
@@ -79,6 +80,7 @@ export default function RootLayout({
                   <Toaster />
                 </ToastProvider>
                 <HotToaster />
+                <Sonner />
               </PluginProvider>
             </ModulesProvider>
           </AuthProvider>

@@ -61,6 +61,11 @@ class TokenManager extends SimpleEmitter {
     return t ? new Date(t.access_expires_at) : null
   }
 
+  getRefreshToken(): string | null {
+    const t = readTokens()
+    return t?.refresh_token || null
+  }
+
   getRefreshTokenExpiry(): Date | null {
     const t = readTokens()
     return t?.refresh_expires_at ? new Date(t.refresh_expires_at) : null
