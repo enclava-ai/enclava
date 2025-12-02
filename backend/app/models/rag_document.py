@@ -40,6 +40,7 @@ class RagDocument(Base):
     file_type = Column(String(50), nullable=False)  # pdf, docx, txt, etc.
     file_size = Column(BigInteger, nullable=False)  # file size in bytes
     mime_type = Column(String(100), nullable=True)
+    source_url = Column(String(500), nullable=True, index=True)  # original source URL
 
     # Processing status
     status = Column(
@@ -93,6 +94,7 @@ class RagDocument(Base):
             "file_type": self.file_type,
             "size": self.file_size,
             "mime_type": self.mime_type,
+            "source_url": self.source_url,
             "status": self.status,
             "processing_error": self.processing_error,
             "converted_content": self.converted_content,

@@ -20,9 +20,9 @@ class EmbeddingService:
 
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or getattr(
-            settings, "RAG_EMBEDDING_MODEL", "BAAI/bge-m3"
+            settings, "RAG_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"
         )
-        self.dimension = 1024  # bge-m3 produces 1024-d vectors
+        self.dimension = 384  # bge-small-en produces 384-d vectors
         self.initialized = False
         self.local_model = None
         self.backend = "uninitialized"
@@ -139,7 +139,7 @@ class EmbeddingService:
 
     def _generate_fallback_embedding(self, text: str) -> List[float]:
         """Generate a single fallback embedding"""
-        dimension = self.dimension or 1024
+        dimension = self.dimension or 384
         # Use hash for reproducible random embeddings
         np.random.seed(hash(text) % 2**32)
         return np.random.random(dimension).tolist()

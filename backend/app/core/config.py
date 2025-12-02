@@ -181,7 +181,7 @@ class Settings(BaseSettings):
     RAG_WARN_ON_FALLBACK: bool = (
         os.getenv("RAG_WARN_ON_FALLBACK", "True").lower() == "true"
     )
-    RAG_EMBEDDING_MODEL: str = os.getenv("RAG_EMBEDDING_MODEL", "bge-m3")
+    RAG_EMBEDDING_MODEL: str = os.getenv("RAG_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
     RAG_DOCUMENT_PROCESSING_TIMEOUT: int = int(
         os.getenv("RAG_DOCUMENT_PROCESSING_TIMEOUT", "300")
     )

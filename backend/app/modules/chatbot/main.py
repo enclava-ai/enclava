@@ -501,13 +501,37 @@ class ChatbotModule(BaseModule):
 
                     if rag_results:
                         logger.info(f"RAG search found {len(rag_results)} results")
-                        sources = [
+                        # Build sources with enhanced metadata
+                        all_sources = [
                             {
-                                "title": f"Document {i+1}",
-                                "content": result.document.content[:200],
+                                "title": result.document.metadata.get("question") or f"Document {i+1}",
+                                "url": result.document.metadata.get("source_url"),
+                                "language": result.document.metadata.get("language"),
+                                "article_id": result.document.metadata.get("article_id"),
+                                "relevance_score": result.relevance_score,
+                                "content_preview": result.document.content[:200] if result.document.content else "",
                             }
                             for i, result in enumerate(rag_results)
                         ]
+
+                        # Deduplicate by URL, keeping the highest relevance score
+                        seen_urls = {}
+                        sources = []
+                        for source in all_sources:
+                            url = source.get("url")
+                            if url:
+                                # If URL already seen, keep the one with higher relevance score
+                                if url not in seen_urls or source["relevance_score"] > seen_urls[url]["relevance_score"]:
+                                    seen_urls[url] = source
+                            else:
+                                # Keep sources without URLs (shouldn't happen, but be safe)
+                                sources.append(source)
+
+                        # Add deduplicated sources and sort by relevance score
+                        sources.extend(seen_urls.values())
+                        sources.sort(key=lambda x: x["relevance_score"], reverse=True)
+
+                        logger.info(f"After deduplication: {len(sources)} unique sources")
 
                         # Build full RAG context from all results
                         rag_context = (
