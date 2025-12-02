@@ -38,16 +38,19 @@ class RAGService:
         self, name: str, description: Optional[str] = None
     ) -> RagCollection:
         """Create a new RAG collection"""
+        logger.info(f"Attempting to create collection with name: '{name}'")
+
         # Check if collection name already exists
         stmt = select(RagCollection).where(
             RagCollection.name == name, RagCollection.is_active == True
         )
         existing = await self.db.scalar(stmt)
         if existing:
+            logger.warning(f"Collection creation failed: '{name}' already exists (ID: {existing.id}, created: {existing.created_at})")
             raise APIException(
                 status_code=400,
                 error_code="COLLECTION_EXISTS",
-                detail=f"Collection '{name}' already exists",
+                detail=f"Collection '{name}' already exists. Please choose a different name.",
             )
 
         # Generate unique Qdrant collection name

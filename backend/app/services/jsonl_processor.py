@@ -20,6 +20,39 @@ from app.modules.rag.main import ProcessedDocument
 logger = logging.getLogger(__name__)
 
 
+def validate_source_url(url: str) -> str | None:
+    """
+    Validate source URL for security compliance.
+
+    Security requirements:
+    - Only http/https protocols allowed
+    - Maximum length 500 characters
+    - Returns None if validation fails
+
+    Args:
+        url: URL string to validate
+
+    Returns:
+        Validated URL or None if invalid
+    """
+    if not url or not isinstance(url, str):
+        return None
+
+    url = url.strip()
+
+    # Check length
+    if len(url) > 500:
+        logger.debug(f"URL exceeds 500 character limit: {len(url)} chars")
+        return None
+
+    # Check protocol (basic validation)
+    if not (url.startswith("http://") or url.startswith("https://")):
+        logger.debug(f"URL has invalid protocol (only http/https allowed): {url[:50]}...")
+        return None
+
+    return url
+
+
 class JSONLProcessor:
     """Specialized processor for JSONL files"""
 
@@ -123,6 +156,10 @@ class JSONLProcessor:
                         answer = payload.get("answer", "")
                         language = payload.get("language", "EN")
 
+                        # Extract and validate source URL
+                        raw_url = payload.get("url")
+                        source_url = validate_source_url(raw_url) if raw_url else None
+
                         if question or answer:
                             # Create Q&A content
                             content = f"Question: {question}\n\nAnswer: {answer}"
@@ -138,6 +175,10 @@ class JSONLProcessor:
                                 "question": question[:100],  # Truncate for metadata
                                 "processed_at": datetime.utcnow().isoformat(),
                             }
+
+                            # Add source_url if valid
+                            if source_url:
+                                doc_metadata["source_url"] = source_url
 
                             # Generate single embedding for the Q&A pair
                             embeddings = await self.rag_module._generate_embeddings(
