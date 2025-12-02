@@ -46,7 +46,7 @@ async function request<T = any>(method: string, url: string, body?: any, extraIn
       if (status === 401) throw makeError('Unauthorized', 'UNAUTHORIZED', status, details)
       if (status === 403) throw makeError('Forbidden', 'FORBIDDEN', status, details)
       if (status === 404) throw makeError('Not found', 'NOT_FOUND', status, details)
-      if (status === 400) throw makeError('Validation error', 'VALIDATION_ERROR', status, details)
+      if (status === 400 || status === 422) throw makeError('Validation error', 'VALIDATION_ERROR', status, details)
       throw makeError('Request failed', 'UNKNOWN', status, details)
     }
 

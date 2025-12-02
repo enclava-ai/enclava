@@ -16,10 +16,9 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
+
 @router.get("/collections")
-async def list_collections(
-    current_user: User = Depends(get_current_user)
-):
+async def list_collections(current_user: User = Depends(get_current_user)):
     """List all available RAG collections"""
     try:
         from app.services.qdrant_stats_service import qdrant_stats_service
@@ -31,10 +30,7 @@ async def list_collections(
         # Extract collection names
         collection_names = [col["name"] for col in collections]
 
-        return {
-            "collections": collection_names,
-            "count": len(collection_names)
-        }
+        return {"collections": collection_names, "count": len(collection_names)}
 
     except Exception as e:
         logger.error(f"List collections error: {e}")
@@ -45,10 +41,14 @@ async def list_collections(
 async def debug_search(
     query: str = Query(..., description="Search query"),
     max_results: int = Query(10, ge=1, le=50, description="Maximum number of results"),
-    score_threshold: float = Query(0.3, ge=0.0, le=1.0, description="Minimum score threshold"),
-    collection_name: Optional[str] = Query(None, description="Collection name to search"),
+    score_threshold: float = Query(
+        0.3, ge=0.0, le=1.0, description="Minimum score threshold"
+    ),
+    collection_name: Optional[str] = Query(
+        None, description="Collection name to search"
+    ),
     config: Optional[Dict[str, Any]] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Debug search endpoint with detailed information"""
     try:
@@ -56,9 +56,7 @@ async def debug_search(
         app_config = settings
 
         # Initialize RAG module with BGE-M3 configuration
-        rag_config = {
-            "embedding_model": "BAAI/bge-m3"
-        }
+        rag_config = {"embedding_model": "BAAI/bge-m3"}
         rag_module = RAGModule(app_config, config=rag_config)
 
         # Get available collections if none specified
@@ -71,9 +69,9 @@ async def debug_search(
                     "results": [],
                     "debug_info": {
                         "error": "No collections available",
-                        "collections_found": 0
+                        "collections_found": 0,
                     },
-                    "search_time_ms": 0
+                    "search_time_ms": 0,
                 }
 
         # Perform search
@@ -82,7 +80,7 @@ async def debug_search(
             max_results=max_results,
             score_threshold=score_threshold,
             collection_name=collection_name,
-            config=config or {}
+            config=config or {},
         )
 
         return results
@@ -94,7 +92,7 @@ async def debug_search(
             "debug_info": {
                 "error": str(e),
                 "query": query,
-                "collection_name": collection_name
+                "collection_name": collection_name,
             },
-            "search_time_ms": 0
+            "search_time_ms": 0,
         }

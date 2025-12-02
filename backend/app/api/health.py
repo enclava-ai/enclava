@@ -44,7 +44,9 @@ class HealthChecker:
                 await session.execute(select(1))
 
                 # Check table availability
-                await session.execute(text("SELECT COUNT(*) FROM information_schema.tables"))
+                await session.execute(
+                    text("SELECT COUNT(*) FROM information_schema.tables")
+                )
 
                 duration = time.time() - start_time
 
@@ -54,8 +56,8 @@ class HealthChecker:
                     "timestamp": datetime.utcnow().isoformat(),
                     "details": {
                         "connection": "successful",
-                        "query_execution": "successful"
-                    }
+                        "query_execution": "successful",
+                    },
                 }
 
         except Exception as e:
@@ -64,10 +66,7 @@ class HealthChecker:
                 "status": "unhealthy",
                 "error": str(e),
                 "timestamp": datetime.utcnow().isoformat(),
-                "details": {
-                    "connection": "failed",
-                    "error_type": type(e).__name__
-                }
+                "details": {"connection": "failed", "error_type": type(e).__name__},
             }
 
     async def check_memory_health(self) -> Dict[str, Any]:
@@ -107,7 +106,7 @@ class HealthChecker:
                 "process_memory_mb": round(process_memory_mb, 2),
                 "system_memory_percent": memory.percent,
                 "system_available_gb": round(memory.available / (1024**3), 2),
-                "issues": issues
+                "issues": issues,
             }
 
         except Exception as e:
@@ -115,7 +114,7 @@ class HealthChecker:
             return {
                 "status": "error",
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def check_connection_health(self) -> Dict[str, Any]:
@@ -128,8 +127,16 @@ class HealthChecker:
 
             # Analyze connections
             total_connections = len(connections)
-            established_connections = len([c for c in connections if c.status == 'ESTABLISHED'])
-            http_connections = len([c for c in connections if any(port in str(c.laddr) for port in [80, 8000, 3000])])
+            established_connections = len(
+                [c for c in connections if c.status == "ESTABLISHED"]
+            )
+            http_connections = len(
+                [
+                    c
+                    for c in connections
+                    if any(port in str(c.laddr) for port in [80, 8000, 3000])
+                ]
+            )
 
             # Check for connection issues
             connection_status = "healthy"
@@ -154,7 +161,7 @@ class HealthChecker:
                 "total_connections": total_connections,
                 "established_connections": established_connections,
                 "http_connections": http_connections,
-                "issues": issues
+                "issues": issues,
             }
 
         except Exception as e:
@@ -162,7 +169,7 @@ class HealthChecker:
             return {
                 "status": "error",
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def check_embedding_service_health(self) -> Dict[str, Any]:
@@ -193,7 +200,7 @@ class HealthChecker:
                 "response_time_ms": round(duration * 1000, 2),
                 "timestamp": datetime.utcnow().isoformat(),
                 "stats": stats,
-                "issues": issues
+                "issues": issues,
             }
 
         except Exception as e:
@@ -201,7 +208,7 @@ class HealthChecker:
             return {
                 "status": "error",
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def check_redis_health(self) -> Dict[str, Any]:
@@ -209,7 +216,7 @@ class HealthChecker:
         if not settings.REDIS_URL:
             return {
                 "status": "not_configured",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         try:
@@ -233,7 +240,7 @@ class HealthChecker:
             return {
                 "status": "healthy",
                 "response_time_ms": round(duration * 1000, 2),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
@@ -241,7 +248,7 @@ class HealthChecker:
             return {
                 "status": "unhealthy",
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def get_comprehensive_health(self) -> Dict[str, Any]:
@@ -251,7 +258,7 @@ class HealthChecker:
             "memory": await self.check_memory_health(),
             "connections": await self.check_connection_health(),
             "embedding_service": await self.check_embedding_service_health(),
-            "redis": await self.check_redis_health()
+            "redis": await self.check_redis_health(),
         }
 
         # Determine overall status
@@ -274,12 +281,16 @@ class HealthChecker:
             "summary": {
                 "total_checks": len(checks),
                 "healthy_checks": len([s for s in statuses if s == "healthy"]),
-                "degraded_checks": len([s for s in statuses if s in ["warning", "degraded", "unhealthy"]]),
-                "failed_checks": len([s for s in statuses if s in ["critical", "error"]]),
-                "total_issues": total_issues
+                "degraded_checks": len(
+                    [s for s in statuses if s in ["warning", "degraded", "unhealthy"]]
+                ),
+                "failed_checks": len(
+                    [s for s in statuses if s in ["critical", "error"]]
+                ),
+                "total_issues": total_issues,
             },
             "version": "1.0.0",
-            "uptime_seconds": int(time.time() - psutil.boot_time())
+            "uptime_seconds": int(time.time() - psutil.boot_time()),
         }
 
 
@@ -294,7 +305,7 @@ async def basic_health_check():
         "status": "healthy",
         "app": settings.APP_NAME,
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -307,7 +318,7 @@ async def detailed_health_check():
         logger.error(f"Detailed health check failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Health check failed: {str(e)}"
+            detail=f"Health check failed: {str(e)}",
         )
 
 
@@ -320,7 +331,7 @@ async def memory_health_check():
         logger.error(f"Memory health check failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Memory health check failed: {str(e)}"
+            detail=f"Memory health check failed: {str(e)}",
         )
 
 
@@ -333,7 +344,7 @@ async def connection_health_check():
         logger.error(f"Connection health check failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Connection health check failed: {str(e)}"
+            detail=f"Connection health check failed: {str(e)}",
         )
 
 
@@ -346,5 +357,5 @@ async def embedding_service_health_check():
         logger.error(f"Embedding service health check failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Embedding service health check failed: {str(e)}"
+            detail=f"Embedding service health check failed: {str(e)}",
         )

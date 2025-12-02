@@ -278,9 +278,13 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="flex space-x-4">
-                <Button onClick={() => window.open('/users', '_blank')}>
+                <Button onClick={() => window.open('/admin/users', '_blank')}>
                   <Users className="mr-2 h-4 w-4" />
                   Manage Users
+                </Button>
+                <Button variant="outline" onClick={() => window.open('/admin/roles', '_blank')}>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Manage Roles
                 </Button>
                 <Button variant="outline" onClick={() => window.open('/api-keys', '_blank')}>
                   <Key className="mr-2 h-4 w-4" />

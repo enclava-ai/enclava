@@ -29,6 +29,7 @@ router = APIRouter(tags=["RAG"])
 
 # Request/Response Models
 
+
 class CollectionCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -78,12 +79,13 @@ class StatsResponse(BaseModel):
 
 # Collection Endpoints
 
+
 @router.get("/collections", response_model=dict)
 async def get_collections(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get all RAG collections - live data directly from Qdrant (source of truth)"""
     try:
@@ -103,7 +105,7 @@ async def get_collections(
             "collections": paginated_collections,
             "total": len(collections),
             "total_documents": stats_data.get("total_documents", 0),
-            "total_size_bytes": stats_data.get("total_size_bytes", 0)
+            "total_size_bytes": stats_data.get("total_size_bytes", 0),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -113,20 +115,19 @@ async def get_collections(
 async def create_collection(
     collection_data: CollectionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Create a new RAG collection"""
     try:
         rag_service = RAGService(db)
         collection = await rag_service.create_collection(
-            name=collection_data.name,
-            description=collection_data.description
+            name=collection_data.name, description=collection_data.description
         )
-        
+
         return {
             "success": True,
             "collection": collection.to_dict(),
-            "message": "Collection created successfully"
+            "message": "Collection created successfully",
         }
     except APIException as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
@@ -136,8 +137,7 @@ async def create_collection(
 
 @router.get("/stats", response_model=dict)
 async def get_rag_stats(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """Get overall RAG statistics - live data directly from Qdrant"""
     try:
@@ -147,7 +147,11 @@ async def get_rag_stats(
         stats_data = await qdrant_stats_service.get_collections_stats()
 
         # Calculate active collections (collections with documents)
-        active_collections = sum(1 for col in stats_data.get("collections", []) if col.get("document_count", 0) > 0)
+        active_collections = sum(
+            1
+            for col in stats_data.get("collections", [])
+            if col.get("document_count", 0) > 0
+        )
 
         # Calculate processing documents from database
         processing_docs = 0
@@ -156,7 +160,9 @@ async def get_rag_stats(
             from app.models.rag_document import RagDocument, ProcessingStatus
 
             result = await db.execute(
-                select(RagDocument).where(RagDocument.status == ProcessingStatus.PROCESSING)
+                select(RagDocument).where(
+                    RagDocument.status == ProcessingStatus.PROCESSING
+                )
             )
             processing_docs = len(result.scalars().all())
         except Exception:
@@ -167,22 +173,28 @@ async def get_rag_stats(
             "stats": {
                 "collections": {
                     "total": stats_data.get("total_collections", 0),
-                    "active": active_collections
+                    "active": active_collections,
                 },
                 "documents": {
                     "total": stats_data.get("total_documents", 0),
                     "processing": processing_docs,
-                    "processed": stats_data.get("total_documents", 0)  # Indexed documents
+                    "processed": stats_data.get(
+                        "total_documents", 0
+                    ),  # Indexed documents
                 },
                 "storage": {
                     "total_size_bytes": stats_data.get("total_size_bytes", 0),
-                    "total_size_mb": round(stats_data.get("total_size_bytes", 0) / (1024 * 1024), 2)
+                    "total_size_mb": round(
+                        stats_data.get("total_size_bytes", 0) / (1024 * 1024), 2
+                    ),
                 },
                 "vectors": {
-                    "total": stats_data.get("total_documents", 0)  # Same as documents for RAG
+                    "total": stats_data.get(
+                        "total_documents", 0
+                    )  # Same as documents for RAG
                 },
-                "last_updated": datetime.utcnow().isoformat()
-            }
+                "last_updated": datetime.utcnow().isoformat(),
+            },
         }
 
         return response_data
@@ -194,20 +206,17 @@ async def get_rag_stats(
 async def get_collection(
     collection_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get a specific collection"""
     try:
         rag_service = RAGService(db)
         collection = await rag_service.get_collection(collection_id)
-        
+
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
-        
-        return {
-            "success": True,
-            "collection": collection.to_dict()
-        }
+
+        return {"success": True, "collection": collection.to_dict()}
     except HTTPException:
         raise
     except Exception as e:
@@ -219,19 +228,20 @@ async def delete_collection(
     collection_id: int,
     cascade: bool = True,  # Default to cascade deletion for better UX
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Delete a collection and optionally all its documents"""
     try:
         rag_service = RAGService(db)
         success = await rag_service.delete_collection(collection_id, cascade=cascade)
-        
+
         if not success:
             raise HTTPException(status_code=404, detail="Collection not found")
-        
+
         return {
             "success": True,
-            "message": "Collection deleted successfully" + (" (with documents)" if cascade else "")
+            "message": "Collection deleted successfully"
+            + (" (with documents)" if cascade else ""),
         }
     except APIException as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
@@ -243,13 +253,14 @@ async def delete_collection(
 
 # Document Endpoints
 
+
 @router.get("/documents", response_model=dict)
 async def get_documents(
     collection_id: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get documents, optionally filtered by collection"""
     try:
@@ -260,11 +271,7 @@ async def get_documents(
             if collection_id.startswith("ext_"):
                 # External collections exist only in Qdrant and have no documents in PostgreSQL
                 # Return empty list since they don't have managed documents
-                return {
-                    "success": True,
-                    "documents": [],
-                    "total": 0
-                }
+                return {"success": True, "documents": [], "total": 0}
             else:
                 # Try to convert to integer for managed collections
                 try:
@@ -272,29 +279,25 @@ async def get_documents(
                 except (ValueError, TypeError):
                     # Attempt to resolve by Qdrant collection name
                     collection_row = await db.scalar(
-                        select(RagCollection).where(RagCollection.qdrant_collection_name == collection_id)
+                        select(RagCollection).where(
+                            RagCollection.qdrant_collection_name == collection_id
+                        )
                     )
                     if collection_row:
                         collection_id_int = collection_row.id
                     else:
                         # Unknown collection identifier; return empty result instead of erroring out
-                        return {
-                            "success": True,
-                            "documents": [],
-                            "total": 0
-                        }
-        
+                        return {"success": True, "documents": [], "total": 0}
+
         rag_service = RAGService(db)
         documents = await rag_service.get_documents(
-            collection_id=collection_id_int,
-            skip=skip,
-            limit=limit
+            collection_id=collection_id_int, skip=skip, limit=limit
         )
-        
+
         return {
             "success": True,
             "documents": [doc.to_dict() for doc in documents],
-            "total": len(documents)
+            "total": len(documents),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -305,13 +308,13 @@ async def upload_document(
     collection_id: str = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Upload and process a document"""
     try:
         # Validate file can be read before processing
         filename = file.filename or "unknown"
-        file_extension = filename.split('.')[-1].lower() if '.' in filename else ''
+        file_extension = filename.split(".")[-1].lower() if "." in filename else ""
 
         # Read file content once and use it for all validations
         file_content = await file.read()
@@ -324,50 +327,66 @@ async def upload_document(
 
         try:
             # Test file readability based on type
-            if file_extension == 'jsonl':
+            if file_extension == "jsonl":
                 # Validate JSONL format - try to parse first few lines
                 try:
-                    content_str = file_content.decode('utf-8')
-                    lines = content_str.strip().split('\n')[:5]  # Check first 5 lines
+                    content_str = file_content.decode("utf-8")
+                    lines = content_str.strip().split("\n")[:5]  # Check first 5 lines
                     import json
+
                     for i, line in enumerate(lines):
                         if line.strip():  # Skip empty lines
                             json.loads(line)  # Will raise JSONDecodeError if invalid
                 except UnicodeDecodeError:
-                    raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
+                    raise HTTPException(
+                        status_code=400, detail="File is not valid UTF-8 text"
+                    )
                 except json.JSONDecodeError as e:
-                    raise HTTPException(status_code=400, detail=f"Invalid JSONL format: {str(e)}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid JSONL format: {str(e)}"
+                    )
 
-            elif file_extension in ['txt', 'md', 'py', 'js', 'html', 'css', 'json']:
+            elif file_extension in ["txt", "md", "py", "js", "html", "css", "json"]:
                 # Validate text files can be decoded
                 try:
-                    file_content.decode('utf-8')
+                    file_content.decode("utf-8")
                 except UnicodeDecodeError:
-                    raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
+                    raise HTTPException(
+                        status_code=400, detail="File is not valid UTF-8 text"
+                    )
 
-            elif file_extension in ['pdf']:
+            elif file_extension in ["pdf"]:
                 # For PDF files, just check if it starts with PDF signature
-                if not file_content.startswith(b'%PDF'):
-                    raise HTTPException(status_code=400, detail="Invalid PDF file format")
+                if not file_content.startswith(b"%PDF"):
+                    raise HTTPException(
+                        status_code=400, detail="Invalid PDF file format"
+                    )
 
-            elif file_extension in ['docx', 'xlsx', 'pptx']:
+            elif file_extension in ["docx", "xlsx", "pptx"]:
                 # For Office documents, check ZIP signature
-                if not file_content.startswith(b'PK'):
-                    raise HTTPException(status_code=400, detail=f"Invalid {file_extension.upper()} file format")
+                if not file_content.startswith(b"PK"):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid {file_extension.upper()} file format",
+                    )
 
             # For other file types, we'll rely on the document processor
 
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"File validation failed: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"File validation failed: {str(e)}"
+            )
 
         rag_service = RAGService(db)
 
         # Resolve collection identifier (supports both numeric IDs and Qdrant collection names)
         collection_identifier = (collection_id or "").strip()
         if not collection_identifier:
-            raise HTTPException(status_code=400, detail="Collection identifier is required")
+            raise HTTPException(
+                status_code=400, detail="Collection identifier is required"
+            )
 
         resolved_collection_id: Optional[int] = None
 
@@ -379,7 +398,9 @@ async def upload_document(
                 qdrant_name = qdrant_name[4:]
 
             try:
-                collection_record = await rag_service.ensure_collection_record(qdrant_name)
+                collection_record = await rag_service.ensure_collection_record(
+                    qdrant_name
+                )
             except Exception as ensure_error:
                 raise HTTPException(status_code=500, detail=str(ensure_error))
 
@@ -392,13 +413,13 @@ async def upload_document(
             collection_id=resolved_collection_id,
             file_content=file_content,
             filename=filename,
-            content_type=file.content_type
+            content_type=file.content_type,
         )
 
         return {
             "success": True,
             "document": document.to_dict(),
-            "message": "Document uploaded and processing started"
+            "message": "Document uploaded and processing started",
         }
     except APIException as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
@@ -412,20 +433,17 @@ async def upload_document(
 async def get_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get a specific document"""
     try:
         rag_service = RAGService(db)
         document = await rag_service.get_document(document_id)
-        
+
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
-        
-        return {
-            "success": True,
-            "document": document.to_dict()
-        }
+
+        return {"success": True, "document": document.to_dict()}
     except HTTPException:
         raise
     except Exception as e:
@@ -436,20 +454,17 @@ async def get_document(
 async def delete_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Delete a document"""
     try:
         rag_service = RAGService(db)
         success = await rag_service.delete_document(document_id)
-        
+
         if not success:
             raise HTTPException(status_code=404, detail="Document not found")
-        
-        return {
-            "success": True,
-            "message": "Document deleted successfully"
-        }
+
+        return {"success": True, "message": "Document deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
@@ -460,13 +475,13 @@ async def delete_document(
 async def reprocess_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Restart processing for a stuck or failed document"""
     try:
         rag_service = RAGService(db)
         success = await rag_service.reprocess_document(document_id)
-        
+
         if not success:
             # Get document to check if it exists and its current status
             document = await rag_service.get_document(document_id)
@@ -474,13 +489,13 @@ async def reprocess_document(
                 raise HTTPException(status_code=404, detail="Document not found")
             else:
                 raise HTTPException(
-                    status_code=400, 
-                    detail=f"Cannot reprocess document with status '{document.status}'. Only 'processing' or 'error' documents can be reprocessed."
+                    status_code=400,
+                    detail=f"Cannot reprocess document with status '{document.status}'. Only 'processing' or 'error' documents can be reprocessed.",
                 )
-        
+
         return {
             "success": True,
-            "message": "Document reprocessing started successfully"
+            "message": "Document reprocessing started successfully",
         }
     except APIException as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
@@ -494,22 +509,24 @@ async def reprocess_document(
 async def download_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Download the original document file"""
     try:
         rag_service = RAGService(db)
         result = await rag_service.download_document(document_id)
-        
+
         if not result:
-            raise HTTPException(status_code=404, detail="Document not found or file not available")
-        
+            raise HTTPException(
+                status_code=404, detail="Document not found or file not available"
+            )
+
         content, filename, mime_type = result
-        
+
         return StreamingResponse(
             io.BytesIO(content),
             media_type=mime_type,
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
     except HTTPException:
         raise
@@ -517,8 +534,8 @@ async def download_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 # Debug Endpoints
+
 
 @router.post("/debug/search")
 async def search_with_debug(
@@ -527,13 +544,13 @@ async def search_with_debug(
     score_threshold: float = 0.3,
     collection_name: str = None,
     config: Dict[str, Any] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Enhanced search with comprehensive debug information
     """
     # Get RAG module from module manager
-    rag_module = module_manager.modules.get('rag')
+    rag_module = module_manager.modules.get("rag")
     if not rag_module or not rag_module.enabled:
         raise HTTPException(status_code=503, detail="RAG module not initialized")
 
@@ -567,7 +584,7 @@ async def search_with_debug(
             query,
             max_results=max_results,
             score_threshold=score_threshold,
-            collection_name=collection_name
+            collection_name=collection_name,
         )
         search_time = (asyncio.get_event_loop().time() - search_start) * 1000
 
@@ -575,22 +592,23 @@ async def search_with_debug(
         scores = [r.score for r in results if r.score is not None]
         if scores:
             import statistics
+
             debug_info["score_stats"] = {
                 "min": min(scores),
                 "max": max(scores),
                 "avg": statistics.mean(scores),
-                "stddev": statistics.stdev(scores) if len(scores) > 1 else 0
+                "stddev": statistics.stdev(scores) if len(scores) > 1 else 0,
             }
 
         # Get collection statistics
         try:
             from qdrant_client.http.models import Filter
+
             collection_name = collection_name or rag_module.default_collection_name
 
             # Count total documents
             count_result = rag_module.qdrant_client.count(
-                collection_name=collection_name,
-                count_filter=Filter(must=[])
+                collection_name=collection_name, count_filter=Filter(must=[])
             )
             total_points = count_result.count
 
@@ -599,7 +617,7 @@ async def search_with_debug(
                 collection_name=collection_name,
                 limit=1000,  # Sample for stats
                 with_payload=True,
-                with_vectors=False
+                with_vectors=False,
             )
 
             unique_docs = set()
@@ -618,7 +636,7 @@ async def search_with_debug(
             debug_info["collection_stats"] = {
                 "total_documents": len(unique_docs),
                 "total_chunks": total_points,
-                "languages": sorted(list(languages))
+                "languages": sorted(list(languages)),
             }
 
         except Exception as e:
@@ -631,16 +649,18 @@ async def search_with_debug(
                 "document": {
                     "id": result.document.id,
                     "content": result.document.content,
-                    "metadata": result.document.metadata
+                    "metadata": result.document.metadata,
                 },
                 "score": result.score,
-                "debug_info": {}
+                "debug_info": {},
             }
 
             # Add hybrid search debug info if available
             metadata = result.document.metadata or {}
             if "_vector_score" in metadata:
-                enhanced_result["debug_info"]["vector_score"] = metadata["_vector_score"]
+                enhanced_result["debug_info"]["vector_score"] = metadata[
+                    "_vector_score"
+                ]
             if "_bm25_score" in metadata:
                 enhanced_result["debug_info"]["bm25_score"] = metadata["_bm25_score"]
 
@@ -652,7 +672,7 @@ async def search_with_debug(
             "results": enhanced_results,
             "debug_info": debug_info,
             "search_time_ms": search_time,
-            "timestamp": start_time.isoformat()
+            "timestamp": start_time.isoformat(),
         }
 
     except Exception as e:
@@ -661,17 +681,17 @@ async def search_with_debug(
 
     finally:
         # Restore original config if modified
-        if config and 'original_config' in locals():
+        if config and "original_config" in locals():
             rag_module.config = original_config
 
 
 @router.get("/debug/config")
 async def get_current_config(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Get current RAG configuration"""
     # Get RAG module from module manager
-    rag_module = module_manager.modules.get('rag')
+    rag_module = module_manager.modules.get("rag")
     if not rag_module or not rag_module.enabled:
         raise HTTPException(status_code=503, detail="RAG module not initialized")
 
@@ -679,5 +699,5 @@ async def get_current_config(
         "config": rag_module.config,
         "embedding_model": rag_module.embedding_model,
         "enabled": rag_module.enabled,
-        "collections": await rag_module._get_collections_safely()
+        "collections": await rag_module._get_collections_safely(),
     }

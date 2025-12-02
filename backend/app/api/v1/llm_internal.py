@@ -13,7 +13,12 @@ from app.db.database import get_db
 from app.core.security import get_current_user
 from app.services.llm.service import llm_service
 from app.services.llm.models import ChatRequest, ChatMessage as LLMChatMessage
-from app.services.llm.exceptions import LLMError, ProviderError, SecurityError, ValidationError
+from app.services.llm.exceptions import (
+    LLMError,
+    ProviderError,
+    SecurityError,
+    ValidationError,
+)
 from app.api.v1.llm import get_cached_models  # Reuse the caching logic
 
 logger = logging.getLogger(__name__)
@@ -35,14 +40,12 @@ async def list_models(
         logger.error(f"Failed to list models: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve models"
+            detail="Failed to retrieve models",
         )
 
 
 @router.get("/providers/status")
-async def get_provider_status(
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
+async def get_provider_status(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     Get status of all LLM providers for authenticated users
     """
@@ -58,23 +61,21 @@ async def get_provider_status(
                     "success_rate": status.success_rate,
                     "last_check": status.last_check.isoformat(),
                     "error_message": status.error_message,
-                    "models_available": status.models_available
+                    "models_available": status.models_available,
                 }
                 for name, status in provider_status.items()
-            }
+            },
         }
     except Exception as e:
         logger.error(f"Failed to get provider status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve provider status"
+            detail="Failed to retrieve provider status",
         )
 
 
 @router.get("/health")
-async def health_check(
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
+async def health_check(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     Get LLM service health status for authenticated users
     """
@@ -83,39 +84,35 @@ async def health_check(
         return {
             "status": health["status"],
             "providers": health.get("providers", {}),
-            "timestamp": health.get("timestamp")
+            "timestamp": health.get("timestamp"),
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Health check failed"
+            detail="Health check failed",
         )
 
 
 @router.get("/metrics")
-async def get_metrics(
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
+async def get_metrics(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     Get LLM service metrics for authenticated users
     """
     try:
         metrics = await llm_service.get_metrics()
-        return {
-            "object": "metrics",
-            "data": metrics
-        }
+        return {"object": "metrics", "data": metrics}
     except Exception as e:
         logger.error(f"Failed to get metrics: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve metrics"
+            detail="Failed to retrieve metrics",
         )
 
 
 class ChatCompletionRequest(BaseModel):
     """Request model for chat completions"""
+
     model: str
     messages: List[Dict[str, str]]
     temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0)
@@ -128,7 +125,7 @@ class ChatCompletionRequest(BaseModel):
 async def create_chat_completion(
     request: ChatCompletionRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Create chat completion for authenticated frontend users.
@@ -137,7 +134,7 @@ async def create_chat_completion(
     try:
         # Get user ID from JWT token context
         user_id = str(current_user.get("id", current_user.get("sub", "0")))
-        
+
         # Convert request to LLM service format
         # For internal use, we use a special api_key_id of 0 to indicate JWT auth
         chat_request = ChatRequest(
@@ -151,15 +148,17 @@ async def create_chat_completion(
             top_p=request.top_p,
             stream=request.stream,
             user_id=user_id,
-            api_key_id=0  # Special value for JWT-authenticated requests
+            api_key_id=0,  # Special value for JWT-authenticated requests
         )
-        
+
         # Log the request for debugging
-        logger.info(f"Internal chat completion request from user {current_user.get('id')}: model={request.model}")
-        
+        logger.info(
+            f"Internal chat completion request from user {current_user.get('id')}: model={request.model}"
+        )
+
         # Process the request through the LLM service
         response = await llm_service.create_chat_completion(chat_request)
-        
+
         # Format the response to match OpenAI's structure
         formatted_response = {
             "id": response.id,
@@ -171,36 +170,39 @@ async def create_chat_completion(
                     "index": choice.index,
                     "message": {
                         "role": choice.message.role,
-                        "content": choice.message.content
+                        "content": choice.message.content,
                     },
-                    "finish_reason": choice.finish_reason
+                    "finish_reason": choice.finish_reason,
                 }
                 for choice in response.choices
             ],
             "usage": {
                 "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-                "total_tokens": response.usage.total_tokens if response.usage else 0
-            } if response.usage else None
+                "completion_tokens": response.usage.completion_tokens
+                if response.usage
+                else 0,
+                "total_tokens": response.usage.total_tokens if response.usage else 0,
+            }
+            if response.usage
+            else None,
         }
-        
+
         return formatted_response
-        
+
     except ValidationError as e:
         logger.error(f"Validation error in chat completion: {e}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid request: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid request: {str(e)}"
         )
     except LLMError as e:
         logger.error(f"LLM service error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"LLM service error: {str(e)}"
+            detail=f"LLM service error: {str(e)}",
         )
     except Exception as e:
         logger.error(f"Unexpected error in chat completion: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to process chat completion"
+            detail="Failed to process chat completion",
         )

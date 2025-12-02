@@ -22,23 +22,22 @@ def get_zammad_configuration_schema() -> Dict[str, Any]:
                 "title": "Configuration Name",
                 "description": "A descriptive name for this configuration",
                 "required": True,
-                "placeholder": "My Zammad Instance"
+                "placeholder": "My Zammad Instance",
             },
             "description": {
-                "type": "string", 
+                "type": "string",
                 "title": "Description",
                 "description": "Optional description of this configuration",
                 "required": False,
-                "placeholder": "Production Zammad instance for customer support"
+                "placeholder": "Production Zammad instance for customer support",
             },
             "is_default": {
                 "type": "boolean",
-                "title": "Default Configuration", 
+                "title": "Default Configuration",
                 "description": "Set as the default configuration for processing",
                 "default": False,
-                "required": False
+                "required": False,
             },
-            
             # Zammad Connection Settings
             "zammad_url": {
                 "type": "url",
@@ -46,16 +45,15 @@ def get_zammad_configuration_schema() -> Dict[str, Any]:
                 "description": "The base URL of your Zammad instance",
                 "required": True,
                 "placeholder": "https://your-zammad.example.com",
-                "pattern": "^https?://.+"
+                "pattern": "^https?://.+",
             },
             "api_token": {
                 "type": "password",
                 "title": "API Token",
                 "description": "Your Zammad API access token (will be encrypted)",
                 "required": True,
-                "placeholder": "Your Zammad API token"
+                "placeholder": "Your Zammad API token",
             },
-            
             # AI Integration
             "chatbot_id": {
                 "type": "select",
@@ -63,9 +61,8 @@ def get_zammad_configuration_schema() -> Dict[str, Any]:
                 "description": "Select the chatbot to use for generating ticket summaries",
                 "required": True,
                 "options": [],  # Will be populated dynamically from available chatbots
-                "placeholder": "Select a chatbot"
+                "placeholder": "Select a chatbot",
             },
-            
             # Processing Settings
             "process_state": {
                 "type": "select",
@@ -75,10 +72,10 @@ def get_zammad_configuration_schema() -> Dict[str, Any]:
                 "default": "open",
                 "options": [
                     {"value": "open", "label": "Open"},
-                    {"value": "pending", "label": "Pending"}, 
+                    {"value": "pending", "label": "Pending"},
                     {"value": "closed", "label": "Closed"},
-                    {"value": "all", "label": "All States"}
-                ]
+                    {"value": "all", "label": "All States"},
+                ],
             },
             "max_tickets": {
                 "type": "integer",
@@ -87,23 +84,22 @@ def get_zammad_configuration_schema() -> Dict[str, Any]:
                 "required": False,
                 "default": 10,
                 "minimum": 1,
-                "maximum": 100
+                "maximum": 100,
             },
             "skip_existing": {
                 "type": "boolean",
                 "title": "Skip Already Processed",
                 "description": "Skip tickets that already have AI summaries",
                 "default": True,
-                "required": False
+                "required": False,
             },
-            
             # Automation Settings
             "auto_process": {
-                "type": "boolean", 
+                "type": "boolean",
                 "title": "Enable Auto Processing",
                 "description": "Automatically process new tickets at regular intervals",
                 "default": False,
-                "required": False
+                "required": False,
             },
             "process_interval": {
                 "type": "integer",
@@ -113,12 +109,8 @@ def get_zammad_configuration_schema() -> Dict[str, Any]:
                 "default": 30,
                 "minimum": 5,
                 "maximum": 1440,
-                "depends_on": {
-                    "field": "auto_process",
-                    "value": True
-                }
+                "depends_on": {"field": "auto_process", "value": True},
             },
-            
             # Customization
             "summary_template": {
                 "type": "textarea",
@@ -126,44 +118,33 @@ def get_zammad_configuration_schema() -> Dict[str, Any]:
                 "description": "Custom template for generating AI summaries. Leave empty for default.",
                 "required": False,
                 "placeholder": "Generate a concise summary of this support ticket including key issues, customer concerns, and any actions taken.",
-                "rows": 3
-            }
+                "rows": 3,
+            },
         },
         "required": ["name", "zammad_url", "api_token", "chatbot_id"],
         "field_groups": [
             {
                 "title": "Basic Information",
-                "fields": ["name", "description", "is_default"]
+                "fields": ["name", "description", "is_default"],
             },
-            {
-                "title": "Zammad Connection", 
-                "fields": ["zammad_url", "api_token"]
-            },
-            {
-                "title": "AI Configuration",
-                "fields": ["chatbot_id", "summary_template"] 
-            },
+            {"title": "Zammad Connection", "fields": ["zammad_url", "api_token"]},
+            {"title": "AI Configuration", "fields": ["chatbot_id", "summary_template"]},
             {
                 "title": "Processing Settings",
-                "fields": ["process_state", "max_tickets", "skip_existing"]
+                "fields": ["process_state", "max_tickets", "skip_existing"],
             },
-            {
-                "title": "Automation",
-                "fields": ["auto_process", "process_interval"]
-            }
+            {"title": "Automation", "fields": ["auto_process", "process_interval"]},
         ],
         "validation": {
             "connection_test": {
                 "endpoint": "/api/v1/zammad/test-connection",
-                "method": "POST", 
+                "method": "POST",
                 "fields": ["zammad_url", "api_token"],
                 "success_message": "Connection to Zammad successful",
-                "error_field": "Connection failed"
+                "error_field": "Connection failed",
             }
-        }
+        },
     }
-
-
 
 
 def get_email_assistant_configuration_schema() -> Dict[str, Any]:
@@ -181,7 +162,7 @@ def get_email_assistant_configuration_schema() -> Dict[str, Any]:
                 "title": "Enable Email Assistant",
                 "description": "Turn the email assistant on/off",
                 "default": False,
-                "required": True
+                "required": True,
             },
             "email_provider": {
                 "type": "select",
@@ -192,12 +173,9 @@ def get_email_assistant_configuration_schema() -> Dict[str, Any]:
                     {"value": "gmail", "label": "Gmail"},
                     {"value": "outlook", "label": "Outlook/Hotmail"},
                     {"value": "imap", "label": "Generic IMAP"},
-                    {"value": "exchange", "label": "Exchange Server"}
+                    {"value": "exchange", "label": "Exchange Server"},
                 ],
-                "depends_on": {
-                    "field": "enable_email_assistant",
-                    "value": True
-                }
+                "depends_on": {"field": "enable_email_assistant", "value": True},
             },
             "email_address": {
                 "type": "email",
@@ -205,12 +183,8 @@ def get_email_assistant_configuration_schema() -> Dict[str, Any]:
                 "description": "Your email address for the assistant to monitor",
                 "required": True,
                 "placeholder": "your-email@example.com",
-                "depends_on": {
-                    "field": "enable_email_assistant",
-                    "value": True
-                }
+                "depends_on": {"field": "enable_email_assistant", "value": True},
             },
-            
             # AI Configuration
             "auto_response_enabled": {
                 "type": "boolean",
@@ -218,10 +192,7 @@ def get_email_assistant_configuration_schema() -> Dict[str, Any]:
                 "description": "Automatically respond to incoming emails",
                 "default": False,
                 "required": False,
-                "depends_on": {
-                    "field": "enable_email_assistant",
-                    "value": True
-                }
+                "depends_on": {"field": "enable_email_assistant", "value": True},
             },
             "response_template": {
                 "type": "textarea",
@@ -230,12 +201,8 @@ def get_email_assistant_configuration_schema() -> Dict[str, Any]:
                 "required": False,
                 "placeholder": "Thank you for your email. I'll respond within 24 hours.",
                 "rows": 3,
-                "depends_on": {
-                    "field": "auto_response_enabled",
-                    "value": True
-                }
+                "depends_on": {"field": "auto_response_enabled", "value": True},
             },
-            
             # Processing Settings
             "check_interval": {
                 "type": "integer",
@@ -245,46 +212,38 @@ def get_email_assistant_configuration_schema() -> Dict[str, Any]:
                 "default": 15,
                 "minimum": 1,
                 "maximum": 1440,
-                "depends_on": {
-                    "field": "enable_email_assistant",
-                    "value": True
-                }
-            }
+                "depends_on": {"field": "enable_email_assistant", "value": True},
+            },
         },
         "required": ["enable_email_assistant"],
         "field_groups": [
             {
                 "title": "Basic Settings",
-                "fields": ["enable_email_assistant", "email_provider", "email_address"]
+                "fields": ["enable_email_assistant", "email_provider", "email_address"],
             },
             {
                 "title": "Auto-Response",
-                "fields": ["auto_response_enabled", "response_template"]
+                "fields": ["auto_response_enabled", "response_template"],
             },
-            {
-                "title": "Processing Settings",
-                "fields": ["check_interval"]
-            }
-        ]
+            {"title": "Processing Settings", "fields": ["check_interval"]},
+        ],
     }
 
 
 def get_plugin_configuration_schema(plugin_id: str) -> Optional[Dict[str, Any]]:
     """
     Get the configuration schema for a specific plugin.
-    
+
     Args:
         plugin_id: The ID of the plugin
-        
+
     Returns:
         The configuration schema dictionary or None if not found
     """
     schemas = {
         "zammad": get_zammad_configuration_schema,
-        "email-assistant": get_email_assistant_configuration_schema
+        "email-assistant": get_email_assistant_configuration_schema,
     }
-    
+
     schema_func = schemas.get(plugin_id)
     return schema_func() if schema_func else None
-
-

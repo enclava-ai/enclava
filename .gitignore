@@ -66,3 +66,16 @@ frontend/node_modules/
 node_modules/
 venv/
 venv_memory_monitor/
+to_delete/
+security-review.md
+features-plan.md
+AGENTS.md
+CLAUDE.md
+backend/CURL_VERIFICATION_EXAMPLES.md
+backend/OPENAI_COMPATIBILITY_GUIDE.md
+backend/production-deployment-guide.md
+features-plan.md
+security-review.md
+backend/.env.local
+backend/.env.test
+

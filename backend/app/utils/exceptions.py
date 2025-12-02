@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 
 class CustomHTTPException(HTTPException):
     """Base custom HTTP exception"""
-    
+
     def __init__(
         self,
         status_code: int,
@@ -24,8 +24,12 @@ class CustomHTTPException(HTTPException):
 
 class AuthenticationError(CustomHTTPException):
     """Authentication error"""
-    
-    def __init__(self, detail: str = "Authentication failed", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        detail: str = "Authentication failed",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             error_code="AUTHENTICATION_ERROR",
@@ -37,8 +41,12 @@ class AuthenticationError(CustomHTTPException):
 
 class AuthorizationError(CustomHTTPException):
     """Authorization error"""
-    
-    def __init__(self, detail: str = "Insufficient permissions", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        detail: str = "Insufficient permissions",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
             error_code="AUTHORIZATION_ERROR",
@@ -49,8 +57,10 @@ class AuthorizationError(CustomHTTPException):
 
 class ValidationError(CustomHTTPException):
     """Validation error"""
-    
-    def __init__(self, detail: str = "Invalid data", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self, detail: str = "Invalid data", details: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             error_code="VALIDATION_ERROR",
@@ -61,8 +71,12 @@ class ValidationError(CustomHTTPException):
 
 class NotFoundError(CustomHTTPException):
     """Not found error"""
-    
-    def __init__(self, detail: str = "Resource not found", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        detail: str = "Resource not found",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
             error_code="NOT_FOUND",
@@ -73,8 +87,12 @@ class NotFoundError(CustomHTTPException):
 
 class ConflictError(CustomHTTPException):
     """Conflict error"""
-    
-    def __init__(self, detail: str = "Resource conflict", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        detail: str = "Resource conflict",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
             error_code="CONFLICT",
@@ -85,8 +103,12 @@ class ConflictError(CustomHTTPException):
 
 class RateLimitError(CustomHTTPException):
     """Rate limit error"""
-    
-    def __init__(self, detail: str = "Rate limit exceeded", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        detail: str = "Rate limit exceeded",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             error_code="RATE_LIMIT_EXCEEDED",
@@ -97,8 +119,10 @@ class RateLimitError(CustomHTTPException):
 
 class BudgetExceededError(CustomHTTPException):
     """Budget exceeded error"""
-    
-    def __init__(self, detail: str = "Budget exceeded", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self, detail: str = "Budget exceeded", details: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             error_code="BUDGET_EXCEEDED",
@@ -109,8 +133,10 @@ class BudgetExceededError(CustomHTTPException):
 
 class ModuleError(CustomHTTPException):
     """Module error"""
-    
-    def __init__(self, detail: str = "Module error", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self, detail: str = "Module error", details: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             error_code="MODULE_ERROR",
@@ -121,33 +147,40 @@ class ModuleError(CustomHTTPException):
 
 class CircuitBreakerOpen(Exception):
     """Circuit breaker is open"""
+
     pass
 
 
 class ModuleLoadError(Exception):
     """Module load error"""
+
     pass
 
 
 class ModuleNotFoundError(Exception):
     """Module not found error"""
+
     pass
 
 
 class ModuleFatalError(Exception):
     """Fatal module error"""
+
     pass
 
 
 class ConfigurationError(Exception):
     """Configuration error"""
+
     pass
 
 
 class PluginError(CustomHTTPException):
     """Plugin error"""
-    
-    def __init__(self, detail: str = "Plugin error", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self, detail: str = "Plugin error", details: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             error_code="PLUGIN_ERROR",
@@ -158,8 +191,12 @@ class PluginError(CustomHTTPException):
 
 class SecurityError(CustomHTTPException):
     """Security error"""
-    
-    def __init__(self, detail: str = "Security violation", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        detail: str = "Security violation",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
             error_code="SECURITY_ERROR",
@@ -170,23 +207,28 @@ class SecurityError(CustomHTTPException):
 
 class PluginLoadError(Exception):
     """Plugin load error"""
+
     pass
 
 
 class PluginInstallError(Exception):
     """Plugin installation error"""
+
     pass
 
 
 class PluginSecurityError(Exception):
     """Plugin security error"""
+
     pass
 
 
 class DatabaseError(CustomHTTPException):
     """Database error"""
-    
-    def __init__(self, detail: str = "Database error", details: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self, detail: str = "Database error", details: Optional[Dict[str, Any]] = None
+    ):
         super().__init__(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             error_code="DATABASE_ERROR",

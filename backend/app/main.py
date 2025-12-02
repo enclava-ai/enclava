@@ -59,7 +59,10 @@ async def _check_redis_startup():
         duration = time.perf_counter() - start
         logger.info(
             "Startup Redis check succeeded",
-            extra={"redis_url": settings.REDIS_URL, "duration_seconds": round(duration, 3)},
+            extra={
+                "redis_url": settings.REDIS_URL,
+                "duration_seconds": round(duration, 3),
+            },
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning(
@@ -103,9 +106,11 @@ async def lifespan(app: FastAPI):
     Application lifespan handler
     """
     logger.info("Starting Enclava platform...")
-    
+    background_tasks = []
+
     # Initialize core cache service (before database to provide caching for auth)
     from app.core.cache import core_cache
+
     try:
         await core_cache.initialize()
         logger.info("Core cache service initialized successfully")
@@ -121,83 +126,119 @@ async def lifespan(app: FastAPI):
 
     # Initialize database
     await init_db()
-    
+
     # Initialize config manager
     await init_config_manager()
 
-    # Initialize LLM service (needed by RAG module)
+    # Ensure platform permissions are registered before module discovery
+    from app.services.permission_manager import permission_registry
+
+    permission_registry.register_platform_permissions()
+
+    # Initialize LLM service (needed by RAG module) concurrently
     from app.services.llm.service import llm_service
-    try:
-        await llm_service.initialize()
-        logger.info("LLM service initialized successfully")
-    except Exception as e:
-        logger.warning(f"LLM service initialization failed: {e}")
+
+    async def initialize_llm_service():
+        try:
+            await llm_service.initialize()
+            logger.info("LLM service initialized successfully")
+        except Exception as exc:
+            logger.warning(f"LLM service initialization failed: {exc}")
+
+    background_tasks.append(asyncio.create_task(initialize_llm_service()))
 
     # Initialize analytics service
-    init_analytics_service()
+    try:
+        init_analytics_service()
+    except Exception as exc:
+        logger.warning(f"Analytics service initialization failed: {exc}")
 
     # Initialize module manager with FastAPI app for router registration
     logger.info("Initializing module manager...")
     await module_manager.initialize(app)
     app.state.module_manager = module_manager
     logger.info("Module manager initialized successfully")
-    
-    # Initialize permission registry
-    logger.info("Initializing permission registry...")
-    from app.services.permission_manager import permission_registry
-    permission_registry.register_platform_permissions()
-    logger.info("Permission registry initialized successfully")
-    
+
     # Initialize document processor
     from app.services.document_processor import document_processor
-    await document_processor.start()
-    app.state.document_processor = document_processor
-    
+
+    try:
+        await document_processor.start()
+        app.state.document_processor = document_processor
+    except Exception as exc:
+        logger.error(f"Document processor failed to start: {exc}")
+        app.state.document_processor = None
+
     # Setup metrics
-    setup_metrics(app)
-    
+    try:
+        setup_metrics(app)
+    except Exception as exc:
+        logger.warning(f"Metrics setup failed: {exc}")
+
     # Start background audit worker
     from app.services.audit_service import start_audit_worker
-    start_audit_worker()
-    
-    # Initialize plugin auto-discovery service
-    from app.services.plugin_autodiscovery import initialize_plugin_autodiscovery
+
     try:
-        discovery_results = await initialize_plugin_autodiscovery()
-        app.state.plugin_discovery_results = discovery_results
-        logger.info(f"Plugin auto-discovery completed: {discovery_results['summary']}")
-    except Exception as e:
-        logger.warning(f"Plugin auto-discovery failed: {e}")
-    
+        start_audit_worker()
+    except Exception as exc:
+        logger.warning(f"Audit worker failed to start: {exc}")
+
+    # Initialize plugin auto-discovery service concurrently
+    async def initialize_plugins():
+        from app.services.plugin_autodiscovery import initialize_plugin_autodiscovery
+
+        try:
+            discovery_results = await initialize_plugin_autodiscovery()
+            app.state.plugin_discovery_results = discovery_results
+            logger.info(
+                f"Plugin auto-discovery completed: {discovery_results.get('summary')}"
+            )
+        except Exception as exc:
+            logger.warning(f"Plugin auto-discovery failed: {exc}")
+            app.state.plugin_discovery_results = {"error": str(exc)}
+
+    background_tasks.append(asyncio.create_task(initialize_plugins()))
+
+    if background_tasks:
+        results = await asyncio.gather(*background_tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning(f"Background startup task failed: {result}")
+
     logger.info("Platform started successfully")
-    
-    yield
-    
-    # Cleanup
-    logger.info("Shutting down platform...")
 
-    # Cleanup embedding service HTTP sessions
-    from app.services.embedding_service import embedding_service
     try:
-        await embedding_service.cleanup()
-        logger.info("Embedding service cleaned up successfully")
-    except Exception as e:
-        logger.error(f"Error cleaning up embedding service: {e}")
+        yield
+    finally:
+        # Cleanup
+        logger.info("Shutting down platform...")
 
-    # Close core cache service
-    from app.core.cache import core_cache
-    await core_cache.cleanup()
+        # Cleanup embedding service HTTP sessions
+        from app.services.embedding_service import embedding_service
 
-    # Close Redis connection for cached API key service
-    from app.services.cached_api_key import cached_api_key_service
-    await cached_api_key_service.close()
+        try:
+            await embedding_service.cleanup()
+            logger.info("Embedding service cleaned up successfully")
+        except Exception as e:
+            logger.error(f"Error cleaning up embedding service: {e}")
 
-    # Stop document processor
-    if hasattr(app.state, 'document_processor'):
-        await app.state.document_processor.stop()
+        # Close core cache service
+        from app.core.cache import core_cache
 
-    await module_manager.cleanup()
-    logger.info("Platform shutdown complete")
+        await core_cache.cleanup()
+
+        # Close Redis connection for cached API key service
+        from app.services.cached_api_key import cached_api_key_service
+
+        await cached_api_key_service.close()
+
+        # Stop document processor
+        processor = getattr(app.state, "document_processor", None)
+        if processor:
+            await processor.stop()
+
+        await module_manager.cleanup()
+        logger.info("Platform shutdown complete")
 
 
 # Create FastAPI application
@@ -269,10 +310,12 @@ async def validation_exception_handler(request, exc: RequestValidationError):
             "type": error.get("type", ""),
             "location": error.get("loc", []),
             "message": error.get("msg", ""),
-            "input": str(error.get("input", "")) if error.get("input") is not None else None
+            "input": str(error.get("input", ""))
+            if error.get("input") is not None
+            else None,
         }
         errors.append(error_dict)
-    
+
     return JSONResponse(
         status_code=422,
         content={
@@ -298,7 +341,7 @@ async def general_exception_handler(request, exc: Exception):
 # Include Internal API routes (for frontend)
 app.include_router(internal_api_router, prefix="/api-internal/v1")
 
-# Include Public API routes (for external clients)  
+# Include Public API routes (for external clients)
 app.include_router(public_api_router, prefix="/api/v1")
 
 # OpenAI-compatible routes are now included in public API router at /api/v1/
@@ -329,7 +372,7 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host=settings.APP_HOST,

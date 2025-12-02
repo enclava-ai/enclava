@@ -4,7 +4,7 @@ This migration represents the complete, accurate database schema based on the ac
 model files in the codebase. All legacy migrations have been consolidated into this
 single migration to ensure the database matches what the models expect.
 
-Revision ID: 000_consolidated_ground_truth_schema
+Revision ID: 000_ground_truth
 Revises: 
 Create Date: 2025-08-22 10:30:00.000000
 

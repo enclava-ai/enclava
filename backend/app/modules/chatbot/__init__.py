@@ -15,7 +15,4 @@ __version__ = "1.0.0"
 __author__ = "Enclava Team"
 
 # Export main classes for easy importing
-__all__ = [
-    "ChatbotModule", 
-    "create_module"
-]
+__all__ = ["ChatbotModule", "create_module"]

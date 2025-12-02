@@ -14,9 +14,43 @@ from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue
 from qdrant_client.http.models import Batch
 
 from app.modules.rag.main import ProcessedDocument
+
 # from app.core.analytics import log_module_event  # Analytics module not available
 
 logger = logging.getLogger(__name__)
+
+
+def validate_source_url(url: str) -> str | None:
+    """
+    Validate source URL for security compliance.
+
+    Security requirements:
+    - Only http/https protocols allowed
+    - Maximum length 500 characters
+    - Returns None if validation fails
+
+    Args:
+        url: URL string to validate
+
+    Returns:
+        Validated URL or None if invalid
+    """
+    if not url or not isinstance(url, str):
+        return None
+
+    url = url.strip()
+
+    # Check length
+    if len(url) > 500:
+        logger.debug(f"URL exceeds 500 character limit: {len(url)} chars")
+        return None
+
+    # Check protocol (basic validation)
+    if not (url.startswith("http://") or url.startswith("https://")):
+        logger.debug(f"URL has invalid protocol (only http/https allowed): {url[:50]}...")
+        return None
+
+    return url
 
 
 class JSONLProcessor:
@@ -26,8 +60,13 @@ class JSONLProcessor:
         self.rag_module = rag_module
         self.config = rag_module.config
 
-    async def process_and_index_jsonl(self, collection_name: str, content: bytes,
-                                   filename: str, metadata: Dict[str, Any]) -> str:
+    async def process_and_index_jsonl(
+        self,
+        collection_name: str,
+        content: bytes,
+        filename: str,
+        metadata: Dict[str, Any],
+    ) -> str:
         """Process and index a JSONL file efficiently
 
         Processes each JSON line as a separate document to avoid
@@ -35,8 +74,8 @@ class JSONLProcessor:
         """
         try:
             # Decode content
-            jsonl_content = content.decode('utf-8', errors='replace')
-            lines = jsonl_content.strip().split('\n')
+            jsonl_content = content.decode("utf-8", errors="replace")
+            lines = jsonl_content.strip().split("\n")
 
             logger.info(f"Processing JSONL file {filename} with {len(lines)} lines")
 
@@ -58,28 +97,38 @@ class JSONLProcessor:
                     batch_start,
                     base_doc_id,
                     filename,
-                    metadata
+                    metadata,
                 )
 
                 processed_count += len(batch_lines)
 
                 # Log progress
                 if processed_count % 50 == 0:
-                    logger.info(f"Processed {processed_count}/{len(lines)} lines from {filename}")
+                    logger.info(
+                        f"Processed {processed_count}/{len(lines)} lines from {filename}"
+                    )
 
                 # Small delay to prevent resource exhaustion
                 await asyncio.sleep(0.05)
 
-            logger.info(f"Successfully processed JSONL file {filename} with {len(lines)} lines")
+            logger.info(
+                f"Successfully processed JSONL file {filename} with {len(lines)} lines"
+            )
             return base_doc_id
 
         except Exception as e:
             logger.error(f"Error processing JSONL file {filename}: {e}")
             raise
 
-    async def _process_jsonl_batch(self, collection_name: str, lines: List[str],
-                                 start_idx: int, base_doc_id: str,
-                                 filename: str, metadata: Dict[str, Any]) -> None:
+    async def _process_jsonl_batch(
+        self,
+        collection_name: str,
+        lines: List[str],
+        start_idx: int,
+        base_doc_id: str,
+        filename: str,
+        metadata: Dict[str, Any],
+    ) -> None:
         """Process a batch of JSONL lines"""
         try:
             points = []
@@ -98,14 +147,18 @@ class JSONLProcessor:
                         continue
 
                     # Handle helpjuice export format
-                    if 'payload' in data and data['payload'] is not None:
-                        payload = data['payload']
-                        article_id = data.get('id', f'article_{line_idx}')
+                    if "payload" in data and data["payload"] is not None:
+                        payload = data["payload"]
+                        article_id = data.get("id", f"article_{line_idx}")
 
                         # Extract Q&A
-                        question = payload.get('question', '')
-                        answer = payload.get('answer', '')
-                        language = payload.get('language', 'EN')
+                        question = payload.get("question", "")
+                        answer = payload.get("answer", "")
+                        language = payload.get("language", "EN")
+
+                        # Extract and validate source URL
+                        raw_url = payload.get("url")
+                        source_url = validate_source_url(raw_url) if raw_url else None
 
                         if question or answer:
                             # Create Q&A content
@@ -120,25 +173,33 @@ class JSONLProcessor:
                                 "line_number": line_idx,
                                 "content_type": "qa_pair",
                                 "question": question[:100],  # Truncate for metadata
-                                "processed_at": datetime.utcnow().isoformat()
+                                "processed_at": datetime.utcnow().isoformat(),
                             }
 
+                            # Add source_url if valid
+                            if source_url:
+                                doc_metadata["source_url"] = source_url
+
                             # Generate single embedding for the Q&A pair
-                            embeddings = await self.rag_module._generate_embeddings([content])
+                            embeddings = await self.rag_module._generate_embeddings(
+                                [content]
+                            )
 
                             # Create point
                             point_id = str(uuid.uuid4())
-                            points.append(PointStruct(
-                                id=point_id,
-                                vector=embeddings[0],
-                                payload={
-                                    **doc_metadata,
-                                    "document_id": f"{base_doc_id}_{article_id}",
-                                    "content": content,
-                                    "chunk_index": 0,
-                                    "chunk_count": 1
-                                }
-                            ))
+                            points.append(
+                                PointStruct(
+                                    id=point_id,
+                                    vector=embeddings[0],
+                                    payload={
+                                        **doc_metadata,
+                                        "document_id": f"{base_doc_id}_{article_id}",
+                                        "content": content,
+                                        "chunk_index": 0,
+                                        "chunk_count": 1,
+                                    },
+                                )
+                            )
 
                     # Handle generic JSON format
                     else:
@@ -146,43 +207,55 @@ class JSONLProcessor:
 
                         # For larger JSON objects, we might need to chunk
                         if len(content) > 1000:
-                            chunks = self.rag_module._chunk_text(content, chunk_size=500)
-                            embeddings = await self.rag_module._generate_embeddings(chunks)
+                            chunks = self.rag_module._chunk_text(
+                                content, chunk_size=500
+                            )
+                            embeddings = await self.rag_module._generate_embeddings(
+                                chunks
+                            )
 
-                            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                            for i, (chunk, embedding) in enumerate(
+                                zip(chunks, embeddings)
+                            ):
                                 point_id = str(uuid.uuid4())
-                                points.append(PointStruct(
+                                points.append(
+                                    PointStruct(
+                                        id=point_id,
+                                        vector=embedding,
+                                        payload={
+                                            **metadata,
+                                            "filename": filename,
+                                            "line_number": line_idx,
+                                            "content_type": "json_object",
+                                            "document_id": f"{base_doc_id}_line_{line_idx}",
+                                            "content": chunk,
+                                            "chunk_index": i,
+                                            "chunk_count": len(chunks),
+                                        },
+                                    )
+                                )
+                        else:
+                            # Small JSON - no chunking needed
+                            embeddings = await self.rag_module._generate_embeddings(
+                                [content]
+                            )
+                            point_id = str(uuid.uuid4())
+                            points.append(
+                                PointStruct(
                                     id=point_id,
-                                    vector=embedding,
+                                    vector=embeddings[0],
                                     payload={
                                         **metadata,
                                         "filename": filename,
                                         "line_number": line_idx,
                                         "content_type": "json_object",
                                         "document_id": f"{base_doc_id}_line_{line_idx}",
-                                        "content": chunk,
-                                        "chunk_index": i,
-                                        "chunk_count": len(chunks)
-                                    }
-                                ))
-                        else:
-                            # Small JSON - no chunking needed
-                            embeddings = await self.rag_module._generate_embeddings([content])
-                            point_id = str(uuid.uuid4())
-                            points.append(PointStruct(
-                                id=point_id,
-                                vector=embeddings[0],
-                                payload={
-                                    **metadata,
-                                    "filename": filename,
-                                    "line_number": line_idx,
-                                    "content_type": "json_object",
-                                    "document_id": f"{base_doc_id}_line_{line_idx}",
-                                    "content": content,
-                                    "chunk_index": 0,
-                                    "chunk_count": 1
-                                }
-                            ))
+                                        "content": content,
+                                        "chunk_index": 0,
+                                        "chunk_count": 1,
+                                    },
+                                )
+                            )
 
                 except json.JSONDecodeError as e:
                     logger.warning(f"Error parsing JSONL line {line_idx}: {e}")
@@ -194,8 +267,7 @@ class JSONLProcessor:
             # Insert all points in this batch
             if points:
                 self.rag_module.qdrant_client.upsert(
-                    collection_name=collection_name,
-                    points=points
+                    collection_name=collection_name, points=points
                 )
 
                 # Update stats

@@ -19,8 +19,10 @@ class EmbeddingService:
     """Service for generating text embeddings using a local transformer model"""
 
     def __init__(self, model_name: Optional[str] = None):
-        self.model_name = model_name or getattr(settings, "RAG_EMBEDDING_MODEL", "BAAI/bge-m3")
-        self.dimension = 1024  # bge-m3 produces 1024-d vectors
+        self.model_name = model_name or getattr(
+            settings, "RAG_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"
+        )
+        self.dimension = 384  # bge-small-en produces 384-d vectors
         self.initialized = False
         self.local_model = None
         self.backend = "uninitialized"
@@ -56,13 +58,15 @@ class EmbeddingService:
             return False
 
         except Exception as exc:
-            logger.error(f"Failed to load local embedding model {self.model_name}: {exc}")
+            logger.error(
+                f"Failed to load local embedding model {self.model_name}: {exc}"
+            )
             logger.warning("Falling back to random embeddings")
             self.local_model = None
             self.initialized = False
             self.backend = "fallback_random"
             return False
-    
+
     async def get_embedding(self, text: str) -> List[float]:
         """Get embedding for a single text"""
         embeddings = await self.get_embeddings([text])
@@ -102,13 +106,21 @@ class EmbeddingService:
             except Exception as exc:
                 logger.error(f"Local embedding generation failed: {exc}")
                 self.backend = "fallback_random"
-                return self._generate_fallback_embeddings(texts, duration=time.time() - start_time)
+                return self._generate_fallback_embeddings(
+                    texts, duration=time.time() - start_time
+                )
 
-        logger.warning("Local embedding model unavailable; using fallback random embeddings")
+        logger.warning(
+            "Local embedding model unavailable; using fallback random embeddings"
+        )
         self.backend = "fallback_random"
-        return self._generate_fallback_embeddings(texts, duration=time.time() - start_time)
-    
-    def _generate_fallback_embeddings(self, texts: List[str], duration: float = None) -> List[List[float]]:
+        return self._generate_fallback_embeddings(
+            texts, duration=time.time() - start_time
+        )
+
+    def _generate_fallback_embeddings(
+        self, texts: List[str], duration: float = None
+    ) -> List[List[float]]:
         """Generate fallback random embeddings when model unavailable"""
         embeddings = []
         for text in texts:
@@ -124,30 +136,30 @@ class EmbeddingService:
             },
         )
         return embeddings
-    
+
     def _generate_fallback_embedding(self, text: str) -> List[float]:
         """Generate a single fallback embedding"""
-        dimension = self.dimension or 1024
+        dimension = self.dimension or 384
         # Use hash for reproducible random embeddings
         np.random.seed(hash(text) % 2**32)
         return np.random.random(dimension).tolist()
-    
+
     async def similarity(self, text1: str, text2: str) -> float:
         """Calculate cosine similarity between two texts"""
         embeddings = await self.get_embeddings([text1, text2])
-        
+
         # Calculate cosine similarity
         vec1 = np.array(embeddings[0])
         vec2 = np.array(embeddings[1])
-        
+
         # Normalize vectors
         vec1_norm = vec1 / np.linalg.norm(vec1)
         vec2_norm = vec2 / np.linalg.norm(vec2)
-        
+
         # Calculate cosine similarity
         similarity = np.dot(vec1_norm, vec2_norm)
         return float(similarity)
-    
+
     async def get_stats(self) -> Dict[str, Any]:
         """Get embedding service statistics"""
         return {
@@ -155,7 +167,7 @@ class EmbeddingService:
             "model_loaded": self.initialized,
             "dimension": self.dimension,
             "backend": self.backend,
-            "initialized": self.initialized
+            "initialized": self.initialized,
         }
 
     async def cleanup(self):

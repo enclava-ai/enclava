@@ -9,28 +9,63 @@ from .budget import Budget
 from .audit_log import AuditLog
 from .rag_collection import RagCollection
 from .rag_document import RagDocument
-from .chatbot import ChatbotInstance, ChatbotConversation, ChatbotMessage, ChatbotAnalytics
+from .chatbot import (
+    ChatbotInstance,
+    ChatbotConversation,
+    ChatbotMessage,
+    ChatbotAnalytics,
+)
 from .prompt_template import PromptTemplate, ChatbotPromptVariable
-from .plugin import Plugin, PluginConfiguration, PluginInstance, PluginAuditLog, PluginCronJob, PluginAPIGateway
+from .plugin import (
+    Plugin,
+    PluginConfiguration,
+    PluginInstance,
+    PluginAuditLog,
+    PluginCronJob,
+    PluginAPIGateway,
+)
+from .role import Role, RoleLevel
+from .tool import Tool, ToolExecution, ToolCategory, ToolType, ToolStatus
+from .notification import (
+    Notification,
+    NotificationTemplate,
+    NotificationChannel,
+    NotificationType,
+    NotificationPriority,
+    NotificationStatus,
+)
 
 __all__ = [
-    "User", 
-    "APIKey", 
-    "UsageTracking", 
-    "Budget", 
+    "User",
+    "APIKey",
+    "UsageTracking",
+    "Budget",
     "AuditLog",
-    "RagCollection", 
+    "RagCollection",
     "RagDocument",
     "ChatbotInstance",
-    "ChatbotConversation", 
+    "ChatbotConversation",
     "ChatbotMessage",
     "ChatbotAnalytics",
     "PromptTemplate",
     "ChatbotPromptVariable",
     "Plugin",
     "PluginConfiguration",
-    "PluginInstance", 
+    "PluginInstance",
     "PluginAuditLog",
     "PluginCronJob",
-    "PluginAPIGateway"
+    "PluginAPIGateway",
+    "Role",
+    "RoleLevel",
+    "Tool",
+    "ToolExecution",
+    "ToolCategory",
+    "ToolType",
+    "ToolStatus",
+    "Notification",
+    "NotificationTemplate",
+    "NotificationChannel",
+    "NotificationType",
+    "NotificationPriority",
+    "NotificationStatus",
 ]

@@ -18,8 +18,8 @@ class QdrantStatsService:
     """Service for getting live statistics from Qdrant"""
 
     def __init__(self):
-        self.qdrant_host = getattr(settings, 'QDRANT_HOST', 'enclava-qdrant')
-        self.qdrant_port = getattr(settings, 'QDRANT_PORT', 6333)
+        self.qdrant_host = getattr(settings, "QDRANT_HOST", "enclava-qdrant")
+        self.qdrant_port = getattr(settings, "QDRANT_PORT", 6333)
         self.qdrant_url = f"http://{self.qdrant_host}:{self.qdrant_port}"
 
     async def get_collections_stats(self) -> Dict[str, Any]:
@@ -30,7 +30,11 @@ class QdrantStatsService:
                 response = await client.get(f"{self.qdrant_url}/collections")
                 if response.status_code != 200:
                     logger.error(f"Failed to get collections: {response.status_code}")
-                    return {"collections": [], "total_documents": 0, "total_size_bytes": 0}
+                    return {
+                        "collections": [],
+                        "total_documents": 0,
+                        "total_size_bytes": 0,
+                    }
 
                 data = response.json()
                 result = data.get("result", {})
@@ -47,7 +51,9 @@ class QdrantStatsService:
 
                     # Get detailed collection info
                     try:
-                        detail_response = await client.get(f"{self.qdrant_url}/collections/{collection_name}")
+                        detail_response = await client.get(
+                            f"{self.qdrant_url}/collections/{collection_name}"
+                        )
                         if detail_response.status_code == 200:
                             detail_data = detail_response.json()
                             detail_result = detail_data.get("result", {})
@@ -80,10 +86,17 @@ class QdrantStatsService:
                                 parts = collection_name[4:].split("_")
                                 if len(parts) > 1:
                                     # Remove the UUID suffix
-                                    uuid_parts = [p for p in parts if len(p) == 8 and all(c in '0123456789abcdef' for c in p)]
+                                    uuid_parts = [
+                                        p
+                                        for p in parts
+                                        if len(p) == 8
+                                        and all(c in "0123456789abcdef" for c in p)
+                                    ]
                                     for uuid_part in uuid_parts:
                                         parts.remove(uuid_part)
-                                    display_name = " ".join(parts).replace("_", " ").title()
+                                    display_name = (
+                                        " ".join(parts).replace("_", " ").title()
+                                    )
 
                             collection_stat = {
                                 "id": collection_name,
@@ -98,7 +111,7 @@ class QdrantStatsService:
                                 "updated_at": datetime.utcnow().isoformat(),
                                 "is_active": status == "green",
                                 "is_managed": True,
-                                "source": "qdrant"
+                                "source": "qdrant",
                             }
 
                             collections.append(collection_stat)
@@ -106,25 +119,36 @@ class QdrantStatsService:
                             total_size_bytes += estimated_size
 
                     except Exception as e:
-                        logger.error(f"Error getting details for collection {collection_name}: {e}")
+                        logger.error(
+                            f"Error getting details for collection {collection_name}: {e}"
+                        )
                         continue
 
                 return {
                     "collections": collections,
                     "total_documents": total_documents,
                     "total_size_bytes": total_size_bytes,
-                    "total_collections": len(collections)
+                    "total_collections": len(collections),
                 }
 
         except Exception as e:
             logger.error(f"Error getting Qdrant stats: {e}")
-            return {"collections": [], "total_documents": 0, "total_size_bytes": 0, "total_collections": 0}
+            return {
+                "collections": [],
+                "total_documents": 0,
+                "total_size_bytes": 0,
+                "total_collections": 0,
+            }
 
-    async def get_collection_stats(self, collection_name: str) -> Optional[Dict[str, Any]]:
+    async def get_collection_stats(
+        self, collection_name: str
+    ) -> Optional[Dict[str, Any]]:
         """Get statistics for a specific collection"""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{self.qdrant_url}/collections/{collection_name}")
+                response = await client.get(
+                    f"{self.qdrant_url}/collections/{collection_name}"
+                )
                 if response.status_code != 200:
                     return None
 
@@ -151,7 +175,7 @@ class QdrantStatsService:
                     "document_count": points_count,
                     "vector_count": points_count,
                     "size_bytes": estimated_size,
-                    "status": status
+                    "status": status,
                 }
 
         except Exception as e:

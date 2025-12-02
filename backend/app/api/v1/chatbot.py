@@ -12,7 +12,12 @@ from sqlalchemy import select, update, delete
 from datetime import datetime
 
 from app.db.database import get_db
-from app.models.chatbot import ChatbotInstance, ChatbotConversation, ChatbotMessage, ChatbotAnalytics
+from app.models.chatbot import (
+    ChatbotInstance,
+    ChatbotConversation,
+    ChatbotMessage,
+    ChatbotAnalytics,
+)
 from app.core.logging import log_api_request
 from app.services.module_manager import module_manager
 from app.core.security import get_current_user
@@ -98,15 +103,16 @@ class ChatbotChatCompletionResponse(BaseModel):
 
 
 @router.get("/list")
-@router.get("/instances") 
+@router.get("/instances")
 async def list_chatbots(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Get list of all chatbots for the current user"""
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
     log_api_request("list_chatbots", {"user_id": user_id})
-    
+
     try:
         # Query chatbots created by the current user
         result = await db.execute(
@@ -115,7 +121,7 @@ async def list_chatbots(
             .order_by(ChatbotInstance.created_at.desc())
         )
         chatbots = result.scalars().all()
-        
+
         chatbot_list = []
         for chatbot in chatbots:
             chatbot_dict = {
@@ -124,42 +130,53 @@ async def list_chatbots(
                 "description": chatbot.description,
                 "config": chatbot.config,
                 "created_by": chatbot.created_by,
-                "created_at": chatbot.created_at.isoformat() if chatbot.created_at else None,
-                "updated_at": chatbot.updated_at.isoformat() if chatbot.updated_at else None,
-                "is_active": chatbot.is_active
+                "created_at": chatbot.created_at.isoformat()
+                if chatbot.created_at
+                else None,
+                "updated_at": chatbot.updated_at.isoformat()
+                if chatbot.updated_at
+                else None,
+                "is_active": chatbot.is_active,
             }
             chatbot_list.append(chatbot_dict)
-        
+
         return chatbot_list
-        
+
     except Exception as e:
         log_api_request("list_chatbots_error", {"error": str(e), "user_id": user_id})
-        raise HTTPException(status_code=500, detail=f"Failed to fetch chatbots: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch chatbots: {str(e)}"
+        )
 
 
 @router.post("/create")
 async def create_chatbot(
     request: ChatbotCreateRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Create a new chatbot instance"""
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-    log_api_request("create_chatbot", {
-        "user_id": user_id,
-        "chatbot_name": request.name,
-        "chatbot_type": request.chatbot_type
-    })
-    
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request(
+        "create_chatbot",
+        {
+            "user_id": user_id,
+            "chatbot_name": request.name,
+            "chatbot_type": request.chatbot_type,
+        },
+    )
+
     try:
-        # Get the chatbot module 
+        # Get the chatbot module
         chatbot_module = module_manager.get_module("chatbot")
         if not chatbot_module:
             raise HTTPException(status_code=500, detail="Chatbot module not available")
-        
+
         # Import needed types
-        from modules.chatbot.main import ChatbotConfig
-        
+        from app.modules.chatbot.main import ChatbotConfig
+
         # Create chatbot config object
         config = ChatbotConfig(
             name=request.name,
@@ -172,19 +189,20 @@ async def create_chatbot(
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             memory_length=request.memory_length,
-            fallback_responses=request.fallback_responses
+            fallback_responses=request.fallback_responses,
         )
-        
+
         # Use sync database session for module compatibility
         from app.db.database import SessionLocal
+
         sync_db = SessionLocal()
-        
+
         try:
             # Use the chatbot module's create method (which handles default prompts)
             chatbot = await chatbot_module.create_chatbot(config, str(user_id), sync_db)
         finally:
             sync_db.close()
-        
+
         # Return the created chatbot
         return {
             "id": chatbot.id,
@@ -192,15 +210,21 @@ async def create_chatbot(
             "description": f"AI chatbot of type {request.chatbot_type}",
             "config": chatbot.config.__dict__,
             "created_by": chatbot.created_by,
-            "created_at": chatbot.created_at.isoformat() if chatbot.created_at else None,
-            "updated_at": chatbot.updated_at.isoformat() if chatbot.updated_at else None,
-            "is_active": chatbot.is_active
+            "created_at": chatbot.created_at.isoformat()
+            if chatbot.created_at
+            else None,
+            "updated_at": chatbot.updated_at.isoformat()
+            if chatbot.updated_at
+            else None,
+            "is_active": chatbot.is_active,
         }
-        
+
     except Exception as e:
         await db.rollback()
         log_api_request("create_chatbot_error", {"error": str(e), "user_id": user_id})
-        raise HTTPException(status_code=500, detail=f"Failed to create chatbot: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create chatbot: {str(e)}"
+        )
 
 
 @router.put("/update/{chatbot_id}")
@@ -208,16 +232,17 @@ async def update_chatbot(
     chatbot_id: str,
     request: ChatbotUpdateRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Update an existing chatbot instance"""
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-    log_api_request("update_chatbot", {
-        "user_id": user_id,
-        "chatbot_id": chatbot_id,
-        "chatbot_name": request.name
-    })
-    
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request(
+        "update_chatbot",
+        {"user_id": user_id, "chatbot_id": chatbot_id, "chatbot_name": request.name},
+    )
+
     try:
         # Get existing chatbot and verify ownership
         result = await db.execute(
@@ -226,10 +251,12 @@ async def update_chatbot(
             .where(ChatbotInstance.created_by == str(user_id))
         )
         chatbot = result.scalar_one_or_none()
-        
+
         if not chatbot:
-            raise HTTPException(status_code=404, detail="Chatbot not found or access denied")
-        
+            raise HTTPException(
+                status_code=404, detail="Chatbot not found or access denied"
+            )
+
         # Get existing config
         existing_config = chatbot.config.copy() if chatbot.config else {}
 
@@ -247,36 +274,41 @@ async def update_chatbot(
             .values(
                 name=existing_config.get("name", chatbot.name),
                 config=existing_config,
-                updated_at=datetime.utcnow()
+                updated_at=datetime.utcnow(),
             )
         )
-        
+
         await db.commit()
-        
+
         # Return updated chatbot
         updated_result = await db.execute(
-            select(ChatbotInstance)
-            .where(ChatbotInstance.id == chatbot_id)
+            select(ChatbotInstance).where(ChatbotInstance.id == chatbot_id)
         )
         updated_chatbot = updated_result.scalar_one()
-        
+
         return {
             "id": updated_chatbot.id,
             "name": updated_chatbot.name,
             "description": updated_chatbot.description,
             "config": updated_chatbot.config,
             "created_by": updated_chatbot.created_by,
-            "created_at": updated_chatbot.created_at.isoformat() if updated_chatbot.created_at else None,
-            "updated_at": updated_chatbot.updated_at.isoformat() if updated_chatbot.updated_at else None,
-            "is_active": updated_chatbot.is_active
+            "created_at": updated_chatbot.created_at.isoformat()
+            if updated_chatbot.created_at
+            else None,
+            "updated_at": updated_chatbot.updated_at.isoformat()
+            if updated_chatbot.updated_at
+            else None,
+            "is_active": updated_chatbot.is_active,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
         log_api_request("update_chatbot_error", {"error": str(e), "user_id": user_id})
-        raise HTTPException(status_code=500, detail=f"Failed to update chatbot: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update chatbot: {str(e)}"
+        )
 
 
 @router.post("/chat/{chatbot_id}")
@@ -284,15 +316,20 @@ async def chat_with_chatbot(
     chatbot_id: str,
     request: ChatRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Send a message to a chatbot and get a response (without persisting conversation)"""
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-    log_api_request("chat_with_chatbot", {
-        "user_id": user_id,
-        "chatbot_id": chatbot_id,
-        "message_length": len(request.message)
-    })
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request(
+        "chat_with_chatbot",
+        {
+            "user_id": user_id,
+            "chatbot_id": chatbot_id,
+            "message_length": len(request.message),
+        },
+    )
 
     try:
         # Get the chatbot instance
@@ -313,54 +350,69 @@ async def chat_with_chatbot(
         try:
             chatbot_module = module_manager.modules.get("chatbot")
             if not chatbot_module:
-                raise HTTPException(status_code=500, detail="Chatbot module not available")
+                raise HTTPException(
+                    status_code=500, detail="Chatbot module not available"
+                )
 
             # Use the chatbot module to generate a response (without persisting)
             response_data = await chatbot_module.chat(
                 chatbot_config=chatbot.config,
                 message=request.message,
                 conversation_history=[],  # Empty history for test chat
-                user_id=str(user_id)
+                user_id=str(user_id),
             )
 
-            response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
+            response_content = response_data.get(
+                "response", "I'm sorry, I couldn't generate a response."
+            )
 
         except Exception as e:
             # Use fallback response
-            fallback_responses = chatbot.config.get("fallback_responses", [
-                "I'm sorry, I'm having trouble processing your request right now."
-            ])
-            response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
+            fallback_responses = chatbot.config.get(
+                "fallback_responses",
+                ["I'm sorry, I'm having trouble processing your request right now."],
+            )
+            response_content = (
+                fallback_responses[0]
+                if fallback_responses
+                else "I'm sorry, I couldn't process your request."
+            )
 
         # Return response without conversation ID (since we're not persisting)
-        return {
-            "response": response_content,
-            "sources": response_data.get("sources")
-        }
-        
+        return {"response": response_content, "sources": response_data.get("sources")}
+
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
-        log_api_request("chat_with_chatbot_error", {"error": str(e), "user_id": user_id})
+        log_api_request(
+            "chat_with_chatbot_error", {"error": str(e), "user_id": user_id}
+        )
         raise HTTPException(status_code=500, detail=f"Failed to process chat: {str(e)}")
 
 
-@router.post("/{chatbot_id}/chat/completions", response_model=ChatbotChatCompletionResponse)
+@router.post(
+    "/{chatbot_id}/chat/completions", response_model=ChatbotChatCompletionResponse
+)
 async def chatbot_chat_completions(
     chatbot_id: str,
     request: ChatbotChatCompletionRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """OpenAI-compatible chat completions endpoint for chatbot"""
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-    log_api_request("chatbot_chat_completions", {
-        "user_id": user_id,
-        "chatbot_id": chatbot_id,
-        "messages_count": len(request.messages)
-    })
-    
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request(
+        "chatbot_chat_completions",
+        {
+            "user_id": user_id,
+            "chatbot_id": chatbot_id,
+            "messages_count": len(request.messages),
+        },
+    )
+
     try:
         # Get the chatbot instance
         result = await db.execute(
@@ -369,74 +421,83 @@ async def chatbot_chat_completions(
             .where(ChatbotInstance.created_by == str(user_id))
         )
         chatbot = result.scalar_one_or_none()
-        
+
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found")
-        
+
         if not chatbot.is_active:
             raise HTTPException(status_code=400, detail="Chatbot is not active")
-        
+
         # Find the last user message to extract conversation context
         user_messages = [msg for msg in request.messages if msg.role == "user"]
         if not user_messages:
-            raise HTTPException(status_code=400, detail="No user message found in conversation")
-        
+            raise HTTPException(
+                status_code=400, detail="No user message found in conversation"
+            )
+
         last_user_message = user_messages[-1].content
-        
+
         # Initialize conversation service
         conversation_service = ConversationService(db)
-        
+
         # For OpenAI format, we'll try to find an existing conversation or create a new one
         # We'll use a simple hash of the conversation messages as the conversation identifier
         import hashlib
-        conv_hash = hashlib.md5(str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()).hexdigest()[:16]
-        
+
+        conv_hash = hashlib.md5(
+            str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()
+        ).hexdigest()[:16]
+
         # Get or create conversation
         conversation = await conversation_service.get_or_create_conversation(
-            chatbot_id=chatbot_id,
-            user_id=str(user_id),
-            conversation_id=conv_hash
+            chatbot_id=chatbot_id, user_id=str(user_id), conversation_id=conv_hash
         )
-        
+
         # Build conversation history from the request messages (excluding system messages for now)
         conversation_history = []
         for msg in request.messages:
             if msg.role in ["user", "assistant"]:
-                conversation_history.append({
-                    "role": msg.role,
-                    "content": msg.content
-                })
-        
+                conversation_history.append({"role": msg.role, "content": msg.content})
+
         # Get chatbot module and generate response
         try:
             chatbot_module = module_manager.modules.get("chatbot")
             if not chatbot_module:
-                raise HTTPException(status_code=500, detail="Chatbot module not available")
-            
+                raise HTTPException(
+                    status_code=500, detail="Chatbot module not available"
+                )
+
             # Merge chatbot config with request parameters
             effective_config = dict(chatbot.config)
             if request.temperature is not None:
                 effective_config["temperature"] = request.temperature
             if request.max_tokens is not None:
                 effective_config["max_tokens"] = request.max_tokens
-            
+
             # Use the chatbot module to generate a response
             response_data = await chatbot_module.chat(
                 chatbot_config=effective_config,
                 message=last_user_message,
                 conversation_history=conversation_history,
-                user_id=str(user_id)
+                user_id=str(user_id),
             )
-            
-            response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
-            
+
+            response_content = response_data.get(
+                "response", "I'm sorry, I couldn't generate a response."
+            )
+
         except Exception as e:
             # Use fallback response
-            fallback_responses = chatbot.config.get("fallback_responses", [
-                "I'm sorry, I'm having trouble processing your request right now."
-            ])
-            response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
-        
+            fallback_responses = chatbot.config.get(
+                "fallback_responses",
+                ["I'm sorry, I'm having trouble processing your request right now."],
+            )
+            response_content = (
+                fallback_responses[0]
+                if fallback_responses
+                else "I'm sorry, I couldn't process your request."
+            )
+
         # Save the conversation messages
         for msg in request.messages:
             if msg.role == "user":  # Only save the new user message
@@ -444,26 +505,26 @@ async def chatbot_chat_completions(
                     conversation_id=conversation.id,
                     role=msg.role,
                     content=msg.content,
-                    metadata={}
+                    metadata={},
                 )
-        
+
         # Save assistant message
         assistant_message = await conversation_service.add_message(
             conversation_id=conversation.id,
             role="assistant",
             content=response_content,
             metadata={},
-            sources=response_data.get("sources")
+            sources=response_data.get("sources"),
         )
-        
+
         # Calculate usage (simple approximation)
         prompt_tokens = sum(len(msg.content.split()) for msg in request.messages)
         completion_tokens = len(response_content.split())
         total_tokens = prompt_tokens + completion_tokens
-        
+
         # Create OpenAI-compatible response
         response_id = f"chatbot-{chatbot_id}-{int(time.time())}"
-        
+
         return ChatbotChatCompletionResponse(
             id=response_id,
             object="chat.completion",
@@ -473,37 +534,42 @@ async def chatbot_chat_completions(
                 ChatChoice(
                     index=0,
                     message=ChatMessage(role="assistant", content=response_content),
-                    finish_reason="stop"
+                    finish_reason="stop",
                 )
             ],
             usage=ChatUsage(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                total_tokens=total_tokens
-            )
+                total_tokens=total_tokens,
+            ),
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
-        log_api_request("chatbot_chat_completions_error", {"error": str(e), "user_id": user_id})
-        raise HTTPException(status_code=500, detail=f"Failed to process chat completions: {str(e)}")
+        log_api_request(
+            "chatbot_chat_completions_error", {"error": str(e), "user_id": user_id}
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process chat completions: {str(e)}"
+        )
 
 
 @router.get("/conversations/{chatbot_id}")
 async def get_chatbot_conversations(
     chatbot_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get conversations for a chatbot"""
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-    log_api_request("get_chatbot_conversations", {
-        "user_id": user_id,
-        "chatbot_id": chatbot_id
-    })
-    
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request(
+        "get_chatbot_conversations", {"user_id": user_id, "chatbot_id": chatbot_id}
+    )
+
     try:
         # Verify chatbot ownership
         chatbot_result = await db.execute(
@@ -512,10 +578,10 @@ async def get_chatbot_conversations(
             .where(ChatbotInstance.created_by == str(user_id))
         )
         chatbot = chatbot_result.scalar_one_or_none()
-        
+
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found")
-        
+
         # Get conversations
         result = await db.execute(
             select(ChatbotConversation)
@@ -524,39 +590,51 @@ async def get_chatbot_conversations(
             .order_by(ChatbotConversation.updated_at.desc())
         )
         conversations = result.scalars().all()
-        
+
         conversation_list = []
         for conv in conversations:
-            conversation_list.append({
-                "id": conv.id,
-                "title": conv.title,
-                "created_at": conv.created_at.isoformat() if conv.created_at else None,
-                "updated_at": conv.updated_at.isoformat() if conv.updated_at else None,
-                "is_active": conv.is_active
-            })
-        
+            conversation_list.append(
+                {
+                    "id": conv.id,
+                    "title": conv.title,
+                    "created_at": conv.created_at.isoformat()
+                    if conv.created_at
+                    else None,
+                    "updated_at": conv.updated_at.isoformat()
+                    if conv.updated_at
+                    else None,
+                    "is_active": conv.is_active,
+                }
+            )
+
         return conversation_list
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        log_api_request("get_chatbot_conversations_error", {"error": str(e), "user_id": user_id})
-        raise HTTPException(status_code=500, detail=f"Failed to fetch conversations: {str(e)}")
+        log_api_request(
+            "get_chatbot_conversations_error", {"error": str(e), "user_id": user_id}
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch conversations: {str(e)}"
+        )
 
 
 @router.get("/conversations/{conversation_id}/messages")
 async def get_conversation_messages(
     conversation_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get messages for a conversation"""
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-    log_api_request("get_conversation_messages", {
-        "user_id": user_id,
-        "conversation_id": conversation_id
-    })
-    
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request(
+        "get_conversation_messages",
+        {"user_id": user_id, "conversation_id": conversation_id},
+    )
+
     try:
         # Verify conversation ownership
         conv_result = await db.execute(
@@ -565,10 +643,10 @@ async def get_conversation_messages(
             .where(ChatbotConversation.user_id == str(user_id))
         )
         conversation = conv_result.scalar_one_or_none()
-        
+
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        
+
         # Get messages
         result = await db.execute(
             select(ChatbotMessage)
@@ -576,40 +654,45 @@ async def get_conversation_messages(
             .order_by(ChatbotMessage.timestamp.asc())
         )
         messages = result.scalars().all()
-        
+
         message_list = []
         for msg in messages:
-            message_list.append({
-                "id": msg.id,
-                "role": msg.role,
-                "content": msg.content,
-                "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
-                "metadata": msg.message_metadata,
-                "sources": msg.sources
-            })
-        
+            message_list.append(
+                {
+                    "id": msg.id,
+                    "role": msg.role,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+                    "metadata": msg.message_metadata,
+                    "sources": msg.sources,
+                }
+            )
+
         return message_list
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        log_api_request("get_conversation_messages_error", {"error": str(e), "user_id": user_id})
-        raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
+        log_api_request(
+            "get_conversation_messages_error", {"error": str(e), "user_id": user_id}
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch messages: {str(e)}"
+        )
 
 
 @router.delete("/delete/{chatbot_id}")
 async def delete_chatbot(
     chatbot_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete a chatbot and all associated conversations/messages"""
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-    log_api_request("delete_chatbot", {
-        "user_id": user_id,
-        "chatbot_id": chatbot_id
-    })
-    
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request("delete_chatbot", {"user_id": user_id, "chatbot_id": chatbot_id})
+
     try:
         # Get existing chatbot and verify ownership
         result = await db.execute(
@@ -618,47 +701,52 @@ async def delete_chatbot(
             .where(ChatbotInstance.created_by == str(user_id))
         )
         chatbot = result.scalar_one_or_none()
-        
+
         if not chatbot:
-            raise HTTPException(status_code=404, detail="Chatbot not found or access denied")
-        
+            raise HTTPException(
+                status_code=404, detail="Chatbot not found or access denied"
+            )
+
         # Delete all messages associated with this chatbot's conversations
         await db.execute(
-            delete(ChatbotMessage)
-            .where(ChatbotMessage.conversation_id.in_(
-                select(ChatbotConversation.id)
-                .where(ChatbotConversation.chatbot_id == chatbot_id)
-            ))
+            delete(ChatbotMessage).where(
+                ChatbotMessage.conversation_id.in_(
+                    select(ChatbotConversation.id).where(
+                        ChatbotConversation.chatbot_id == chatbot_id
+                    )
+                )
+            )
         )
-        
-        # Delete all conversations associated with this chatbot  
+
+        # Delete all conversations associated with this chatbot
         await db.execute(
-            delete(ChatbotConversation)
-            .where(ChatbotConversation.chatbot_id == chatbot_id)
+            delete(ChatbotConversation).where(
+                ChatbotConversation.chatbot_id == chatbot_id
+            )
         )
-        
+
         # Delete any analytics data
         await db.execute(
-            delete(ChatbotAnalytics)
-            .where(ChatbotAnalytics.chatbot_id == chatbot_id)
+            delete(ChatbotAnalytics).where(ChatbotAnalytics.chatbot_id == chatbot_id)
         )
-        
+
         # Finally, delete the chatbot itself
         await db.execute(
-            delete(ChatbotInstance)
-            .where(ChatbotInstance.id == chatbot_id)
+            delete(ChatbotInstance).where(ChatbotInstance.id == chatbot_id)
         )
-        
+
         await db.commit()
-        
+
         return {"message": "Chatbot deleted successfully", "chatbot_id": chatbot_id}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
         log_api_request("delete_chatbot_error", {"error": str(e), "user_id": user_id})
-        raise HTTPException(status_code=500, detail=f"Failed to delete chatbot: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete chatbot: {str(e)}"
+        )
 
 
 @router.post("/external/{chatbot_id}/chat")
@@ -666,115 +754,133 @@ async def external_chat_with_chatbot(
     chatbot_id: str,
     request: ChatRequest,
     api_key: APIKey = Depends(get_api_key_auth),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """External API endpoint for chatbot access with API key authentication"""
-    log_api_request("external_chat_with_chatbot", {
-        "chatbot_id": chatbot_id,
-        "api_key_id": api_key.id,
-        "message_length": len(request.message)
-    })
-    
+    log_api_request(
+        "external_chat_with_chatbot",
+        {
+            "chatbot_id": chatbot_id,
+            "api_key_id": api_key.id,
+            "message_length": len(request.message),
+        },
+    )
+
     try:
         # Check if API key can access this chatbot
         if not api_key.can_access_chatbot(chatbot_id):
-            raise HTTPException(status_code=403, detail="API key not authorized for this chatbot")
-        
+            raise HTTPException(
+                status_code=403, detail="API key not authorized for this chatbot"
+            )
+
         # Get the chatbot instance
         result = await db.execute(
-            select(ChatbotInstance)
-            .where(ChatbotInstance.id == chatbot_id)
+            select(ChatbotInstance).where(ChatbotInstance.id == chatbot_id)
         )
         chatbot = result.scalar_one_or_none()
-        
+
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found")
-        
+
         if not chatbot.is_active:
             raise HTTPException(status_code=400, detail="Chatbot is not active")
-        
+
         # Initialize conversation service
         conversation_service = ConversationService(db)
-        
+
         # Get or create conversation with API key context
         conversation = await conversation_service.get_or_create_conversation(
             chatbot_id=chatbot_id,
             user_id=f"api_key_{api_key.id}",
             conversation_id=request.conversation_id,
-            title=f"API Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+            title=f"API Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
         )
-        
+
         # Add API key metadata to conversation context if new
         if not conversation.context_data.get("api_key_id"):
             conversation.context_data = {"api_key_id": api_key.id}
             await db.commit()
-        
+
         # Add user message to conversation
         await conversation_service.add_message(
             conversation_id=conversation.id,
             role="user",
             content=request.message,
-            metadata={"api_key_id": api_key.id}
+            metadata={"api_key_id": api_key.id},
         )
-        
+
         # Get chatbot module and generate response
         try:
             chatbot_module = module_manager.modules.get("chatbot")
             if not chatbot_module:
-                raise HTTPException(status_code=500, detail="Chatbot module not available")
-            
+                raise HTTPException(
+                    status_code=500, detail="Chatbot module not available"
+                )
+
             # Load conversation history for context
             conversation_history = await conversation_service.get_conversation_history(
                 conversation_id=conversation.id,
-                limit=chatbot.config.get('memory_length', 10),
-                include_system=False
+                limit=chatbot.config.get("memory_length", 10),
+                include_system=False,
             )
-            
+
             # Use the chatbot module to generate a response
             response_data = await chatbot_module.chat(
                 chatbot_config=chatbot.config,
                 message=request.message,
                 conversation_history=conversation_history,
-                user_id=f"api_key_{api_key.id}"
+                user_id=f"api_key_{api_key.id}",
             )
-            
-            response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
+
+            response_content = response_data.get(
+                "response", "I'm sorry, I couldn't generate a response."
+            )
             sources = response_data.get("sources")
-            
+
         except Exception as e:
             # Use fallback response
-            fallback_responses = chatbot.config.get("fallback_responses", [
-                "I'm sorry, I'm having trouble processing your request right now."
-            ])
-            response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
+            fallback_responses = chatbot.config.get(
+                "fallback_responses",
+                ["I'm sorry, I'm having trouble processing your request right now."],
+            )
+            response_content = (
+                fallback_responses[0]
+                if fallback_responses
+                else "I'm sorry, I couldn't process your request."
+            )
             sources = None
-        
+
         # Save assistant message using conversation service
         assistant_message = await conversation_service.add_message(
             conversation_id=conversation.id,
             role="assistant",
             content=response_content,
             metadata={"api_key_id": api_key.id},
-            sources=sources
+            sources=sources,
         )
-        
+
         # Update API key usage stats
-        api_key.update_usage(tokens_used=len(request.message) + len(response_content), cost_cents=0)
+        api_key.update_usage(
+            tokens_used=len(request.message) + len(response_content), cost_cents=0
+        )
         await db.commit()
-        
+
         return {
             "conversation_id": conversation.id,
             "response": response_content,
             "sources": sources,
             "timestamp": assistant_message.timestamp.isoformat(),
-            "chatbot_id": chatbot_id
+            "chatbot_id": chatbot_id,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
-        log_api_request("external_chat_with_chatbot_error", {"error": str(e), "chatbot_id": chatbot_id})
+        log_api_request(
+            "external_chat_with_chatbot_error",
+            {"error": str(e), "chatbot_id": chatbot_id},
+        )
         raise HTTPException(status_code=500, detail=f"Failed to process chat: {str(e)}")
 
 
@@ -785,29 +891,25 @@ class ChatbotModelsResponse(BaseModel):
 
 
 # Implementation functions for OpenAI compatibility (called by v1 endpoints)
-async def external_chatbot_models(
-    chatbot_id: str,
-    api_key: APIKey,
-    db: AsyncSession
-):
+async def external_chatbot_models(chatbot_id: str, api_key: APIKey, db: AsyncSession):
     """
     OpenAI-compatible models endpoint implementation
     Returns only the model configured for this specific chatbot
     """
-    log_api_request("external_chatbot_models", {
-        "chatbot_id": chatbot_id,
-        "api_key_id": api_key.id
-    })
+    log_api_request(
+        "external_chatbot_models", {"chatbot_id": chatbot_id, "api_key_id": api_key.id}
+    )
 
     try:
         # Check if API key can access this chatbot
         if not api_key.can_access_chatbot(chatbot_id):
-            raise HTTPException(status_code=403, detail="API key not authorized for this chatbot")
+            raise HTTPException(
+                status_code=403, detail="API key not authorized for this chatbot"
+            )
 
         # Get the chatbot instance
         result = await db.execute(
-            select(ChatbotInstance)
-            .where(ChatbotInstance.id == chatbot_id)
+            select(ChatbotInstance).where(ChatbotInstance.id == chatbot_id)
         )
         chatbot = result.scalar_one_or_none()
 
@@ -828,43 +930,44 @@ async def external_chatbot_models(
                     "id": model_name,
                     "object": "model",
                     "created": int(time.time()),
-                    "owned_by": "enclava-chatbot"
+                    "owned_by": "enclava-chatbot",
                 }
-            ]
+            ],
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        log_api_request("external_chatbot_models_error", {"error": str(e), "chatbot_id": chatbot_id})
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve models: {str(e)}")
+        log_api_request(
+            "external_chatbot_models_error", {"error": str(e), "chatbot_id": chatbot_id}
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve models: {str(e)}"
+        )
 
 
 async def external_chatbot_retrieve_model(
-    chatbot_id: str,
-    model_id: str,
-    api_key: APIKey,
-    db: AsyncSession
+    chatbot_id: str, model_id: str, api_key: APIKey, db: AsyncSession
 ):
     """
     OpenAI-compatible model retrieve endpoint implementation
     Returns model info if the model matches the chatbot's configured model
     """
-    log_api_request("external_chatbot_retrieve_model", {
-        "chatbot_id": chatbot_id,
-        "model_id": model_id,
-        "api_key_id": api_key.id
-    })
+    log_api_request(
+        "external_chatbot_retrieve_model",
+        {"chatbot_id": chatbot_id, "model_id": model_id, "api_key_id": api_key.id},
+    )
 
     try:
         # Check if API key can access this chatbot
         if not api_key.can_access_chatbot(chatbot_id):
-            raise HTTPException(status_code=403, detail="API key not authorized for this chatbot")
+            raise HTTPException(
+                status_code=403, detail="API key not authorized for this chatbot"
+            )
 
         # Get the chatbot instance
         result = await db.execute(
-            select(ChatbotInstance)
-            .where(ChatbotInstance.id == chatbot_id)
+            select(ChatbotInstance).where(ChatbotInstance.id == chatbot_id)
         )
         chatbot = result.scalar_one_or_none()
 
@@ -886,38 +989,47 @@ async def external_chatbot_retrieve_model(
             "id": configured_model,
             "object": "model",
             "created": int(time.time()),
-            "owned_by": "enclava-chatbot"
+            "owned_by": "enclava-chatbot",
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        log_api_request("external_chatbot_retrieve_model_error", {"error": str(e), "chatbot_id": chatbot_id})
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve model: {str(e)}")
+        log_api_request(
+            "external_chatbot_retrieve_model_error",
+            {"error": str(e), "chatbot_id": chatbot_id},
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve model: {str(e)}"
+        )
 
 
 async def external_chatbot_chat_completions(
     chatbot_id: str,
     request: ChatbotChatCompletionRequest,
     api_key: APIKey,
-    db: AsyncSession
+    db: AsyncSession,
 ):
     """External OpenAI-compatible chat completions endpoint implementation with API key authentication"""
-    log_api_request("external_chatbot_chat_completions", {
-        "chatbot_id": chatbot_id,
-        "api_key_id": api_key.id,
-        "messages_count": len(request.messages)
-    })
+    log_api_request(
+        "external_chatbot_chat_completions",
+        {
+            "chatbot_id": chatbot_id,
+            "api_key_id": api_key.id,
+            "messages_count": len(request.messages),
+        },
+    )
 
     try:
         # Check if API key can access this chatbot
         if not api_key.can_access_chatbot(chatbot_id):
-            raise HTTPException(status_code=403, detail="API key not authorized for this chatbot")
+            raise HTTPException(
+                status_code=403, detail="API key not authorized for this chatbot"
+            )
 
         # Get the chatbot instance
         result = await db.execute(
-            select(ChatbotInstance)
-            .where(ChatbotInstance.id == chatbot_id)
+            select(ChatbotInstance).where(ChatbotInstance.id == chatbot_id)
         )
         chatbot = result.scalar_one_or_none()
 
@@ -930,7 +1042,9 @@ async def external_chatbot_chat_completions(
         # Find the last user message to extract conversation context
         user_messages = [msg for msg in request.messages if msg.role == "user"]
         if not user_messages:
-            raise HTTPException(status_code=400, detail="No user message found in conversation")
+            raise HTTPException(
+                status_code=400, detail="No user message found in conversation"
+            )
 
         last_user_message = user_messages[-1].content
 
@@ -940,14 +1054,17 @@ async def external_chatbot_chat_completions(
         # For OpenAI format, we'll try to find an existing conversation or create a new one
         # We'll use a simple hash of the conversation messages as the conversation identifier
         import hashlib
-        conv_hash = hashlib.md5(str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()).hexdigest()[:16]
+
+        conv_hash = hashlib.md5(
+            str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()
+        ).hexdigest()[:16]
 
         # Get or create conversation with API key context
         conversation = await conversation_service.get_or_create_conversation(
             chatbot_id=chatbot_id,
             user_id=f"api_key_{api_key.id}",
             conversation_id=conv_hash,
-            title=f"API Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+            title=f"API Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
         )
 
         # Add API key metadata to conversation context if new
@@ -959,16 +1076,15 @@ async def external_chatbot_chat_completions(
         conversation_history = []
         for msg in request.messages:
             if msg.role in ["user", "assistant"]:
-                conversation_history.append({
-                    "role": msg.role,
-                    "content": msg.content
-                })
+                conversation_history.append({"role": msg.role, "content": msg.content})
 
         # Get chatbot module and generate response
         try:
             chatbot_module = module_manager.modules.get("chatbot")
             if not chatbot_module:
-                raise HTTPException(status_code=500, detail="Chatbot module not available")
+                raise HTTPException(
+                    status_code=500, detail="Chatbot module not available"
+                )
 
             # Merge chatbot config with request parameters
             effective_config = dict(chatbot.config)
@@ -982,18 +1098,25 @@ async def external_chatbot_chat_completions(
                 chatbot_config=effective_config,
                 message=last_user_message,
                 conversation_history=conversation_history,
-                user_id=f"api_key_{api_key.id}"
+                user_id=f"api_key_{api_key.id}",
             )
 
-            response_content = response_data.get("response", "I'm sorry, I couldn't generate a response.")
+            response_content = response_data.get(
+                "response", "I'm sorry, I couldn't generate a response."
+            )
             sources = response_data.get("sources")
 
         except Exception as e:
             # Use fallback response
-            fallback_responses = chatbot.config.get("fallback_responses", [
-                "I'm sorry, I'm having trouble processing your request right now."
-            ])
-            response_content = fallback_responses[0] if fallback_responses else "I'm sorry, I couldn't process your request."
+            fallback_responses = chatbot.config.get(
+                "fallback_responses",
+                ["I'm sorry, I'm having trouble processing your request right now."],
+            )
+            response_content = (
+                fallback_responses[0]
+                if fallback_responses
+                else "I'm sorry, I couldn't process your request."
+            )
             sources = None
 
         # Save the conversation messages
@@ -1003,7 +1126,7 @@ async def external_chatbot_chat_completions(
                     conversation_id=conversation.id,
                     role=msg.role,
                     content=msg.content,
-                    metadata={"api_key_id": api_key.id}
+                    metadata={"api_key_id": api_key.id},
                 )
 
         # Save assistant message using conversation service
@@ -1012,7 +1135,7 @@ async def external_chatbot_chat_completions(
             role="assistant",
             content=response_content,
             metadata={"api_key_id": api_key.id},
-            sources=sources
+            sources=sources,
         )
 
         # Update API key usage stats
@@ -1035,36 +1158,37 @@ async def external_chatbot_chat_completions(
                 ChatChoice(
                     index=0,
                     message=ChatMessage(role="assistant", content=response_content),
-                    finish_reason="stop"
+                    finish_reason="stop",
                 )
             ],
             usage=ChatUsage(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                total_tokens=total_tokens
-            )
+                total_tokens=total_tokens,
+            ),
         )
 
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
-        log_api_request("external_chatbot_chat_completions_error", {"error": str(e), "chatbot_id": chatbot_id})
-        raise HTTPException(status_code=500, detail=f"Failed to process chat completions: {str(e)}")
-
-
+        log_api_request(
+            "external_chatbot_chat_completions_error",
+            {"error": str(e), "chatbot_id": chatbot_id},
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process chat completions: {str(e)}"
+        )
 
 
 @router.get("/external/{chatbot_id}/v1/models", response_model=ChatbotModelsResponse)
 async def external_chatbot_models_v1(
     chatbot_id: str,
     api_key: APIKey = Depends(get_api_key_auth),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """OpenAI v1 API compatible models endpoint with /v1 prefix"""
     return await external_chatbot_models(chatbot_id, api_key, db)
-
-
 
 
 @router.get("/external/{chatbot_id}/v1/models/{model_id}")
@@ -1072,20 +1196,21 @@ async def external_chatbot_retrieve_model_v1(
     chatbot_id: str,
     model_id: str,
     api_key: APIKey = Depends(get_api_key_auth),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """OpenAI v1 API compatible model retrieve endpoint with /v1 prefix"""
     return await external_chatbot_retrieve_model(chatbot_id, model_id, api_key, db)
 
 
-
-
-@router.post("/external/{chatbot_id}/v1/chat/completions", response_model=ChatbotChatCompletionResponse)
+@router.post(
+    "/external/{chatbot_id}/v1/chat/completions",
+    response_model=ChatbotChatCompletionResponse,
+)
 async def external_chatbot_chat_completions_v1(
     chatbot_id: str,
     request: ChatbotChatCompletionRequest,
     api_key: APIKey = Depends(get_api_key_auth),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """OpenAI v1 API compatible chat completions endpoint with /v1 prefix"""
     return await external_chatbot_chat_completions(chatbot_id, request, api_key, db)
