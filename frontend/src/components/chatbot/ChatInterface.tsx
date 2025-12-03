@@ -15,6 +15,7 @@ import { chatbotApi } from "@/lib/api-client"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeHighlight from "rehype-highlight"
+import { SourcesList } from "@/components/chat/SourcesList"
 
 interface ChatMessage {
   id: string
@@ -265,16 +266,7 @@ export function ChatInterface({ chatbotId, chatbotName, onClose }: ChatInterface
                       
                       {/* Sources for assistant messages */}
                       {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-xs text-foreground/60">Sources:</p>
-                          <div className="space-y-1">
-                            {message.sources.map((source, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {source.title || `Source ${index + 1}`}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
+                        <SourcesList sources={message.sources} />
                       )}
 
                       <div className="flex items-center justify-between text-xs text-foreground/50 dark:text-slate-400 chat-timestamp">

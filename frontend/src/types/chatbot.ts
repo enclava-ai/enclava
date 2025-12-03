@@ -14,7 +14,11 @@ export interface ChatMessage {
 export interface ChatMessageSource {
   title: string
   content: string
-  url?: string
+  url?: string | null
+  language?: string
+  article_id?: string
+  relevance_score?: number
+  content_preview?: string
   metadata?: Record<string, unknown>
 }
 

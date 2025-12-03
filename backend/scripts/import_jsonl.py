@@ -12,7 +12,7 @@ Notes:
   - Runs fully inside the backend, so Docker service hostnames (e.g. enclava-qdrant)
     and privatemode-proxy are reachable.
   - Uses RAGModule + JSONLProcessor to embed/index each JSONL line.
-  - Creates the collection if missing (size=1024, cosine).
+  - Creates the collection if missing (size=384, cosine).
 """
 
 import argparse
@@ -37,9 +37,9 @@ async def import_jsonl(collection_name: str, file_path: str):
     if not any(c.name == collection_name for c in collections):
         client.create_collection(
             collection_name=collection_name,
-            vectors_config=VectorParams(size=1024, distance=Distance.COSINE),
+            vectors_config=VectorParams(size=384, distance=Distance.COSINE),
         )
-        print(f"Created Qdrant collection '{collection_name}' (size=1024, cosine)")
+        print(f"Created Qdrant collection '{collection_name}' (size=384, cosine)")
     else:
         print(f"Using existing Qdrant collection '{collection_name}'")
 
@@ -49,7 +49,7 @@ async def import_jsonl(collection_name: str, file_path: str):
         "chunk_overlap": 50,
         "max_results": 10,
         "score_threshold": 0.3,
-        "embedding_model": "intfloat/multilingual-e5-large-instruct",
+        "embedding_model": "BAAI/bge-small-en-v1.5",
     })
     await rag.initialize()
 

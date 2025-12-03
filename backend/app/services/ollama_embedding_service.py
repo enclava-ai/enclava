@@ -16,11 +16,11 @@ class OllamaEmbeddingService:
     """Service for generating text embeddings using Ollama"""
 
     def __init__(
-        self, model_name: str = "bge-m3", base_url: str = "http://172.17.0.1:11434"
+        self, model_name: str = "bge-small-en", base_url: str = "http://172.17.0.1:11434"
     ):
         self.model_name = model_name
         self.base_url = base_url
-        self.dimension = 1024  # bge-m3 dimension
+        self.dimension = 384  # bge-small-en dimension
         self.initialized = False
         self._session = None
 
@@ -142,7 +142,7 @@ class OllamaEmbeddingService:
 
     def _generate_fallback_embedding(self, text: str) -> List[float]:
         """Generate a single fallback embedding"""
-        dimension = self.dimension  # 1024 for bge-m3
+        dimension = self.dimension  # 384 for bge-small-en
         # Use hash for reproducible random embeddings
         np.random.seed(hash(text) % 2**32)
         return np.random.random(dimension).tolist()

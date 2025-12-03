@@ -96,6 +96,7 @@ class ProcessedDocument:
     file_hash: str
     file_size: int
     embedding: Optional[List[float]] = None
+    source_url: Optional[str] = None
     created_at: datetime = None
 
     def __post_init__(self):
@@ -164,9 +165,9 @@ class RAGModule(BaseModule):
         if config:
             self.config.update(config)
 
-        # Ensure embedding model configured (defaults to local BGE-M3)
+        # Ensure embedding model configured (defaults to local BGE-small-en)
         default_embedding_model = getattr(
-            settings, "RAG_EMBEDDING_MODEL", "BAAI/bge-m3"
+            settings, "RAG_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"
         )
         self.config.setdefault("embedding_model", default_embedding_model)
         self.default_embedding_model = default_embedding_model
@@ -300,11 +301,27 @@ class RAGModule(BaseModule):
         elif content.startswith(b"{") or content.startswith(b"["):
             # Check if it's JSONL by looking for newline-delimited JSON
             try:
-                lines = content.decode("utf-8", errors="ignore").split("\n")
-                if len(lines) > 1 and all(
-                    line.strip().startswith("{") for line in lines[:3] if line.strip()
+                content_str = content.decode("utf-8", errors="ignore")
+                lines = content_str.split("\n")
+                # Filter out empty lines
+                non_empty_lines = [line.strip() for line in lines[:10] if line.strip()]
+
+                # If we have multiple non-empty lines that all start with {, it's likely JSONL
+                if len(non_empty_lines) > 1 and all(
+                    line.startswith("{") and line.endswith("}") for line in non_empty_lines[:5]
                 ):
-                    return "application/x-ndjson"
+                    # Additional validation: try parsing a few lines as JSON
+                    import json
+                    valid_json_lines = 0
+                    for line in non_empty_lines[:3]:
+                        try:
+                            json.loads(line)
+                            valid_json_lines += 1
+                        except:
+                            break
+
+                    if valid_json_lines > 1:
+                        return "application/x-ndjson"
             except:
                 pass
             return "application/json"
@@ -1125,12 +1142,31 @@ class RAGModule(BaseModule):
     async def _process_json(self, content: bytes, filename: str) -> str:
         """Process JSON files"""
         try:
-            json_data = json.loads(content.decode("utf-8"))
+            json_str = content.decode("utf-8", errors="ignore")
+            json_data = json.loads(json_str)
             # Convert JSON to readable text
             return json.dumps(json_data, indent=2)
 
+        except json.JSONDecodeError as e:
+            # Check if this might be JSONL content that was misdetected
+            try:
+                lines = json_str.split("\n")
+                # Filter out empty lines
+                non_empty_lines = [line.strip() for line in lines if line.strip()]
+
+                # If multiple valid JSON lines, treat as JSONL
+                if len(non_empty_lines) > 1:
+                    logger.warning(f"File '{filename}' appears to be JSONL format, processing as JSONL")
+                    # Call JSONL processor directly
+                    return await self._process_jsonl(content, filename)
+
+                logger.error(f"Error processing JSON file '{filename}': {e}")
+                return ""
+            except Exception as fallback_e:
+                logger.error(f"Error processing JSON file '{filename}': {e}, fallback also failed: {fallback_e}")
+                return ""
         except Exception as e:
-            logger.error(f"Error processing JSON file: {e}")
+            logger.error(f"Error processing JSON file '{filename}': {e}")
             return ""
 
     async def _process_markdown(self, content: bytes, filename: str) -> str:
@@ -1273,7 +1309,11 @@ class RAGModule(BaseModule):
 
             # Detect MIME type
             mime_type = self._detect_mime_type(filename, file_data)
-            file_type = mime_type.split("/")[0]
+            # Special handling for JSONL files - use extension instead of MIME family
+            if mime_type == "application/x-ndjson" or filename.lower().endswith('.jsonl'):
+                file_type = "jsonl"
+            else:
+                file_type = mime_type.split("/")[0]
             logger.info(f"Detected MIME type: {mime_type}, file type: {file_type}")
 
             # Check if file type is supported
@@ -1561,6 +1601,10 @@ class RAGModule(BaseModule):
                     "content": chunk,
                     "indexed_at": datetime.utcnow().isoformat(),
                 }
+
+                # Add source_url if present in ProcessedDocument
+                if processed_doc.source_url:
+                    chunk_metadata["source_url"] = processed_doc.source_url
 
                 points.append(
                     PointStruct(
@@ -1927,10 +1971,53 @@ class RAGModule(BaseModule):
                     }
 
             logger.info(f"\nAggregated documents count: {len(document_scores)}")
+
+            # Phase 2: URL Deduplication
+            # Track documents by source_url to deduplicate
+            url_to_doc = {}
+            deduplicated_scores = {}
+            docs_without_url = 0
+            urls_deduplicated = 0
+
+            for doc_id, data in document_scores.items():
+                source_url = data["metadata"].get("source_url")
+
+                if source_url:
+                    # Document has a URL
+                    if source_url in url_to_doc:
+                        # URL already seen - keep document with higher score
+                        existing_doc_id = url_to_doc[source_url]
+                        existing_score = deduplicated_scores[existing_doc_id]["score"]
+
+                        if data["score"] > existing_score:
+                            # Replace with higher scoring document
+                            logger.info(f"URL dedup: Replacing {existing_doc_id} (score={existing_score:.4f}) with {doc_id} (score={data['score']:.4f}) for URL: {source_url}")
+                            del deduplicated_scores[existing_doc_id]
+                            url_to_doc[source_url] = doc_id
+                            deduplicated_scores[doc_id] = data
+                        else:
+                            logger.info(f"URL dedup: Skipping {doc_id} (score={data['score']:.4f}), keeping {existing_doc_id} (score={existing_score:.4f}) for URL: {source_url}")
+
+                        urls_deduplicated += 1
+                    else:
+                        # First time seeing this URL
+                        url_to_doc[source_url] = doc_id
+                        deduplicated_scores[doc_id] = data
+                else:
+                    # Document without URL - always include
+                    deduplicated_scores[doc_id] = data
+                    docs_without_url += 1
+
+            logger.info(f"\n=== URL Deduplication Metrics ===")
+            logger.info(f"Documents before deduplication: {len(document_scores)}")
+            logger.info(f"Documents after deduplication: {len(deduplicated_scores)}")
+            logger.info(f"Unique URLs found: {len(url_to_doc)}")
+            logger.info(f"Duplicate URLs removed: {urls_deduplicated}")
+            logger.info(f"Documents without URL: {docs_without_url}")
             logger.info("=== END ENHANCED RAG SEARCH DEBUGGING ===")
 
-            # Create SearchResult objects
-            for doc_id, data in document_scores.items():
+            # Create SearchResult objects from deduplicated results
+            for doc_id, data in deduplicated_scores.items():
                 document = Document(
                     id=doc_id, content=data["content"], metadata=data["metadata"]
                 )
