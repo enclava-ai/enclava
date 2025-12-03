@@ -40,8 +40,10 @@ async function request<T = any>(method: string, url: string, body?: any, extraIn
     })
 
     if (!res.ok) {
+      // Read the body once to avoid "Body has already been consumed" errors on non-JSON responses
+      const rawBody = await res.text().catch(() => '')
       let details: any = undefined
-      try { details = await res.json() } catch { details = await res.text() }
+      try { details = rawBody ? JSON.parse(rawBody) : undefined } catch { details = rawBody }
       const status = res.status
       if (status === 401) throw makeError('Unauthorized', 'UNAUTHORIZED', status, details)
       if (status === 403) throw makeError('Forbidden', 'FORBIDDEN', status, details)
@@ -114,4 +116,3 @@ export const chatbotApi = {
     }).then(res => res.json())
   }
 }
-
