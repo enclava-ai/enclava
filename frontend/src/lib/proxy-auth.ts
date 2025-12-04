@@ -19,8 +19,10 @@ export async function proxyRequest(path: string, init?: RequestInit): Promise<Re
 
 export async function handleProxyResponse<T = any>(response: Response, defaultMessage = 'Request failed'): Promise<T> {
   if (!response.ok) {
+    // Read the body once to avoid "Body has already been consumed" when the upstream returns HTML errors
+    const rawBody = await response.text().catch(() => '')
     let details: any
-    try { details = await response.json() } catch { details = await response.text() }
+    try { details = rawBody ? JSON.parse(rawBody) : undefined } catch { details = rawBody }
     throw new Error(typeof details === 'string' ? `${defaultMessage}: ${details}` : (details?.error || defaultMessage))
   }
   const contentType = response.headers.get('content-type') || ''
@@ -28,4 +30,3 @@ export async function handleProxyResponse<T = any>(response: Response, defaultMe
   // @ts-ignore allow non-json
   return (await response.text()) as T
 }
-
