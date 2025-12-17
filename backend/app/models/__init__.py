@@ -34,6 +34,8 @@ from .notification import (
     NotificationPriority,
     NotificationStatus,
 )
+from .agent_config import AgentConfig
+from .mcp_server import MCPServer
 
 __all__ = [
     "User",
@@ -68,4 +70,6 @@ __all__ = [
     "NotificationType",
     "NotificationPriority",
     "NotificationStatus",
+    "AgentConfig",
+    "MCPServer",
 ]

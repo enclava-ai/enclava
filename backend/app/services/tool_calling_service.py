@@ -164,16 +164,35 @@ class ToolCallingService:
         }
 
     async def _get_available_tools_for_user(
-        self, user: Union[User, Dict[str, Any]]
+        self, user: Union[User, Dict[str, Any]], include_builtin: bool = True
     ) -> List[Any]:
-        """Get tools available to the user"""
+        """Get tools available to the user.
 
+        Returns Tool model objects AND BuiltinTool instances (NOT OpenAI schemas).
+        Conversion to OpenAI format happens in _convert_tools_to_openai_format.
+
+        Args:
+            user: User requesting tools
+            include_builtin: Whether to include built-in tools (default: True)
+
+        Returns:
+            List of tool objects (mix of Tool models and BuiltinTool instances)
+        """
+        from app.services.builtin_tools.registry import BuiltinToolRegistry
+
+        tools = []
         user_id = self._get_user_id(user)
 
-        # Get user's own tools + public approved tools
-        tools = await self.tool_mgmt.get_tools(
+        # Add built-in tools (as BuiltinTool objects, NOT schemas)
+        if include_builtin:
+            builtin_tools = BuiltinToolRegistry.get_all()
+            tools.extend(builtin_tools)
+
+        # Add custom tools (as Tool model objects)
+        custom_tools = await self.tool_mgmt.get_tools(
             user_id=user_id, limit=100  # Reasonable limit for tool calling
         )
+        tools.extend(custom_tools)
 
         return tools
 
@@ -198,10 +217,48 @@ class ToolCallingService:
 
         return openai_tools
 
+    async def _get_mcp_config(
+        self,
+        server_name: str,
+        user_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """Get MCP server configuration by name from database.
+
+        Looks up MCP server from database. Users can access their own
+        servers and global servers.
+
+        Args:
+            server_name: Name of the MCP server (e.g., "order-api")
+            user_id: User ID for access control
+
+        Returns:
+            Dict with url, api_key (decrypted), timeout, max_retries,
+            or None if not configured
+        """
+        from app.services.mcp_server_service import MCPServerService
+
+        service = MCPServerService(self.db)
+        return await service.get_server_config_for_tool_calling(server_name, user_id)
+
     async def _execute_tool_call(
         self, tool_call: ToolCall, user: Union[User, Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Execute a single tool call"""
+        """Execute a single tool call - routes to builtin, MCP, or custom tools.
+
+        Routing priority:
+        1. Built-in tools (rag_search, web_search, code_execution)
+        2. MCP tools (server_name.tool_name format)
+        3. Custom user tools (from database)
+
+        Args:
+            tool_call: ToolCall object with function name and arguments
+            user: User executing the tool
+
+        Returns:
+            Dict with execution results (output, error_message, status)
+        """
+        from app.services.builtin_tools.registry import BuiltinToolRegistry
+        from app.services.builtin_tools.base import ToolExecutionContext
 
         function_name = tool_call.function.get("name")
         if not function_name:
@@ -213,7 +270,37 @@ class ToolCallingService:
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid tool call arguments: {e}")
 
-        # Execute the tool
+        # 1. Check built-in tools first
+        if BuiltinToolRegistry.is_builtin(function_name):
+            tool = BuiltinToolRegistry.get(function_name)
+            ctx = ToolExecutionContext(
+                user_id=self._get_user_id(user),
+                db=self.db
+            )
+            result = await tool.execute(arguments, ctx)
+            return {
+                "output": result.output,
+                "error_message": result.error,
+                "status": "completed" if result.success else "failed"
+            }
+
+        # 2. Check MCP tools (format: "server_name.tool_name")
+        if "." in function_name:
+            server_name, tool_name = function_name.split(".", 1)
+            user_id = self._get_user_id(user)
+            mcp_config = await self._get_mcp_config(server_name, user_id)
+            if mcp_config:
+                from app.services.mcp_client import MCPClient
+                client = MCPClient(
+                    server_url=mcp_config["url"],
+                    api_key=mcp_config.get("api_key"),
+                    api_key_header_name=mcp_config.get("api_key_header_name", "Authorization"),
+                    timeout_seconds=mcp_config.get("timeout", 30),
+                    max_retries=mcp_config.get("max_retries", 3)
+                )
+                return await client.call_tool(tool_name, arguments)
+
+        # 3. Fallback to custom tools (existing behavior)
         result = await self.execute_tool_by_name(function_name, arguments, user)
 
         return result
@@ -254,14 +341,43 @@ class ToolCallingService:
     async def validate_tool_availability(
         self, tool_names: List[str], user: Union[User, Dict[str, Any]]
     ) -> Dict[str, bool]:
-        """Validate which tools are available to the user"""
+        """Validate which tools are available to the user.
+
+        Checks tools in this priority order:
+        1. Built-in tools (rag_search, web_search, code_execution)
+        2. MCP tools (server_name.tool_name format)
+        3. Custom user tools (from database)
+
+        Args:
+            tool_names: List of tool names to validate
+            user: User requesting validation
+
+        Returns:
+            Dict mapping tool names to availability (True/False)
+        """
+        from app.services.builtin_tools.registry import BuiltinToolRegistry
 
         availability: Dict[str, bool] = {}
-
         user_id = self._get_user_id(user)
 
         for tool_name in tool_names:
             try:
+                # 1. Check built-in tools first
+                if BuiltinToolRegistry.is_builtin(tool_name):
+                    availability[tool_name] = True
+                    continue
+
+                # 2. Check MCP tools (format: "server_name.tool_name")
+                if "." in tool_name:
+                    server_name = tool_name.split(".", 1)[0]
+                    mcp_config = await self._get_mcp_config(server_name, user_id)
+                    if mcp_config:
+                        # MCP server is configured, assume tool is available
+                        # (we don't check actual tool existence to avoid overhead)
+                        availability[tool_name] = True
+                        continue
+
+                # 3. Check custom user tools (from database)
                 tool = await self.tool_mgmt.get_tool_by_name_and_user(tool_name, user_id)
                 if tool:
                     availability[tool_name] = tool.can_be_used_by(user)
@@ -275,7 +391,8 @@ class ToolCallingService:
                         limit=1,
                     )
                     availability[tool_name] = len(tools) > 0
-            except Exception:
+            except Exception as e:
+                logger.error(f"Error validating tool '{tool_name}': {e}")
                 availability[tool_name] = False
 
         return availability

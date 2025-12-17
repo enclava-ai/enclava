@@ -116,3 +116,122 @@ export const chatbotApi = {
     }).then(res => res.json())
   }
 }
+
+export const agentApi = {
+  listAgents(params?: { category?: string; is_public?: boolean }) {
+    const queryParams = new URLSearchParams()
+    if (params?.category) queryParams.append('category', params.category)
+    if (params?.is_public !== undefined) queryParams.append('is_public', String(params.is_public))
+    const query = queryParams.toString()
+    return apiClient.get(`/api/v1/tool-calling/agent/configs${query ? `?${query}` : ''}`)
+  },
+  getAgent(id: number) {
+    return apiClient.get(`/api/v1/tool-calling/agent/configs/${id}`)
+  },
+  createAgent(config: any) {
+    return apiClient.post('/api/v1/tool-calling/agent/configs', config)
+  },
+  updateAgent(id: number, config: any) {
+    return apiClient.put(`/api/v1/tool-calling/agent/configs/${id}`, config)
+  },
+  deleteAgent(id: number) {
+    return apiClient.delete(`/api/v1/tool-calling/agent/configs/${id}`)
+  },
+  chat(agentConfigId: number, message: string, conversationId?: string) {
+    return apiClient.post('/api/v1/tool-calling/agent/chat', {
+      agent_config_id: agentConfigId,
+      message,
+      conversation_id: conversationId
+    })
+  }
+}
+
+export const toolApi = {
+  listTools() {
+    return apiClient.get('/api/v1/tool-calling/available')
+  }
+}
+
+export const mcpServerApi = {
+  /**
+   * List all MCP servers accessible to the current user
+   */
+  listServers(includeInactive?: boolean) {
+    const params = includeInactive ? '?include_inactive=true' : ''
+    return apiClient.get(`/api/v1/mcp-servers${params}`)
+  },
+
+  /**
+   * Get simplified list for agent configuration dropdowns
+   */
+  getAvailableServers() {
+    return apiClient.get('/api/v1/mcp-servers/available')
+  },
+
+  /**
+   * Get a specific MCP server by ID
+   */
+  getServer(id: number) {
+    return apiClient.get(`/api/v1/mcp-servers/${id}`)
+  },
+
+  /**
+   * Create a new MCP server
+   */
+  createServer(config: {
+    name: string
+    display_name: string
+    description?: string
+    server_url: string
+    api_key?: string
+    api_key_header_name?: string
+    timeout_seconds?: number
+    max_retries?: number
+    is_global?: boolean
+  }) {
+    return apiClient.post('/api/v1/mcp-servers', config)
+  },
+
+  /**
+   * Update an existing MCP server
+   */
+  updateServer(id: number, config: {
+    display_name?: string
+    description?: string
+    server_url?: string
+    api_key?: string
+    api_key_header_name?: string
+    timeout_seconds?: number
+    max_retries?: number
+    is_global?: boolean
+    is_active?: boolean
+  }) {
+    return apiClient.put(`/api/v1/mcp-servers/${id}`, config)
+  },
+
+  /**
+   * Delete an MCP server
+   */
+  deleteServer(id: number) {
+    return apiClient.delete(`/api/v1/mcp-servers/${id}`)
+  },
+
+  /**
+   * Test connection to an MCP server (before saving)
+   */
+  testConnection(config: {
+    server_url: string
+    api_key?: string
+    api_key_header_name?: string
+    timeout_seconds?: number
+  }) {
+    return apiClient.post('/api/v1/mcp-servers/test', config)
+  },
+
+  /**
+   * Refresh cached tools for an existing MCP server
+   */
+  refreshTools(id: number) {
+    return apiClient.post(`/api/v1/mcp-servers/${id}/refresh-tools`)
+  }
+}

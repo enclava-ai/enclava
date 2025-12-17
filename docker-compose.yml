@@ -33,7 +33,7 @@ services:
 
   # Main application backend
   enclava-backend:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
     environment:
@@ -46,6 +46,10 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - LOG_LLM_PROMPTS=${LOG_LLM_PROMPTS:-false}
       - BASE_URL=${BASE_URL}
+      # Agent & Tool Calling System - Web Search
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
+      # Agent & Tool Calling System - MCP Servers (pass all MCP_* env vars)
+      # Example: MCP_ORDER_API_URL, MCP_ORDER_API_KEY, MCP_WEATHER_URL, etc.
     depends_on:
       - enclava-migrate
       - enclava-postgres
@@ -57,6 +61,10 @@ services:
       - ./backend:/app
       - ./logs:/app/logs
       - ./plugins:/plugins
+      # Docker socket for code execution sandbox
+      # SECURITY NOTE: This allows the backend to spawn Docker containers
+      # In production, consider using Docker-in-Docker or restricting permissions
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - enclava-net
     restart: unless-stopped

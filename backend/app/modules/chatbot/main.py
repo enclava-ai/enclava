@@ -148,6 +148,117 @@ class ChatbotInstance(BaseModel):
     is_active: bool = True
 
 
+# Helper functions for tool integration
+
+
+def get_tool_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract tool configuration from chatbot config, with defaults.
+
+    Args:
+        config: Chatbot configuration dictionary
+
+    Returns:
+        Tool configuration dict with defaults applied
+    """
+    tool_config = config.get("tools", {})
+    return {
+        "enabled": tool_config.get("enabled", False),
+        "builtin_tools": tool_config.get("builtin_tools", []),
+        "mcp_servers": tool_config.get("mcp_servers", []),
+        "include_custom_tools": tool_config.get("include_custom_tools", True),
+        "tool_choice": tool_config.get("tool_choice", "auto"),
+        "max_iterations": tool_config.get("max_iterations", 5)
+    }
+
+
+def _get_user_id(user: Union[User, Dict[str, Any]]) -> int:
+    """Extract integer user ID from either User model or auth dict.
+
+    Mirrors ToolCallingService._get_user_id for consistency.
+
+    Args:
+        user: User model or auth dict
+
+    Returns:
+        Integer user ID
+    """
+    if isinstance(user, dict):
+        return int(user.get("id"))
+    return int(user.id)
+
+
+def _get_mcp_config(server_name: str) -> Optional[Dict[str, Any]]:
+    """Get MCP server configuration by name.
+
+    Reads from environment variables:
+    - MCP_{SERVER_NAME}_URL
+    - MCP_{SERVER_NAME}_KEY (optional)
+
+    Same logic as ToolCallingService._get_mcp_config for consistency.
+
+    Args:
+        server_name: Name of the MCP server (e.g., "order-api")
+
+    Returns:
+        Dict with url and optional api_key, or None if not configured
+    """
+    import os
+
+    env_prefix = f"MCP_{server_name.upper().replace('-', '_')}"
+    url = os.getenv(f"{env_prefix}_URL")
+
+    if not url:
+        return None
+
+    return {
+        "url": url,
+        "api_key": os.getenv(f"{env_prefix}_KEY")
+    }
+
+
+async def _load_custom_tools_async(user_id: int, limit: int = 100) -> List[Dict[str, Any]]:
+    """Load custom tools using async session.
+
+    CRITICAL: Chatbot module uses sync Session, but ToolManagementService
+    requires AsyncSession. This helper creates a temporary async session
+    to load custom tools, similar to how _load_prompt_templates creates
+    its own sync session.
+
+    NOTE: Uses existing `async_session_factory` from database.py (NOT `async_session_maker`).
+
+    Args:
+        user_id: User ID to load tools for
+        limit: Maximum number of tools to return
+
+    Returns:
+        List of tools in OpenAI format
+    """
+    from app.db.database import async_session_factory
+    from app.services.tool_management_service import ToolManagementService
+
+    tools = []
+
+    async with async_session_factory() as async_db:
+        try:
+            tool_mgmt = ToolManagementService(async_db)
+            custom_tools = await tool_mgmt.get_tools(user_id=user_id, limit=limit)
+
+            for custom_tool in custom_tools:
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": custom_tool.name,
+                        "description": custom_tool.description or f"Execute {custom_tool.display_name}",
+                        "parameters": custom_tool.parameters_schema
+                        or {"type": "object", "properties": {}, "required": []}
+                    }
+                })
+        except Exception as e:
+            logger.warning(f"Failed to load custom tools: {e}")
+
+    return tools
+
+
 class ChatbotModule(BaseModule):
     """Main chatbot module implementation"""
 
@@ -367,25 +478,114 @@ class ChatbotModule(BaseModule):
                     f"Message {idx}: id={msg.id}, role={msg.role}, content_preview={msg.content[:50] if msg.content else 'None'}..."
                 )
 
-            # Generate response
-            response_content, sources = await self._generate_response(
-                request.message, messages, chatbot_config, request.context, db
-            )
+            # Check if tools are enabled
+            tool_config = get_tool_config(db_chatbot.config)
 
-            # Create assistant message
-            assistant_message = DBMessage(
-                conversation_id=conversation.id,
-                role=MessageRole.ASSISTANT.value,
-                content=response_content,
-                sources=sources,
-                metadata={
-                    "model": chatbot_config.model,
-                    "temperature": chatbot_config.temperature,
-                },
-            )
-            db.add(assistant_message)
-            db.commit()
-            db.refresh(assistant_message)
+            if tool_config["enabled"]:
+                # Use tool calling path
+                from app.services.tool_calling_service import ToolCallingService
+                from app.services.llm.models import ChatMessage as LLMChatMessage
+                from app.db.database import async_session_factory
+
+                # Build tool list based on config
+                tools = await self._build_tool_list(tool_config, {"id": user_id})
+
+                # Build message list for LLM (system + history)
+                llm_messages = []
+                if chatbot_config.system_prompt:
+                    llm_messages.append(LLMChatMessage(
+                        role="system",
+                        content=chatbot_config.system_prompt
+                    ))
+
+                # Add conversation history (reverse order since we got desc)
+                for msg in reversed(messages):
+                    llm_messages.append(LLMChatMessage(
+                        role=msg.role,
+                        content=msg.content,
+                        tool_calls=msg.tool_calls,
+                        tool_call_id=msg.tool_call_id
+                    ))
+
+                # Create ChatRequest with tools
+                # CRITICAL: Need async session for ToolCallingService
+                async with async_session_factory() as async_db:
+                    tool_service = ToolCallingService(async_db)
+
+                    # Create request - note this needs api_key_id which we don't have in chatbot context
+                    # For chatbot, we'll pass 0 as a placeholder since it's not API key based
+                    from app.services.llm.models import ChatRequest
+                    chat_request = ChatRequest(
+                        model=chatbot_config.model,
+                        messages=llm_messages,
+                        tools=tools,
+                        tool_choice=tool_config["tool_choice"],
+                        temperature=chatbot_config.temperature,
+                        max_tokens=chatbot_config.max_tokens,
+                        user_id=user_id,
+                        api_key_id=0  # Chatbot doesn't use API keys
+                    )
+
+                    # Use ToolCallingService for execution
+                    llm_response = await tool_service.create_chat_completion_with_tools(
+                        request=chat_request,
+                        user={"id": user_id},
+                        max_tool_calls=tool_config["max_iterations"]
+                    )
+
+                # Extract response
+                assistant_msg = llm_response.choices[0].message
+                response_content = assistant_msg.content
+                tool_calls_data = None
+
+                if assistant_msg.tool_calls:
+                    tool_calls_data = [
+                        {
+                            "id": tc.id,
+                            "type": tc.type,
+                            "function": tc.function
+                        }
+                        for tc in assistant_msg.tool_calls
+                    ]
+
+                # Create assistant message with tool calls
+                assistant_message = DBMessage(
+                    conversation_id=conversation.id,
+                    role=MessageRole.ASSISTANT.value,
+                    content=response_content,
+                    tool_calls=tool_calls_data,
+                    message_metadata={
+                        "model": chatbot_config.model,
+                        "temperature": chatbot_config.temperature,
+                        "tools_enabled": True,
+                    },
+                )
+                db.add(assistant_message)
+                db.commit()
+                db.refresh(assistant_message)
+
+                sources = None  # Tools don't use RAG sources directly
+
+            else:
+                # Use existing non-tool path
+                response_content, sources = await self._generate_response(
+                    request.message, messages, chatbot_config, request.context, db
+                )
+
+                # Create assistant message
+                assistant_message = DBMessage(
+                    conversation_id=conversation.id,
+                    role=MessageRole.ASSISTANT.value,
+                    content=response_content,
+                    sources=sources,
+                    message_metadata={
+                        "model": chatbot_config.model,
+                        "temperature": chatbot_config.temperature,
+                    },
+                )
+                db.add(assistant_message)
+                db.commit()
+                db.refresh(assistant_message)
 
             # Update conversation timestamp
             conversation.updated_at = datetime.utcnow()
@@ -423,6 +623,75 @@ class ChatbotModule(BaseModule):
                 message_id=assistant_message.id,
                 metadata={"error": str(e), "fallback": True},
             )
+
+    async def _build_tool_list(
+        self,
+        tool_config: Dict[str, Any],
+        user: Union[User, Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Build OpenAI-format tool list based on config.
+
+        Includes:
+        - Enabled built-in tools (from config.builtin_tools list)
+        - MCP server tools (from config.mcp_servers list)
+        - User's custom tools from database (if config.include_custom_tools is True)
+
+        IMPORTANT: Uses _load_custom_tools_async() for custom tools because
+        chatbot module uses sync Session but ToolManagementService needs AsyncSession.
+
+        Args:
+            tool_config: Tool configuration dict from get_tool_config()
+            user: User model or dict
+
+        Returns:
+            List of tools in OpenAI function calling format
+        """
+        from app.services.builtin_tools.registry import BuiltinToolRegistry
+
+        tools = []
+
+        # 1. Add enabled built-in tools
+        for tool_name in tool_config.get("builtin_tools", []):
+            tool = BuiltinToolRegistry.get(tool_name)
+            if tool:
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.parameters_schema
+                    }
+                })
+
+        # 2. Add MCP server tools (already normalized to OpenAI format by MCPClient)
+        for server_name in tool_config.get("mcp_servers", []):
+            mcp_cfg = _get_mcp_config(server_name)  # Use module-level helper
+            if mcp_cfg:
+                from app.services.mcp_client import MCPClient
+                client = MCPClient(
+                    server_url=mcp_cfg["url"],
+                    api_key=mcp_cfg.get("api_key"),
+                    api_key_header_name=mcp_cfg.get("api_key_header_name", "Authorization")
+                )
+                try:
+                    # MCPClient.list_tools() returns normalized OpenAI format
+                    mcp_tools = await client.list_tools()
+                    # Prefix tool names with server name for routing
+                    for mcp_tool in mcp_tools:
+                        mcp_tool["function"]["name"] = f"{server_name}.{mcp_tool['function']['name']}"
+                        tools.append(mcp_tool)
+                except Exception as e:
+                    logger.warning(f"Failed to list tools from MCP server {server_name}: {e}")
+
+        # 3. Add user's custom tools from database (if enabled)
+        # CRITICAL: Use async helper because chatbot uses sync Session
+        # but ToolManagementService requires AsyncSession
+        if tool_config.get("include_custom_tools", True):
+            user_id = _get_user_id(user)
+            custom_tools = await _load_custom_tools_async(user_id, limit=100)
+            tools.extend(custom_tools)
+
+        return tools
 
     async def _generate_response(
         self,
