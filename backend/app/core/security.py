@@ -36,7 +36,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     import time
 
     start_time = time.time()
-    logger.info(
+    logger.debug(
         f"=== PASSWORD VERIFICATION START === BCRYPT_ROUNDS: {settings.BCRYPT_ROUNDS}"
     )
 
@@ -50,7 +50,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
         end_time = time.time()
         duration = end_time - start_time
-        logger.info(
+        logger.debug(
             f"=== PASSWORD VERIFICATION END === Duration: {duration:.3f}s, Result: {result}"
         )
 
@@ -94,7 +94,7 @@ def create_access_token(
     import time
 
     start_time = time.time()
-    logger.info(f"=== CREATE ACCESS TOKEN START ===")
+    logger.debug(f"=== CREATE ACCESS TOKEN START ===")
 
     try:
         to_encode = data.copy()
@@ -106,7 +106,7 @@ def create_access_token(
             )
 
         to_encode.update({"exp": expire})
-        logger.info(f"JWT encode start...")
+        logger.debug(f"JWT encode start...")
         encode_start = time.time()
         encoded_jwt = jwt.encode(
             to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
@@ -118,15 +118,15 @@ def create_access_token(
         total_duration = end_time - start_time
 
         # Log token creation details
-        logger.info(f"Created access token for user {data.get('sub')}")
-        logger.info(f"Token expires at: {expire.isoformat()} (UTC)")
-        logger.info(f"Current UTC time: {datetime.utcnow().isoformat()}")
-        logger.info(
+        logger.debug(f"Created access token for user {data.get('sub')}")
+        logger.debug(f"Token expires at: {expire.isoformat()} (UTC)")
+        logger.debug(f"Current UTC time: {datetime.utcnow().isoformat()}")
+        logger.debug(
             f"ACCESS_TOKEN_EXPIRE_MINUTES setting: {settings.ACCESS_TOKEN_EXPIRE_MINUTES}"
         )
-        logger.info(f"JWT encode duration: {encode_duration:.3f}s")
-        logger.info(f"Total token creation duration: {total_duration:.3f}s")
-        logger.info(f"=== CREATE ACCESS TOKEN END ===")
+        logger.debug(f"JWT encode duration: {encode_duration:.3f}s")
+        logger.debug(f"Total token creation duration: {total_duration:.3f}s")
+        logger.debug(f"=== CREATE ACCESS TOKEN END ===")
 
         return encoded_jwt
     except Exception as e:
@@ -156,7 +156,7 @@ def verify_token(token: str) -> Dict[str, Any]:
     try:
         # Log current time before verification
         current_time = datetime.utcnow()
-        logger.info(f"Verifying token at: {current_time.isoformat()} (UTC)")
+        logger.debug(f"Verifying token at: {current_time.isoformat()} (UTC)")
 
         # Decode without verification first to check expiration
         try:
@@ -164,19 +164,19 @@ def verify_token(token: str) -> Dict[str, Any]:
             exp_timestamp = unverified_payload.get("exp")
             if exp_timestamp:
                 exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=None)
-                logger.info(f"Token expiration time: {exp_datetime.isoformat()} (UTC)")
-                logger.info(
+                logger.debug(f"Token expiration time: {exp_datetime.isoformat()} (UTC)")
+                logger.debug(
                     f"Time until expiration: {(exp_datetime - current_time).total_seconds()} seconds"
                 )
         except Exception as decode_error:
-            logger.warning(
+            logger.debug(
                 f"Could not decode token for expiration check: {decode_error}"
             )
 
         payload = jwt.decode(
             token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
         )
-        logger.info(f"Token verified successfully for user {payload.get('sub')}")
+        logger.debug(f"Token verified successfully for user {payload.get('sub')}")
         return payload
     except JWTError as e:
         logger.warning(f"Token verification failed: {e}")
@@ -192,7 +192,7 @@ async def get_current_user(
     try:
         # Log server time for debugging clock sync issues
         server_time = datetime.utcnow()
-        logger.info(f"get_current_user called at: {server_time.isoformat()} (UTC)")
+        logger.debug(f"get_current_user called at: {server_time.isoformat()} (UTC)")
 
         payload = verify_token(credentials.credentials)
         user_id: str = payload.get("sub")

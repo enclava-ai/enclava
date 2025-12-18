@@ -269,7 +269,7 @@ class ModulePermissionRegistry:
         import time
 
         start_time = time.time()
-        logger.info(
+        logger.debug(
             f"=== GET USER PERMISSIONS START === Roles: {roles}, Custom perms: {custom_permissions}"
         )
 
@@ -281,18 +281,18 @@ class ModulePermissionRegistry:
                 role_perms = self.role_permissions.get(
                     role, self.default_roles.get(role, [])
                 )
-                logger.info(f"Role '{role}' has {len(role_perms)} permissions")
+                logger.debug(f"Role '{role}' has {len(role_perms)} permissions")
                 permissions.update(role_perms)
 
             # Add custom permissions
             if custom_permissions:
                 permissions.update(custom_permissions)
-                logger.info(f"Added {len(custom_permissions)} custom permissions")
+                logger.debug(f"Added {len(custom_permissions)} custom permissions")
 
             result = list(permissions)
             end_time = time.time()
             duration = end_time - start_time
-            logger.info(
+            logger.debug(
                 f"=== GET USER PERMISSIONS END === Total permissions: {len(result)}, Duration: {duration:.3f}s"
             )
 
