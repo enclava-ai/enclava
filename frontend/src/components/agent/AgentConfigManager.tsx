@@ -30,9 +30,10 @@ import { useToast } from "@/hooks/use-toast"
 import { AgentChatInterface } from "./AgentChatInterface"
 import { MCPServerManager } from "./MCPServerManager"
 import ModelSelector from "@/components/playground/ModelSelector"
-import { agentApi, toolApi } from "@/lib/api-client"
+import { agentApi, toolApi, mcpServerApi } from "@/lib/api-client"
 import type { AgentConfig, CreateAgentConfigRequest, Tool } from "@/types/agent"
 import { BUILTIN_TOOLS, AGENT_CATEGORIES } from "@/types/agent"
+import type { AvailableMCPServersResponse } from "@/types/mcp-server"
 
 const AGENT_TYPE_ICONS: Record<string, typeof Bot> = {
   support: Bot,
@@ -45,6 +46,7 @@ export function AgentConfigManager() {
   const [mainTab, setMainTab] = useState<string>("agents")
   const [agents, setAgents] = useState<AgentConfig[]>([])
   const [availableTools, setAvailableTools] = useState<Tool[]>([])
+  const [availableMCPServers, setAvailableMCPServers] = useState<AvailableMCPServersResponse["servers"]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -96,6 +98,7 @@ export function AgentConfigManager() {
   useEffect(() => {
     loadAgents()
     loadTools()
+    loadMCPServers()
   }, [])
 
   const loadAgents = async () => {
@@ -119,6 +122,15 @@ export function AgentConfigManager() {
       setAvailableTools(data.tools || [])
     } catch (error) {
       console.error('Failed to load tools:', error)
+    }
+  }
+
+  const loadMCPServers = async () => {
+    try {
+      const data = await mcpServerApi.getAvailableServers()
+      setAvailableMCPServers(data.servers || [])
+    } catch (error) {
+      console.error('Failed to load MCP servers:', error)
     }
   }
 
@@ -277,6 +289,18 @@ export function AgentConfigManager() {
       builtin_tools: current.includes(toolName)
         ? current.filter(t => t !== toolName)
         : [...current, toolName]
+    }))
+  }
+
+  const toggleMCPServer = (serverName: string, isCreate: boolean) => {
+    const setter = isCreate ? setNewAgent : setEditAgent
+    const current = isCreate ? newAgent.mcp_servers || [] : editAgent.mcp_servers || []
+
+    setter(prev => ({
+      ...prev,
+      mcp_servers: current.includes(serverName)
+        ? current.filter(s => s !== serverName)
+        : [...current, serverName]
     }))
   }
 
@@ -444,6 +468,42 @@ export function AgentConfigManager() {
                   </div>
                 </div>
 
+                <div>
+                  <Label className="flex items-center gap-2">
+                    <Server className="h-4 w-4" />
+                    MCP Servers
+                  </Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Select external MCP servers this agent can access
+                  </p>
+                  {availableMCPServers.length > 0 ? (
+                    <div className="space-y-2 mt-2">
+                      {availableMCPServers.map((server) => (
+                        <div key={server.name} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`mcp-${server.name}`}
+                            checked={newAgent.mcp_servers?.includes(server.name)}
+                            onCheckedChange={() => toggleMCPServer(server.name, true)}
+                          />
+                          <Label htmlFor={`mcp-${server.name}`} className="flex-1 cursor-pointer">
+                            <span className="font-medium">{server.display_name}</span>
+                            {server.is_global && (
+                              <Badge variant="secondary" className="ml-2 text-xs">Global</Badge>
+                            )}
+                            <p className="text-sm text-muted-foreground">
+                              {server.description || `${server.tool_count} tools available`}
+                            </p>
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">
+                      No MCP servers available. Add servers in the MCP Servers tab.
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="include_custom"
@@ -541,9 +601,15 @@ export function AgentConfigManager() {
                     <Badge variant="outline" className="text-xs">{agent.model}</Badge>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Tools</span>
+                    <span className="text-muted-foreground">Built-in Tools</span>
                     <Badge variant="default">
                       {agent.tools_config.builtin_tools.length} enabled
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">MCP Servers</span>
+                    <Badge variant={agent.tools_config.mcp_servers.length > 0 ? "default" : "secondary"}>
+                      {agent.tools_config.mcp_servers.length} connected
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -743,6 +809,42 @@ export function AgentConfigManager() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Server className="h-4 w-4" />
+                  MCP Servers
+                </Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Select external MCP servers this agent can access
+                </p>
+                {availableMCPServers.length > 0 ? (
+                  <div className="space-y-2 mt-2">
+                    {availableMCPServers.map((server) => (
+                      <div key={server.name} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`edit-mcp-${server.name}`}
+                          checked={editAgent.mcp_servers?.includes(server.name)}
+                          onCheckedChange={() => toggleMCPServer(server.name, false)}
+                        />
+                        <Label htmlFor={`edit-mcp-${server.name}`} className="flex-1 cursor-pointer">
+                          <span className="font-medium">{server.display_name}</span>
+                          {server.is_global && (
+                            <Badge variant="secondary" className="ml-2 text-xs">Global</Badge>
+                          )}
+                          <p className="text-sm text-muted-foreground">
+                            {server.description || `${server.tool_count} tools available`}
+                          </p>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    No MCP servers available. Add servers in the MCP Servers tab.
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">

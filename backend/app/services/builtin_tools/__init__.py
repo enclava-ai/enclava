@@ -4,7 +4,6 @@ Built-in Tools Package
 This package contains built-in tools that are available to all users:
 - RAGSearchTool: Search the knowledge base
 - WebSearchTool: Search the internet via Brave API
-- CodeExecutionTool: Execute Python code in a sandboxed environment
 
 Tools are registered at application startup via register_builtin_tools().
 """
@@ -13,7 +12,6 @@ from .base import BuiltinTool, ToolExecutionContext, ToolResult
 from .registry import BuiltinToolRegistry
 from .rag_search import RAGSearchTool
 from .web_search import WebSearchTool
-from .code_execution import CodeExecutionTool
 
 
 def register_builtin_tools():
@@ -31,7 +29,6 @@ def register_builtin_tools():
     # Register built-in tools
     BuiltinToolRegistry.register(RAGSearchTool())
     BuiltinToolRegistry.register(WebSearchTool())
-    BuiltinToolRegistry.register(CodeExecutionTool())
 
 
 __all__ = [
@@ -41,6 +38,5 @@ __all__ = [
     "BuiltinToolRegistry",
     "RAGSearchTool",
     "WebSearchTool",
-    "CodeExecutionTool",
     "register_builtin_tools",
 ]

@@ -246,7 +246,7 @@ class ToolCallingService:
         """Execute a single tool call - routes to builtin, MCP, or custom tools.
 
         Routing priority:
-        1. Built-in tools (rag_search, web_search, code_execution)
+        1. Built-in tools (rag_search, web_search)
         2. MCP tools (server_name.tool_name format)
         3. Custom user tools (from database)
 
@@ -344,7 +344,7 @@ class ToolCallingService:
         """Validate which tools are available to the user.
 
         Checks tools in this priority order:
-        1. Built-in tools (rag_search, web_search, code_execution)
+        1. Built-in tools (rag_search, web_search)
         2. MCP tools (server_name.tool_name format)
         3. Custom user tools (from database)
 

@@ -29,7 +29,6 @@ class AgentConfig(Base):
 
     Examples:
     - "Research Assistant" - web_search + rag_search tools
-    - "Code Helper" - code_execution + rag_search tools
     - "Customer Support" - order-api MCP tools + knowledge base
     """
 
