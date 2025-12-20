@@ -24,9 +24,9 @@ router = APIRouter()
 
 # Pydantic models
 class AuditLogResponse(BaseModel):
-    id: str
-    user_id: Optional[str] = None
-    api_key_id: Optional[str] = None
+    id: int
+    user_id: Optional[int] = None
+    api_key_id: Optional[int] = None
     action: str
     resource_type: str
     resource_id: Optional[str] = None

@@ -38,6 +38,7 @@ class APIKeyCreate(BaseModel):
     allowed_ips: List[str] = Field(default_factory=list)
     allowed_models: List[str] = Field(default_factory=list)  # Model restrictions
     allowed_chatbots: List[str] = Field(default_factory=list)  # Chatbot restrictions
+    allowed_agents: List[str] = Field(default_factory=list)  # Agent config restrictions
     is_unlimited: bool = True  # Unlimited budget flag
     budget_limit_cents: Optional[int] = Field(None, ge=0)  # Budget limit in cents
     budget_type: Optional[str] = Field(None, pattern="^(total|monthly)$")  # Budget type
@@ -56,6 +57,7 @@ class APIKeyUpdate(BaseModel):
     allowed_ips: Optional[List[str]] = None
     allowed_models: Optional[List[str]] = None  # Model restrictions
     allowed_chatbots: Optional[List[str]] = None  # Chatbot restrictions
+    allowed_agents: Optional[List[str]] = None  # Agent config restrictions
     is_unlimited: Optional[bool] = None  # Unlimited budget flag
     budget_limit_cents: Optional[int] = Field(None, ge=0)  # Budget limit in cents
     budget_type: Optional[str] = Field(None, pattern="^(total|monthly)$")  # Budget type
@@ -81,6 +83,7 @@ class APIKeyResponse(BaseModel):
     allowed_ips: List[str]
     allowed_models: List[str]  # Model restrictions
     allowed_chatbots: List[str]  # Chatbot restrictions
+    allowed_agents: List[str]  # Agent config restrictions
     budget_limit: Optional[int] = Field(
         None, alias="budget_limit_cents"
     )  # Budget limit in cents
@@ -113,6 +116,7 @@ class APIKeyResponse(BaseModel):
             "allowed_ips": api_key.allowed_ips,
             "allowed_models": api_key.allowed_models,
             "allowed_chatbots": api_key.allowed_chatbots,
+            "allowed_agents": api_key.allowed_agents or [],
             "budget_limit_cents": api_key.budget_limit_cents,
             "budget_type": api_key.budget_type,
             "is_unlimited": api_key.is_unlimited,
@@ -324,6 +328,7 @@ async def create_api_key(
         allowed_ips=api_key_data.allowed_ips,
         allowed_models=api_key_data.allowed_models,
         allowed_chatbots=api_key_data.allowed_chatbots,
+        allowed_agents=api_key_data.allowed_agents,
         is_unlimited=api_key_data.is_unlimited,
         budget_limit_cents=api_key_data.budget_limit_cents
         if not api_key_data.is_unlimited

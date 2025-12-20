@@ -24,6 +24,7 @@ class ToolCallingService:
         self.db = db
         self.tool_mgmt = ToolManagementService(db)
         self.tool_exec = ToolExecutionService(db)
+        self._tool_resources: Optional[Dict[str, Any]] = None
 
     def _get_user_id(self, user: Union[User, Dict[str, Any]]) -> int:
         """Extract integer user ID from either User model or auth dict."""
@@ -37,6 +38,7 @@ class ToolCallingService:
         user: Union[User, Dict[str, Any]],
         auto_execute_tools: bool = True,
         max_tool_calls: int = 5,
+        tool_resources: Optional[Dict[str, Any]] = None,
     ) -> ChatResponse:
         """
         Create chat completion with tool calling support
@@ -46,7 +48,10 @@ class ToolCallingService:
             user: User making the request
             auto_execute_tools: Whether to automatically execute tool calls
             max_tool_calls: Maximum number of tool calls to prevent infinite loops
+            tool_resources: Tool resources (e.g., file_search.vector_store_ids for RAG)
         """
+        # Store tool_resources for use in _execute_tool_call
+        self._tool_resources = tool_resources
 
         # Get available tools for the user
         available_tools = await self._get_available_tools_for_user(user)
@@ -275,7 +280,8 @@ class ToolCallingService:
             tool = BuiltinToolRegistry.get(function_name)
             ctx = ToolExecutionContext(
                 user_id=self._get_user_id(user),
-                db=self.db
+                db=self.db,
+                tool_resources=self._tool_resources
             )
             result = await tool.execute(arguments, ctx)
             return {

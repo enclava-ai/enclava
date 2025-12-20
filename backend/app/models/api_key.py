@@ -58,6 +58,9 @@ class APIKey(Base):
     allowed_chatbots = Column(
         JSON, default=list
     )  # List of allowed chatbot IDs for chatbot-specific keys
+    allowed_agents = Column(
+        JSON, default=list
+    )  # List of allowed agent config IDs for agent-specific keys
 
     # Budget configuration
     is_unlimited = Column(Boolean, default=True)  # Unlimited budget flag
@@ -108,6 +111,7 @@ class APIKey(Base):
             "allowed_endpoints": self.allowed_endpoints,
             "allowed_ips": self.allowed_ips,
             "allowed_chatbots": self.allowed_chatbots,
+            "allowed_agents": self.allowed_agents,
             "description": self.description,
             "tags": self.tags,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -170,6 +174,13 @@ class APIKey(Base):
         if not self.allowed_chatbots:  # Empty list means all chatbots allowed
             return True
         return chatbot_id in self.allowed_chatbots
+
+    def can_access_agent(self, agent_id: int) -> bool:
+        """Check if the API key can access a specific agent config"""
+        if not self.allowed_agents:  # Empty list means all agents allowed
+            return True
+        # Convert to string for comparison since JSON stores as strings
+        return str(agent_id) in [str(a) for a in self.allowed_agents]
 
     def update_usage(self, tokens_used: int = 0, cost_cents: int = 0):
         """Update usage statistics"""
@@ -243,6 +254,17 @@ class APIKey(Base):
         """Remove an allowed chatbot"""
         if chatbot_id in self.allowed_chatbots:
             self.allowed_chatbots.remove(chatbot_id)
+
+    def add_allowed_agent(self, agent_id: int):
+        """Add an allowed agent config"""
+        agent_id_str = str(agent_id)
+        if agent_id_str not in [str(a) for a in self.allowed_agents]:
+            self.allowed_agents.append(agent_id_str)
+
+    def remove_allowed_agent(self, agent_id: int):
+        """Remove an allowed agent config"""
+        agent_id_str = str(agent_id)
+        self.allowed_agents = [a for a in self.allowed_agents if str(a) != agent_id_str]
 
     @classmethod
     def create_default_key(
@@ -327,4 +349,36 @@ class APIKey(Base):
             allowed_chatbots=[chatbot_id],
             description=f"API key for chatbot: {chatbot_name}",
             tags=["chatbot", f"chatbot-{chatbot_id}"],
+        )
+
+    @classmethod
+    def create_agent_key(
+        cls,
+        user_id: int,
+        name: str,
+        key_hash: str,
+        key_prefix: str,
+        agent_id: int,
+        agent_name: str,
+    ) -> "APIKey":
+        """Create an agent-specific API key"""
+        return cls(
+            name=name,
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+            user_id=user_id,
+            is_active=True,
+            permissions={"agent": True},
+            scopes=["agent.chat"],
+            rate_limit_per_minute=100,
+            rate_limit_per_hour=6000,
+            rate_limit_per_day=144000,
+            allowed_models=[],  # Will use agent's configured model
+            allowed_endpoints=[
+                f"/api/v1/tool-calling/agent/chat",
+            ],
+            allowed_ips=[],
+            allowed_agents=[str(agent_id)],
+            description=f"API key for agent: {agent_name}",
+            tags=["agent", f"agent-{agent_id}"],
         )

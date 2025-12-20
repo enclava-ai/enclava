@@ -17,10 +17,12 @@ class ToolExecutionContext:
         user_id: User executing the tool
         db: Async database session for queries
         config: Optional configuration dict for tool-specific settings
+        tool_resources: Optional tool resources from agent config (e.g., file_search.vector_store_ids)
     """
     user_id: int
     db: Any  # AsyncSession - using Any to avoid circular imports
     config: Dict[str, Any] = field(default_factory=dict)
+    tool_resources: Optional[Dict[str, Any]] = None
 
 
 @dataclass

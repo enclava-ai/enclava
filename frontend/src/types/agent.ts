@@ -29,6 +29,22 @@ export interface ToolsConfig {
   max_iterations: number
 }
 
+export interface FileSearchResource {
+  vector_store_ids: string[]
+  max_results?: number
+}
+
+export interface ToolResources {
+  file_search?: FileSearchResource
+}
+
+export interface RagCollection {
+  id: number | string
+  name: string
+  description: string
+  document_count: number
+}
+
 export interface AgentConfig {
   id: number
   name: string
@@ -39,6 +55,7 @@ export interface AgentConfig {
   temperature: number
   max_tokens: number
   tools_config: ToolsConfig
+  tool_resources?: ToolResources
   category?: string
   tags: string[]
   is_public: boolean
@@ -76,6 +93,7 @@ export interface CreateAgentConfigRequest {
   category?: string
   tags?: string[]
   is_public?: boolean
+  tool_resources?: ToolResources
 }
 
 export interface UpdateAgentConfigRequest extends Partial<CreateAgentConfigRequest> {}
@@ -137,9 +155,8 @@ export type AgentEvent =
 export type AgentConfigField = keyof CreateAgentConfigRequest
 export type MessageRole = AgentChatMessage['role']
 
-// Built-in Tools
+// Built-in Tools (RAG is configured via Knowledge Base tab, not here)
 export const BUILTIN_TOOLS = [
-  { value: 'rag_search', label: 'RAG Search', description: 'Search knowledge base documents' },
   { value: 'web_search', label: 'Web Search', description: 'Search the web using Brave API' },
 ] as const
 

@@ -24,14 +24,15 @@ import {
   Code,
   Search,
   Globe,
-  Server
+  Server,
+  Database
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { AgentChatInterface } from "./AgentChatInterface"
 import { MCPServerManager } from "./MCPServerManager"
 import ModelSelector from "@/components/playground/ModelSelector"
-import { agentApi, toolApi, mcpServerApi } from "@/lib/api-client"
-import type { AgentConfig, CreateAgentConfigRequest, Tool } from "@/types/agent"
+import { agentApi, toolApi, mcpServerApi, apiClient } from "@/lib/api-client"
+import type { AgentConfig, CreateAgentConfigRequest, Tool, RagCollection } from "@/types/agent"
 import { BUILTIN_TOOLS, AGENT_CATEGORIES } from "@/types/agent"
 import type { AvailableMCPServersResponse } from "@/types/mcp-server"
 
@@ -47,6 +48,7 @@ export function AgentConfigManager() {
   const [agents, setAgents] = useState<AgentConfig[]>([])
   const [availableTools, setAvailableTools] = useState<Tool[]>([])
   const [availableMCPServers, setAvailableMCPServers] = useState<AvailableMCPServersResponse["servers"]>([])
+  const [ragCollections, setRagCollections] = useState<RagCollection[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -73,7 +75,8 @@ export function AgentConfigManager() {
     max_iterations: 5,
     category: "general",
     tags: [],
-    is_public: false
+    is_public: false,
+    tool_resources: undefined
   })
 
   // Edit agent form state
@@ -92,13 +95,15 @@ export function AgentConfigManager() {
     max_iterations: 5,
     category: "general",
     tags: [],
-    is_public: false
+    is_public: false,
+    tool_resources: undefined
   })
 
   useEffect(() => {
     loadAgents()
     loadTools()
     loadMCPServers()
+    loadRagCollections()
   }, [])
 
   const loadAgents = async () => {
@@ -134,6 +139,15 @@ export function AgentConfigManager() {
     }
   }
 
+  const loadRagCollections = async () => {
+    try {
+      const data = await apiClient.get('/api-internal/v1/rag/collections')
+      setRagCollections(data.collections || [])
+    } catch (error) {
+      console.error('Failed to load RAG collections:', error)
+    }
+  }
+
   const handleTestChat = (agent: AgentConfig) => {
     setTestingAgent(agent)
     setShowChatInterface(true)
@@ -156,7 +170,8 @@ export function AgentConfigManager() {
       max_iterations: agent.tools_config.max_iterations,
       category: agent.category,
       tags: agent.tags,
-      is_public: agent.is_public
+      is_public: agent.is_public,
+      tool_resources: agent.tool_resources
     })
     setShowEditDialog(true)
   }
@@ -250,7 +265,8 @@ export function AgentConfigManager() {
       max_iterations: 5,
       category: "general",
       tags: [],
-      is_public: false
+      is_public: false,
+      tool_resources: undefined
     })
   }
 
@@ -270,7 +286,8 @@ export function AgentConfigManager() {
       max_iterations: 5,
       category: "general",
       tags: [],
-      is_public: false
+      is_public: false,
+      tool_resources: undefined
     })
   }
 
@@ -302,6 +319,85 @@ export function AgentConfigManager() {
         ? current.filter(s => s !== serverName)
         : [...current, serverName]
     }))
+  }
+
+  const toggleRagCollection = (collectionId: string, isCreate: boolean) => {
+    const setter = isCreate ? setNewAgent : setEditAgent
+    const agent = isCreate ? newAgent : editAgent
+    const currentIds = agent.tool_resources?.file_search?.vector_store_ids || []
+
+    setter(prev => ({
+      ...prev,
+      tool_resources: {
+        ...prev.tool_resources,
+        file_search: {
+          vector_store_ids: currentIds.includes(collectionId)
+            ? currentIds.filter(id => id !== collectionId)
+            : [...currentIds, collectionId]
+        }
+      }
+    }))
+  }
+
+  const getSelectedRagCollections = (isCreate: boolean): string[] => {
+    const agent = isCreate ? newAgent : editAgent
+    return agent.tool_resources?.file_search?.vector_store_ids || []
+  }
+
+  const getRagMaxResults = (isCreate: boolean): number => {
+    const agent = isCreate ? newAgent : editAgent
+    return agent.tool_resources?.file_search?.max_results || 5
+  }
+
+  const setRagMaxResults = (value: number, isCreate: boolean) => {
+    const setter = isCreate ? setNewAgent : setEditAgent
+    setter(prev => ({
+      ...prev,
+      tool_resources: {
+        ...prev.tool_resources,
+        file_search: {
+          ...prev.tool_resources?.file_search,
+          vector_store_ids: prev.tool_resources?.file_search?.vector_store_ids || [],
+          max_results: value
+        }
+      }
+    }))
+  }
+
+  // Check if knowledge base is enabled (has collections selected)
+  const isKnowledgeBaseEnabled = (isCreate: boolean): boolean => {
+    return getSelectedRagCollections(isCreate).length > 0
+  }
+
+  // Sync rag_search tool with knowledge base selection
+  const syncRagSearchTool = (hasCollections: boolean, isCreate: boolean) => {
+    const setter = isCreate ? setNewAgent : setEditAgent
+    const current = isCreate ? newAgent.builtin_tools || [] : editAgent.builtin_tools || []
+
+    if (hasCollections && !current.includes('rag_search')) {
+      setter(prev => ({
+        ...prev,
+        builtin_tools: [...(prev.builtin_tools || []), 'rag_search']
+      }))
+    } else if (!hasCollections && current.includes('rag_search')) {
+      setter(prev => ({
+        ...prev,
+        builtin_tools: (prev.builtin_tools || []).filter(t => t !== 'rag_search')
+      }))
+    }
+  }
+
+  // Enhanced toggle that also syncs rag_search tool
+  const toggleRagCollectionWithSync = (collectionId: string, isCreate: boolean) => {
+    const currentIds = getSelectedRagCollections(isCreate)
+    const willHaveCollections = currentIds.includes(collectionId)
+      ? currentIds.length > 1  // Removing one, check if others remain
+      : true  // Adding one, will have at least one
+
+    toggleRagCollection(collectionId, isCreate)
+
+    // Use setTimeout to ensure state is updated before syncing
+    setTimeout(() => syncRagSearchTool(willHaveCollections, isCreate), 0)
   }
 
   return (
@@ -345,9 +441,10 @@ export function AgentConfigManager() {
             </DialogHeader>
 
             <Tabs defaultValue="basic" className="mt-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="basic">Basic</TabsTrigger>
                 <TabsTrigger value="personality">Personality</TabsTrigger>
+                <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
                 <TabsTrigger value="tools">Tools</TabsTrigger>
                 <TabsTrigger value="advanced">Advanced</TabsTrigger>
               </TabsList>
@@ -446,6 +543,74 @@ export function AgentConfigManager() {
                     <span>Creative</span>
                   </div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="knowledge" className="space-y-4 mt-6">
+                <div>
+                  <Label className="flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    Knowledge Base Collections
+                  </Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Select which knowledge base collections this agent can search.
+                    Selecting any collection will enable RAG search for this agent.
+                  </p>
+                  {ragCollections.length > 0 ? (
+                    <div className="space-y-2 mt-2 max-h-64 overflow-y-auto border rounded-md p-3">
+                      {ragCollections.map((collection) => (
+                        <div key={collection.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`rag-${collection.id}`}
+                            checked={getSelectedRagCollections(true).includes(String(collection.id))}
+                            onCheckedChange={() => toggleRagCollectionWithSync(String(collection.id), true)}
+                          />
+                          <Label htmlFor={`rag-${collection.id}`} className="flex-1 cursor-pointer">
+                            <span className="font-medium">{collection.name}</span>
+                            <p className="text-sm text-muted-foreground">
+                              {collection.document_count} documents
+                            </p>
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border rounded-md">
+                      <Database className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        No knowledge base collections available.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Create collections in the RAG module first.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {isKnowledgeBaseEnabled(true) && (
+                  <div>
+                    <Label>Search Results: {getRagMaxResults(true)}</Label>
+                    <Slider
+                      value={[getRagMaxResults(true)]}
+                      onValueChange={([value]) => setRagMaxResults(value, true)}
+                      min={1}
+                      max={20}
+                      step={1}
+                      className="mt-2"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Maximum number of knowledge base results to include in agent context
+                    </p>
+                  </div>
+                )}
+
+                {isKnowledgeBaseEnabled(true) && (
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      RAG Search will be enabled with {getSelectedRagCollections(true).length} collection(s)
+                    </span>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="tools" className="space-y-4 mt-6">
@@ -688,9 +853,10 @@ export function AgentConfigManager() {
           </DialogHeader>
 
           <Tabs defaultValue="basic" className="mt-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="basic">Basic</TabsTrigger>
               <TabsTrigger value="personality">Personality</TabsTrigger>
+              <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
               <TabsTrigger value="tools">Tools</TabsTrigger>
               <TabsTrigger value="advanced">Advanced</TabsTrigger>
             </TabsList>
@@ -789,6 +955,74 @@ export function AgentConfigManager() {
                   <span>Creative</span>
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="knowledge" className="space-y-4 mt-6">
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  Knowledge Base Collections
+                </Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Select which knowledge base collections this agent can search.
+                  Selecting any collection will enable RAG search for this agent.
+                </p>
+                {ragCollections.length > 0 ? (
+                  <div className="space-y-2 mt-2 max-h-64 overflow-y-auto border rounded-md p-3">
+                    {ragCollections.map((collection) => (
+                      <div key={collection.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`edit-rag-${collection.id}`}
+                          checked={getSelectedRagCollections(false).includes(String(collection.id))}
+                          onCheckedChange={() => toggleRagCollectionWithSync(String(collection.id), false)}
+                        />
+                        <Label htmlFor={`edit-rag-${collection.id}`} className="flex-1 cursor-pointer">
+                          <span className="font-medium">{collection.name}</span>
+                          <p className="text-sm text-muted-foreground">
+                            {collection.document_count} documents
+                          </p>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border rounded-md">
+                    <Database className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      No knowledge base collections available.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Create collections in the RAG module first.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {isKnowledgeBaseEnabled(false) && (
+                <div>
+                  <Label>Search Results: {getRagMaxResults(false)}</Label>
+                  <Slider
+                    value={[getRagMaxResults(false)]}
+                    onValueChange={([value]) => setRagMaxResults(value, false)}
+                    min={1}
+                    max={20}
+                    step={1}
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Maximum number of knowledge base results to include in agent context
+                  </p>
+                </div>
+              )}
+
+              {isKnowledgeBaseEnabled(false) && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    RAG Search will be enabled with {getSelectedRagCollections(false).length} collection(s)
+                  </span>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="tools" className="space-y-4 mt-6">

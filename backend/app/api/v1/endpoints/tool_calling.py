@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.db.database import get_db
 from app.core.security import get_current_user
+from app.services.api_key_auth import get_api_key_context
 from app.services.tool_calling_service import ToolCallingService
 from app.services.llm.models import ChatRequest, ChatResponse, ChatMessage
 from app.schemas.tool_calling import (
@@ -197,6 +198,7 @@ class AgentConfigCreate(BaseModel):
     category: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     is_public: bool = Field(default=False)
+    tool_resources: Optional[Dict[str, Any]] = Field(default=None)
 
 
 class AgentConfigUpdate(BaseModel):
@@ -216,6 +218,7 @@ class AgentConfigUpdate(BaseModel):
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     is_public: Optional[bool] = None
+    tool_resources: Optional[Dict[str, Any]] = None
 
 
 class AgentChatRequest(BaseModel):
@@ -396,6 +399,7 @@ async def create_agent_config(
         temperature=request.temperature,
         max_tokens=request.max_tokens,
         tools_config=tools_config,
+        tool_resources=request.tool_resources,
         category=request.category,
         tags=request.tags,
         is_public=request.is_public,
@@ -538,12 +542,22 @@ async def chat_with_agent(
     request: AgentChatRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user),
+    api_key_context: Optional[Dict[str, Any]] = Depends(get_api_key_context),
 ):
     """Chat with a pre-configured agent."""
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
 
     # Load agent config
     agent = await get_agent_config_by_id(request.agent_config_id, current_user, db)
+
+    # Check API key access restrictions if using API key authentication
+    if api_key_context:
+        api_key = api_key_context.get("api_key")
+        if api_key and not api_key.can_access_agent(request.agent_config_id):
+            raise HTTPException(
+                status_code=403,
+                detail="API key not authorized to access this agent"
+            )
 
     # Get or create conversation
     conversation = await get_or_create_conversation(request.conversation_id, user_id, db)
@@ -638,7 +652,8 @@ async def chat_with_agent(
     response = await service.create_chat_completion_with_tools(
         request=chat_request,
         user=current_user,
-        max_tool_calls=agent.tools_config.get("max_iterations", 5)
+        max_tool_calls=agent.tools_config.get("max_iterations", 5),
+        tool_resources=agent.tool_resources
     )
 
     # Extract assistant message

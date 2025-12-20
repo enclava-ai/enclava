@@ -56,6 +56,18 @@ class AgentConfig(Base):
     #     "max_iterations": 5
     # }
 
+    # Tool resources (OpenAI Responses API format)
+    tool_resources = Column(JSON, nullable=True)
+    # Expected structure:
+    # {
+    #     "file_search": {
+    #         "vector_store_ids": ["products-kb", "faq-kb"],
+    #         "top_k": 5,
+    #         "top_k_per_collection": 3,
+    #         "score_threshold": 0.5
+    #     }
+    # }
+
     # Categories and tags for organization
     category = Column(String(50), nullable=True, index=True)  # "support", "development", "research"
     tags = Column(JSON, default=list)  # ["coding", "debugging", "analysis"]
@@ -94,6 +106,7 @@ class AgentConfig(Base):
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "tools_config": self.tools_config,
+            "tool_resources": self.tool_resources,
             "category": self.category,
             "tags": self.tags,
             "is_public": self.is_public,

@@ -23,7 +23,6 @@ import { ChevronDown } from "lucide-react"
 const MODULE_NAV_MAP = {
   chatbot: { href: "/chatbot", label: "Chatbot" },
   rag: { href: "/rag", label: "RAG" },
-  agent: { href: "/agents", label: "Agents" },
   // Add more mappings as needed
 }
 
@@ -74,6 +73,8 @@ const Navigation = () => {
   // Build settings children based on permissions
   const settingsChildren = [
     { href: "/settings", label: "System Settings" },
+    { href: "/llm", label: "LLM Config" },
+    { href: "/rag-demo", label: "RAG Demo" },
     { href: "/plugins", label: "Plugins" },
     { href: "/prompt-templates", label: "Prompt Templates" },
   ];
@@ -84,31 +85,26 @@ const Navigation = () => {
   }
 
   // Core navigation items that are always visible
+  // Order: Dashboard, Agents, Chatbot (module), Rag (module), Settings
   const coreNavItems = [
     { href: "/dashboard", label: "Dashboard" },
-    {
-      href: "/llm",
-      label: "LLM",
-      children: [
-        { href: "/llm", label: "Models & Config" },
-        { href: "/playground", label: "Playground" },
-        { href: "/rag-demo", label: "RAG Demo" },
-      ]
-    },
-    {
-      href: "/settings",
-      label: "Settings",
-      children: settingsChildren
-    },
+    { href: "/agents", label: "Agents" },
   ]
+
+  // Settings goes at the end
+  const settingsItem = {
+    href: "/settings",
+    label: "Settings",
+    children: settingsChildren
+  }
 
   // Dynamic navigation items based on enabled modules
   const moduleNavItems = Object.entries(MODULE_NAV_MAP)
     .filter(([moduleName]) => isModuleEnabled(moduleName))
     .map(([, navItem]) => navItem)
 
-  // Combine core, module-based, and plugin navigation items
-  const navItems = [...coreNavItems, ...moduleNavItems, ...pluginNavItems]
+  // Combine: Dashboard, Agents, module items (Chatbot, RAG), plugins, then Settings at the end
+  const navItems = [...coreNavItems, ...moduleNavItems, ...pluginNavItems, settingsItem]
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

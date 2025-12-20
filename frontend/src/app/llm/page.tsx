@@ -7,27 +7,28 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { 
-  Key, 
-  Plus, 
-  Settings, 
-  Trash2, 
-  Calendar, 
-  Lock, 
+import {
+  Key,
+  Plus,
+  Settings,
+  Trash2,
+  Lock,
   Unlock,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Zap
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { apiClient } from '@/lib/api-client'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useRouter } from 'next/navigation'
+import ChatPlayground from '@/components/playground/ChatPlayground'
+import EmbeddingPlayground from '@/components/playground/EmbeddingPlayground'
+import ModelSelector from '@/components/playground/ModelSelector'
 
 interface APIKey {
   id: number
@@ -50,21 +51,6 @@ interface APIKey {
   tags: string[]
 }
 
-interface Model {
-  id: string
-  object: string
-  created?: number
-  owned_by?: string
-  permission?: any[]
-  root?: string
-  parent?: string
-  provider?: string
-  capabilities?: string[]
-  context_window?: number
-  max_output_tokens?: number
-  supports_streaming?: boolean
-  supports_function_calling?: boolean
-}
 
 export default function LLMPage() {
   return (
@@ -77,10 +63,11 @@ export default function LLMPage() {
 function LLMPageContent() {
   const [activeTab, setActiveTab] = useState('api-keys')
   const [apiKeys, setApiKeys] = useState<APIKey[]>([])
-  const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState(true)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [editingKey, setEditingKey] = useState<APIKey | null>(null)
+  const [selectedModel, setSelectedModel] = useState('')
+  const [playgroundTab, setPlaygroundTab] = useState('chat')
   const { toast } = useToast()
   const router = useRouter()
 
@@ -103,20 +90,14 @@ function LLMPageContent() {
       if (!token) {
         throw new Error('No authentication token found')
       }
-      
-      // Fetch API keys and models using API client
-      const [keysData, modelsData] = await Promise.all([
-        apiClient.get('/api-internal/v1/api-keys').catch(e => {
-          return { data: [] }
-        }),
-        apiClient.get('/api-internal/v1/llm/models').catch(e => {
-          return { data: [] }
-        })
-      ])
+
+      // Fetch API keys using API client
+      const keysData = await apiClient.get('/api-internal/v1/api-keys').catch(() => {
+        return { data: [] }
+      })
 
       setApiKeys(keysData.api_keys || [])
-      setModels(modelsData.data || [])
-      
+
     } catch (error) {
       toast({
         title: "Error",
@@ -207,7 +188,7 @@ function LLMPageContent() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="api-keys">API Keys</TabsTrigger>
-          <TabsTrigger value="models">Models</TabsTrigger>
+          <TabsTrigger value="playground">Playground</TabsTrigger>
         </TabsList>
 
         <TabsContent value="api-keys" className="mt-6">
@@ -333,69 +314,42 @@ function LLMPageContent() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="models" className="mt-6">
+        <TabsContent value="playground" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Available Models</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                AI Model Testing
+              </CardTitle>
               <CardDescription>
-                Models available through your LLM platform.
+                Select a model and test different AI capabilities.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {models.map((model) => {
-                  // Helper function to get provider from model ID
-                  const getProviderFromModel = (modelId: string): string => {
-                    if (modelId.startsWith('privatemode-')) return 'PrivateMode.ai'
-                    if (modelId.startsWith('gpt-') || modelId.includes('openai')) return 'OpenAI'
-                    if (modelId.startsWith('claude-') || modelId.includes('anthropic')) return 'Anthropic'
-                    if (modelId.startsWith('gemini-') || modelId.includes('google')) return 'Google'
-                    if (modelId.includes('cohere')) return 'Cohere'
-                    if (modelId.includes('mistral')) return 'Mistral'
-                    if (modelId.includes('llama') && !modelId.startsWith('privatemode-')) return 'Meta'
-                    return model.owned_by || 'Unknown'
-                  }
-                  
-                  return (
-                    <div key={model.id} className="border rounded-lg p-4">
-                      <h3 className="font-medium">{model.id}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Provider: {getProviderFromModel(model.id)}
-                      </p>
-                      <div className="flex gap-2 mt-2">
-                        <Badge variant="outline">
-                          {model.object || 'model'}
-                        </Badge>
-                        {model.supports_streaming && (
-                          <Badge variant="secondary" className="text-xs">
-                            Streaming
-                          </Badge>
-                        )}
-                        {model.supports_function_calling && (
-                          <Badge variant="secondary" className="text-xs">
-                            Functions
-                          </Badge>
-                        )}
-                        {model.capabilities?.includes('tee') && (
-                          <Badge variant="outline" className="text-xs border-green-500 text-green-700">
-                            TEE
-                          </Badge>
-                        )}
-                      </div>
-                      {model.context_window && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Context: {model.context_window.toLocaleString()} tokens
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-                {models.length === 0 && (
-                  <div className="col-span-full text-center py-8 text-muted-foreground">
-                    No models available. Check your LLM platform configuration.
-                  </div>
-                )}
+              {/* Model Selector */}
+              <div className="mb-6">
+                <label className="text-sm font-medium mb-2 block">Select Model</label>
+                <ModelSelector
+                  value={selectedModel}
+                  onValueChange={setSelectedModel}
+                  className="w-full max-w-md"
+                />
               </div>
+
+              <Tabs value={playgroundTab} onValueChange={setPlaygroundTab}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="chat">Chat Completions</TabsTrigger>
+                  <TabsTrigger value="embeddings">Embeddings</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="chat" className="mt-6">
+                  <ChatPlayground selectedModel={selectedModel} />
+                </TabsContent>
+
+                <TabsContent value="embeddings" className="mt-6">
+                  <EmbeddingPlayground />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </TabsContent>
