@@ -46,7 +46,19 @@ class RAGSearchTool(BuiltinTool):
 
     name = "rag_search"
     display_name = "RAG Search"
-    description = "Search the knowledge base for relevant information using vector similarity across multiple collections"
+    description = """Search the internal knowledge base for information from uploaded documents and configured vector stores.
+
+USE THIS TOOL WHEN:
+- User asks about content from uploaded files, documents, or internal knowledge
+- Searching company/project-specific information stored in the knowledge base
+- Looking up information from the configured vector stores (collections)
+- User explicitly mentions "knowledge base", "documents", or "uploaded files"
+
+DO NOT USE THIS TOOL WHEN:
+- User asks about external websites, public GitHub repos, or public information
+- Real-time data is needed (news, current events, live data)
+- An MCP tool (like deepwiki for GitHub) is better suited for the query
+- User is asking about general knowledge not in the uploaded documents"""
     parameters_schema = {
         "type": "object",
         "properties": {

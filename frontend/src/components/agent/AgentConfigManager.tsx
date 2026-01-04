@@ -25,7 +25,9 @@ import {
   Search,
   Globe,
   Server,
-  Database
+  Database,
+  Copy,
+  Link
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { AgentChatInterface } from "./AgentChatInterface"
@@ -41,6 +43,54 @@ const AGENT_TYPE_ICONS: Record<string, typeof Bot> = {
   development: Code,
   research: Brain,
   general: Wrench
+}
+
+// Default prompt templates for each agent category
+const AGENT_PROMPT_TEMPLATES: Record<string, string> = {
+  support: `You are a professional customer support agent. Your role is to help users with their questions and issues in a friendly, efficient, and helpful manner.
+
+Guidelines:
+- Always be polite, patient, and empathetic
+- Ask clarifying questions when needed to fully understand the issue
+- Provide clear, step-by-step solutions when possible
+- If you cannot help with something, clearly explain why and suggest alternatives
+- Use the available tools to look up information and provide accurate answers
+- Keep responses concise but thorough`,
+
+  development: `You are an expert software development assistant with deep knowledge of programming languages, frameworks, and best practices.
+
+Guidelines:
+- Help users with coding questions, debugging, and architecture decisions
+- Provide clear code examples when helpful
+- Explain technical concepts in an accessible way
+- Use available tools to search documentation and codebases
+- Follow best practices for security, performance, and maintainability
+- Ask clarifying questions about requirements when needed`,
+
+  research: `You are a research assistant specialized in finding, analyzing, and synthesizing information from various sources.
+
+Guidelines:
+- Use available search and knowledge base tools to gather comprehensive information
+- Provide well-structured, fact-based responses with sources when possible
+- Analyze information critically and present multiple perspectives when relevant
+- Summarize complex topics clearly and concisely
+- Acknowledge limitations and uncertainties in available information
+- Suggest follow-up questions or areas for deeper investigation`,
+
+  general: `You are a helpful AI assistant ready to assist with a wide variety of tasks and questions.
+
+Guidelines:
+- Be helpful, accurate, and friendly in all interactions
+- Use available tools effectively to provide the best possible assistance
+- Adapt your communication style to the user's needs
+- Ask clarifying questions when requests are ambiguous
+- Provide structured, easy-to-follow responses
+- Be honest about limitations and uncertainties`
+}
+
+// Get prompt template for a category
+const getPromptTemplate = (category: string): string => {
+  return AGENT_PROMPT_TEMPLATES[category] || AGENT_PROMPT_TEMPLATES.general
 }
 
 export function AgentConfigManager() {
@@ -62,9 +112,8 @@ export function AgentConfigManager() {
   // New agent form state
   const [newAgent, setNewAgent] = useState<CreateAgentConfigRequest>({
     name: "",
-    display_name: "",
     description: "",
-    system_prompt: "",
+    system_prompt: getPromptTemplate("general"),
     model: "gpt-oss-120b",
     temperature: 0.7,
     max_tokens: 2000,
@@ -82,7 +131,6 @@ export function AgentConfigManager() {
   // Edit agent form state
   const [editAgent, setEditAgent] = useState<CreateAgentConfigRequest>({
     name: "",
-    display_name: "",
     description: "",
     system_prompt: "",
     model: "gpt-oss-120b",
@@ -157,7 +205,6 @@ export function AgentConfigManager() {
     setEditingAgent(agent)
     setEditAgent({
       name: agent.name,
-      display_name: agent.display_name,
       description: agent.description,
       system_prompt: agent.system_prompt,
       model: agent.model,
@@ -233,7 +280,7 @@ export function AgentConfigManager() {
       setDeletingAgent(null)
       toast({
         title: "Success",
-        description: `${deletingAgent.display_name} has been deleted`
+        description: `${deletingAgent.name} has been deleted`
       })
     } catch (error) {
       toast({
@@ -252,9 +299,8 @@ export function AgentConfigManager() {
   const resetForm = () => {
     setNewAgent({
       name: "",
-      display_name: "",
       description: "",
-      system_prompt: "",
+      system_prompt: getPromptTemplate("general"),
       model: "gpt-oss-120b",
       temperature: 0.7,
       max_tokens: 2000,
@@ -273,7 +319,6 @@ export function AgentConfigManager() {
   const resetEditForm = () => {
     setEditAgent({
       name: "",
-      display_name: "",
       description: "",
       system_prompt: "",
       model: "gpt-oss-120b",
@@ -451,26 +496,15 @@ export function AgentConfigManager() {
 
               <TabsContent value="basic" className="space-y-4 mt-6">
                 <div>
-                  <Label htmlFor="name">Agent Name (ID) <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="name">Agent Name <span className="text-destructive">*</span></Label>
                   <Input
                     id="name"
                     value={newAgent.name}
                     onChange={(e) => setNewAgent(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., customer-support-agent"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Unique identifier for the agent (required)</p>
-                </div>
-
-                <div>
-                  <Label htmlFor="display_name">Display Name <span className="text-destructive">*</span></Label>
-                  <Input
-                    id="display_name"
-                    value={newAgent.display_name}
-                    onChange={(e) => setNewAgent(prev => ({ ...prev, display_name: e.target.value }))}
                     placeholder="e.g., Customer Support Agent"
                     required
                   />
+                  <p className="text-xs text-muted-foreground mt-1">Name for your agent (required)</p>
                 </div>
 
                 <div>
@@ -487,8 +521,12 @@ export function AgentConfigManager() {
                 <div>
                   <Label htmlFor="category">Category</Label>
                   <Select
-                    value={newAgent.category}
-                    onValueChange={(value) => setNewAgent(prev => ({ ...prev, category: value }))}
+                    value={newAgent.category || "general"}
+                    onValueChange={(value) => setNewAgent(prev => ({
+                      ...prev,
+                      category: value,
+                      system_prompt: getPromptTemplate(value)
+                    }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -501,6 +539,9 @@ export function AgentConfigManager() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Selecting a category will load a default prompt template
+                  </p>
                 </div>
 
                 <div>
@@ -514,7 +555,28 @@ export function AgentConfigManager() {
 
               <TabsContent value="personality" className="space-y-4 mt-6">
                 <div>
-                  <Label htmlFor="prompt">System Prompt <span className="text-destructive">*</span></Label>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label htmlFor="prompt">System Prompt <span className="text-destructive">*</span></Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setNewAgent(prev => ({
+                          ...prev,
+                          system_prompt: getPromptTemplate(prev.category || "general")
+                        }))
+                        toast({
+                          title: "Template Loaded",
+                          description: "System prompt updated from category template"
+                        })
+                      }}
+                    >
+                      Load Template
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Define your agent's personality, expertise, and behavior. This prompt shapes how your agent responds.
+                  </p>
                   <Textarea
                     id="prompt"
                     value={newAgent.system_prompt}
@@ -523,9 +585,14 @@ export function AgentConfigManager() {
                     className="min-h-[200px] font-mono text-sm"
                     required
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Define the agent's personality, expertise, and behavior (required)
-                  </p>
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs text-muted-foreground">
+                      Tip: Be specific about tone, expertise, and response format
+                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      {newAgent.system_prompt?.length || 0} characters
+                    </span>
+                  </div>
                 </div>
 
                 <div>
@@ -722,7 +789,7 @@ export function AgentConfigManager() {
               <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={createAgent} disabled={!newAgent.name || !newAgent.display_name || !newAgent.system_prompt}>
+              <Button onClick={createAgent} disabled={!newAgent.name || !newAgent.system_prompt}>
                 Create Agent
               </Button>
             </div>
@@ -745,7 +812,7 @@ export function AgentConfigManager() {
                       <Icon className="h-5 w-5 text-primary-foreground" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{agent.display_name}</CardTitle>
+                      <CardTitle className="text-lg">{agent.name}</CardTitle>
                       <CardDescription>{categoryInfo.label}</CardDescription>
                     </div>
                   </div>
@@ -828,14 +895,14 @@ export function AgentConfigManager() {
         <Dialog open={showChatInterface} onOpenChange={setShowChatInterface}>
           <DialogContent className="max-w-6xl w-[90vw] h-[85vh] p-0 flex flex-col">
             <DialogHeader className="sr-only">
-              <DialogTitle>Chat with {testingAgent.display_name}</DialogTitle>
+              <DialogTitle>Chat with {testingAgent.name}</DialogTitle>
               <DialogDescription>
                 Test your agent by having a conversation
               </DialogDescription>
             </DialogHeader>
             <AgentChatInterface
               agentConfigId={testingAgent.id}
-              agentName={testingAgent.display_name}
+              agentName={testingAgent.name}
               onClose={() => setShowChatInterface(false)}
             />
           </DialogContent>
@@ -846,43 +913,33 @@ export function AgentConfigManager() {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Agent: {editingAgent?.display_name}</DialogTitle>
+            <DialogTitle>Edit Agent: {editingAgent?.name}</DialogTitle>
             <DialogDescription>
               Update your agent's configuration and settings.
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="basic" className="mt-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="basic">Basic</TabsTrigger>
               <TabsTrigger value="personality">Personality</TabsTrigger>
               <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
               <TabsTrigger value="tools">Tools</TabsTrigger>
               <TabsTrigger value="advanced">Advanced</TabsTrigger>
+              <TabsTrigger value="integration">Integration</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4 mt-6">
               <div>
-                <Label htmlFor="edit-name">Agent Name (ID) <span className="text-destructive">*</span></Label>
+                <Label htmlFor="edit-name">Agent Name <span className="text-destructive">*</span></Label>
                 <Input
                   id="edit-name"
                   value={editAgent.name}
                   onChange={(e) => setEditAgent(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., customer-support-agent"
-                  required
-                />
-                <p className="text-xs text-muted-foreground mt-1">Unique identifier for the agent (required)</p>
-              </div>
-
-              <div>
-                <Label htmlFor="edit-display_name">Display Name <span className="text-destructive">*</span></Label>
-                <Input
-                  id="edit-display_name"
-                  value={editAgent.display_name}
-                  onChange={(e) => setEditAgent(prev => ({ ...prev, display_name: e.target.value }))}
                   placeholder="e.g., Customer Support Agent"
                   required
                 />
+                <p className="text-xs text-muted-foreground mt-1">Name for your agent (required)</p>
               </div>
 
               <div>
@@ -899,7 +956,7 @@ export function AgentConfigManager() {
               <div>
                 <Label htmlFor="edit-category">Category</Label>
                 <Select
-                  value={editAgent.category}
+                  value={editAgent.category || "general"}
                   onValueChange={(value) => setEditAgent(prev => ({ ...prev, category: value }))}
                 >
                   <SelectTrigger>
@@ -926,7 +983,28 @@ export function AgentConfigManager() {
 
             <TabsContent value="personality" className="space-y-4 mt-6">
               <div>
-                <Label htmlFor="edit-prompt">System Prompt <span className="text-destructive">*</span></Label>
+                <div className="flex justify-between items-center mb-2">
+                  <Label htmlFor="edit-prompt">System Prompt <span className="text-destructive">*</span></Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditAgent(prev => ({
+                        ...prev,
+                        system_prompt: getPromptTemplate(prev.category || "general")
+                      }))
+                      toast({
+                        title: "Template Loaded",
+                        description: "System prompt updated from category template"
+                      })
+                    }}
+                  >
+                    Load Template
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Define your agent's personality, expertise, and behavior. This prompt shapes how your agent responds.
+                </p>
                 <Textarea
                   id="edit-prompt"
                   value={editAgent.system_prompt}
@@ -935,9 +1013,14 @@ export function AgentConfigManager() {
                   className="min-h-[200px] font-mono text-sm"
                   required
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Define the agent's personality, expertise, and behavior (required)
-                </p>
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-xs text-muted-foreground">
+                    Tip: Be specific about tone, expertise, and response format
+                  </p>
+                  <span className="text-xs text-muted-foreground">
+                    {editAgent.system_prompt?.length || 0} characters
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -1128,6 +1211,208 @@ export function AgentConfigManager() {
                 <Label htmlFor="edit-is_public">Make this agent public</Label>
               </div>
             </TabsContent>
+
+            <TabsContent value="integration" className="space-y-6 mt-6">
+              {editingAgent && (
+                <div className="space-y-6">
+                  <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg">
+                    <Link className="h-5 w-5 text-primary" />
+                    <div>
+                      <h3 className="font-medium">OpenAI-Compatible API</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Use this endpoint to integrate your agent with any OpenAI-compatible client
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium">Chat Completions Endpoint</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        OpenAI-compatible endpoint for chat completions
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/agent/${editingAgent.id}/v1/chat/completions`}
+                          readOnly
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/agent/${editingAgent.id}/v1/chat/completions`)
+                            toast({
+                              title: "Copied!",
+                              description: "Endpoint URL copied to clipboard"
+                            })
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium">Base URL (for OpenAI SDK)</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Use this as your base_url when configuring OpenAI client
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/agent/${editingAgent.id}/v1`}
+                          readOnly
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/agent/${editingAgent.id}/v1`)
+                            toast({
+                              title: "Copied!",
+                              description: "Base URL copied to clipboard"
+                            })
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="flex items-start space-x-2">
+                        <div className="text-green-600 dark:text-green-400">
+                          <Globe className="h-4 w-4 mt-0.5" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                            API Key Authentication
+                          </p>
+                          <p className="text-xs text-green-700 dark:text-green-200 mt-1">
+                            Use your API key in the Authorization header as Bearer token. Create an API key in the API Keys section and ensure it has access to this agent.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium">Example Usage</h4>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">cURL Example</Label>
+                        <div className="relative">
+                          <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto">
+                            <code>{`curl -X POST "${typeof window !== 'undefined' ? window.location.origin : ''}/agent/${editingAgent.id}/v1/chat/completions" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "messages": [
+      {"role": "user", "content": "Hello!"}
+    ],
+    "temperature": 0.7
+  }'`}</code>
+                          </pre>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`curl -X POST "${window.location.origin}/agent/${editingAgent.id}/v1/chat/completions" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "messages": [
+      {"role": "user", "content": "Hello!"}
+    ],
+    "temperature": 0.7
+  }'`)
+                              toast({
+                                title: "Copied!",
+                                description: "cURL example copied to clipboard"
+                              })
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Python Example (OpenAI SDK)</Label>
+                        <div className="relative">
+                          <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto">
+                            <code>{`from openai import OpenAI
+
+client = OpenAI(
+    base_url="${typeof window !== 'undefined' ? window.location.origin : ''}/agent/${editingAgent.id}/v1",
+    api_key="YOUR_API_KEY"
+)
+
+response = client.chat.completions.create(
+    model="default",  # Model is configured in agent
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+print(response.choices[0].message.content)`}</code>
+                          </pre>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`from openai import OpenAI
+
+client = OpenAI(
+    base_url="${window.location.origin}/agent/${editingAgent.id}/v1",
+    api_key="YOUR_API_KEY"
+)
+
+response = client.chat.completions.create(
+    model="default",  # Model is configured in agent
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+print(response.choices[0].message.content)`)
+                              toast({
+                                title: "Copied!",
+                                description: "Python example copied to clipboard"
+                              })
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Agent ID</Label>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            value={String(editingAgent.id)}
+                            readOnly
+                            className="font-mono text-sm w-32"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(String(editingAgent.id))
+                              toast({
+                                title: "Copied!",
+                                description: "Agent ID copied to clipboard"
+                              })
+                            }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
 
           <div className="flex justify-end space-x-2 mt-6 pt-6 border-t">
@@ -1138,7 +1423,7 @@ export function AgentConfigManager() {
             }}>
               Cancel
             </Button>
-            <Button onClick={updateAgent} disabled={!editAgent.name || !editAgent.display_name || !editAgent.system_prompt}>
+            <Button onClick={updateAgent} disabled={!editAgent.name || !editAgent.system_prompt}>
               Save Changes
             </Button>
           </div>
@@ -1151,7 +1436,7 @@ export function AgentConfigManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Agent</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deletingAgent?.display_name}"? This will permanently
+              Are you sure you want to delete "{deletingAgent?.name}"? This will permanently
               remove the agent configuration. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

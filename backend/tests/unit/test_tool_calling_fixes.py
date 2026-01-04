@@ -1,9 +1,7 @@
 """
-Unit tests for tool calling service fixes (P1 and P2).
+Unit tests for tool calling service - validate_tool_availability.
 
-Tests:
-1. P1: Agent chatbot instance initialization
-2. P2: validate_tool_availability with built-in and MCP tools
+Tests built-in tools, MCP tools, and custom tools validation.
 """
 
 import pytest
@@ -24,45 +22,8 @@ def mock_user():
     return {"id": 1, "email": "test@example.com"}
 
 
-class TestAgentChatbotInitialization:
-    """Test P1: Agent chatbot instance initialization."""
-
-    @pytest.mark.asyncio
-    async def test_agent_chatbot_instance_creation(self):
-        """Test that agent chatbot instance can be created."""
-        from app.services.agent_init import AGENT_CHATBOT_ID, initialize_agent_chatbot_instance
-        from app.models.chatbot import ChatbotInstance
-
-        # Verify the constant is defined
-        assert AGENT_CHATBOT_ID == "agent"
-
-        # Mock database operations
-        with patch('app.services.agent_init.async_session_factory') as mock_factory:
-            mock_session = AsyncMock()
-            mock_factory.return_value.__aenter__.return_value = mock_session
-
-            # Mock execute to return None (no existing instance)
-            mock_result = AsyncMock()
-            mock_result.scalar_one_or_none.return_value = None
-            mock_session.execute.return_value = mock_result
-
-            # Call initialization
-            await initialize_agent_chatbot_instance()
-
-            # Verify add and commit were called
-            assert mock_session.add.called
-            assert mock_session.commit.called
-
-            # Verify the instance created has correct properties
-            added_instance = mock_session.add.call_args[0][0]
-            assert isinstance(added_instance, ChatbotInstance)
-            assert added_instance.id == AGENT_CHATBOT_ID
-            assert added_instance.name == "Agent"
-            assert added_instance.created_by == "system"
-
-
 class TestValidateToolAvailability:
-    """Test P2: validate_tool_availability with built-in and MCP tools."""
+    """Test validate_tool_availability with built-in and MCP tools."""
 
     @pytest.mark.asyncio
     async def test_validate_builtin_tools(self, mock_db, mock_user):
@@ -185,35 +146,3 @@ class TestValidateToolAvailability:
         assert result["rag_search"] is True
         # Verify database was NOT queried
         mock_tool_mgmt.get_tool_by_name_and_user.assert_not_called()
-
-
-class TestAgentChatbotConstantUsage:
-    """Test that agent chatbot constant is properly used."""
-
-    def test_agent_chatbot_id_imported_correctly(self):
-        """Test that AGENT_CHATBOT_ID can be imported in tool_calling.py."""
-        from app.api.v1.endpoints.tool_calling import AGENT_CHATBOT_ID
-        assert AGENT_CHATBOT_ID == "agent"
-
-    @pytest.mark.asyncio
-    async def test_get_or_create_conversation_uses_constant(self):
-        """Test that get_or_create_conversation uses AGENT_CHATBOT_ID."""
-        from app.api.v1.endpoints.tool_calling import get_or_create_conversation, AGENT_CHATBOT_ID
-        from app.models.chatbot import ChatbotConversation
-
-        mock_db = AsyncMock()
-
-        # Mock execute to return None (no existing conversation)
-        mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_db.execute.return_value = mock_result
-
-        # Call the function
-        result = await get_or_create_conversation(None, 1, mock_db)
-
-        # Verify add was called with a ChatbotConversation that has correct chatbot_id
-        assert mock_db.add.called
-        added_conv = mock_db.add.call_args[0][0]
-        assert isinstance(added_conv, ChatbotConversation)
-        assert added_conv.chatbot_id == AGENT_CHATBOT_ID
-        assert added_conv.chatbot_id == "agent"

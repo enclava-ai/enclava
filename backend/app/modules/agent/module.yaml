@@ -1,0 +1,123 @@
+name: agent
+version: 1.0.0
+description: "Pre-configured AI agents with custom tool sets and prompts"
+author: "Enclava Team"
+category: "ai_agents"
+
+# Module lifecycle
+enabled: true
+auto_start: true
+dependencies:
+  - rag
+optional_dependencies:
+  - analytics
+
+# Configuration
+config_schema: "./config_schema.json"
+ui_components: "./ui_components/"
+
+# Module capabilities
+provides:
+  - "agent_chat"
+  - "agent_configuration"
+  - "agent_management"
+
+consumes:
+  - "rag_search"
+  - "tool_execution"
+  - "llm_completion"
+
+# API endpoints
+endpoints:
+  - path: "/agent/configs"
+    method: "GET"
+    description: "List agent configurations"
+
+  - path: "/agent/configs"
+    method: "POST"
+    description: "Create new agent configuration"
+
+  - path: "/agent/configs/{config_id}"
+    method: "GET"
+    description: "Get specific agent configuration"
+
+  - path: "/agent/configs/{config_id}"
+    method: "PUT"
+    description: "Update agent configuration"
+
+  - path: "/agent/configs/{config_id}"
+    method: "DELETE"
+    description: "Delete agent configuration"
+
+  - path: "/agent/chat"
+    method: "POST"
+    description: "Chat with a pre-configured agent"
+
+# UI Configuration
+ui_config:
+  icon: "bot"
+  color: "#8B5CF6"
+  category: "AI & ML"
+
+  # Configuration forms
+  forms:
+    - name: "basic_config"
+      title: "Basic Settings"
+      fields: ["name", "display_name", "description", "category"]
+
+    - name: "ai_config"
+      title: "AI Configuration"
+      fields: ["system_prompt", "model", "temperature", "max_tokens"]
+
+    - name: "tools"
+      title: "Tool Configuration"
+      fields: ["builtin_tools", "mcp_servers", "include_custom_tools", "tool_choice", "max_iterations"]
+
+    - name: "resources"
+      title: "Tool Resources"
+      fields: ["tool_resources"]
+
+# Permissions
+permissions:
+  - name: "agent.create"
+    description: "Create new agent configurations"
+
+  - name: "agent.configure"
+    description: "Configure agent settings"
+
+  - name: "agent.chat"
+    description: "Chat with agents"
+
+  - name: "agent.manage"
+    description: "Manage all agents (admin)"
+
+# Analytics events
+analytics_events:
+  - name: "agent_created"
+    description: "New agent configuration created"
+
+  - name: "agent_chat_message"
+    description: "User sent message to agent"
+
+  - name: "agent_response_generated"
+    description: "Agent generated response"
+
+  - name: "agent_tool_used"
+    description: "Agent executed a tool"
+
+# Health checks
+health_checks:
+  - name: "llm_connectivity"
+    description: "Check LLM service connection"
+
+  - name: "rag_availability"
+    description: "Check RAG module availability"
+
+  - name: "tool_availability"
+    description: "Check tool execution service"
+
+# Documentation
+documentation:
+  readme: "./README.md"
+  examples: "./examples/"
+  api_docs: "./docs/api.md"

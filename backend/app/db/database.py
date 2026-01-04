@@ -71,41 +71,27 @@ metadata = MetaData()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Get database session"""
-    import time
+    from fastapi import HTTPException
+    from starlette.exceptions import HTTPException as StarletteHTTPException
 
-    start_time = time.time()
-    request_id = f"db_{int(time.time() * 1000)}"
-
-    logger.debug(f"[{request_id}] === DATABASE SESSION START ===")
-
-    try:
-        logger.debug(f"[{request_id}] Creating database session...")
-        async with async_session_factory() as session:
-            logger.debug(f"[{request_id}] Database session created successfully")
-            try:
-                yield session
-            except Exception as e:
-                # Only log if there's an actual error, not normal operation
-                if str(e).strip():  # Only log if error message exists
-                    logger.error(
-                        f"[{request_id}] Database session error: {str(e)}",
-                        exc_info=True,
-                    )
-                await session.rollback()
-                raise
-            finally:
-                close_start = time.time()
-                await session.close()
-                close_time = time.time() - close_start
-                total_time = time.time() - start_time
-                logger.debug(
-                    f"[{request_id}] Database session closed. Close time: {close_time:.3f}s, Total time: {total_time:.3f}s"
-                )
-    except Exception as e:
-        logger.error(
-            f"[{request_id}] Failed to create database session: {e}", exc_info=True
-        )
-        raise
+    async with async_session_factory() as session:
+        try:
+            yield session
+        except (HTTPException, StarletteHTTPException):
+            # Don't log HTTP exceptions - these are normal API responses (401, 403, 404, etc.)
+            # Just rollback any pending transaction and re-raise
+            await session.rollback()
+            raise
+        except SQLAlchemyError as e:
+            # Log actual database errors
+            logger.error(f"Database error during request: {e}")
+            await session.rollback()
+            raise
+        except Exception as e:
+            # Log unexpected errors but don't treat them as database failures
+            logger.warning(f"Request error (non-database): {type(e).__name__}")
+            await session.rollback()
+            raise
 
 
 async def init_db():

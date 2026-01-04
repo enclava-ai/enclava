@@ -150,25 +150,26 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
     setIsLoading(true)
 
     try {
-      const data = await agentApi.chat(
-        agentConfigId,
-        messageToSend,
-        conversationId
-      )
+      // Build conversation history in OpenAI format
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+      conversationHistory.push({ role: 'user', content: messageToSend })
+
+      const data = await agentApi.chat(agentConfigId, conversationHistory)
+
+      // Parse OpenAI-compatible response
+      const responseContent = data.choices?.[0]?.message?.content || ''
 
       const assistantMessage: AgentChatMessage = {
         id: generateTimestampId('msg'),
         role: 'assistant',
-        content: data.content || '',
-        timestamp: new Date(),
-        tool_calls: data.tool_calls_made
+        content: responseContent,
+        timestamp: new Date()
       }
 
       setMessages(prev => [...prev, assistantMessage])
-
-      if (data.conversation_id && data.conversation_id !== conversationId) {
-        setConversationId(data.conversation_id)
-      }
     } catch (error: any) {
       const errorMsg = error?.details?.detail || error?.message || "Failed to send message"
       toast({
@@ -179,7 +180,7 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, agentConfigId, conversationId, toast])
+  }, [input, isLoading, agentConfigId, messages, toast])
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

@@ -58,6 +58,16 @@ def start_audit_worker():
         logger.info("Audit worker task created")
 
 
+def _parse_user_id(user_id: Optional[str]) -> Optional[int]:
+    """Convert user_id string to integer, handling None and invalid values."""
+    if user_id is None:
+        return None
+    try:
+        return int(user_id)
+    except (ValueError, TypeError):
+        return None
+
+
 async def log_audit_event_async(
     user_id: Optional[str] = None,
     api_key_id: Optional[str] = None,
@@ -85,8 +95,11 @@ async def log_audit_event_async(
         if api_key_id:
             audit_details["api_key_id"] = api_key_id
 
+        # Convert user_id to integer (database expects Integer, not String)
+        parsed_user_id = _parse_user_id(user_id)
+
         audit_data = {
-            "user_id": user_id,
+            "user_id": parsed_user_id,
             "action": action,
             "resource_type": resource_type,
             "resource_id": resource_id,
@@ -146,8 +159,11 @@ async def log_audit_event(
         if api_key_id:
             audit_details["api_key_id"] = api_key_id
 
+        # Convert user_id to integer (database expects Integer, not String)
+        parsed_user_id = _parse_user_id(user_id)
+
         audit_log = AuditLog(
-            user_id=user_id,
+            user_id=parsed_user_id,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,

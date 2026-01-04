@@ -123,26 +123,37 @@ export const agentApi = {
     if (params?.category) queryParams.append('category', params.category)
     if (params?.is_public !== undefined) queryParams.append('is_public', String(params.is_public))
     const query = queryParams.toString()
-    return apiClient.get(`/api/v1/tool-calling/agent/configs${query ? `?${query}` : ''}`)
+    return apiClient.get(`/agent/configs${query ? `?${query}` : ''}`)
   },
   getAgent(id: number) {
-    return apiClient.get(`/api/v1/tool-calling/agent/configs/${id}`)
+    return apiClient.get(`/agent/configs/${id}`)
   },
   createAgent(config: any) {
-    return apiClient.post('/api/v1/tool-calling/agent/configs', config)
+    return apiClient.post('/agent/configs', config)
   },
   updateAgent(id: number, config: any) {
-    return apiClient.put(`/api/v1/tool-calling/agent/configs/${id}`, config)
+    return apiClient.put(`/agent/configs/${id}`, config)
   },
   deleteAgent(id: number) {
-    return apiClient.delete(`/api/v1/tool-calling/agent/configs/${id}`)
+    return apiClient.delete(`/agent/configs/${id}`)
   },
-  chat(agentConfigId: number, message: string, conversationId?: string) {
-    return apiClient.post('/api/v1/tool-calling/agent/chat', {
-      agent_config_id: agentConfigId,
-      message,
-      conversation_id: conversationId
+  // OpenAI-compatible chat completions (internal, JWT auth)
+  chat(agentConfigId: number, messages: Array<{role: string; content: string}>, options?: {
+    temperature?: number
+    max_tokens?: number
+  }) {
+    return apiClient.post(`/agent/${agentConfigId}/chat/completions`, {
+      messages,
+      ...options
     })
+  },
+  // Simple chat helper - wraps a single message in OpenAI format
+  sendMessage(agentConfigId: number, message: string, history?: Array<{role: string; content: string}>) {
+    const messages = [
+      ...(history || []),
+      { role: 'user', content: message }
+    ]
+    return apiClient.post(`/agent/${agentConfigId}/chat/completions`, { messages })
   }
 }
 

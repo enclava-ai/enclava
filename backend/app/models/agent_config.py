@@ -36,7 +36,6 @@ class AgentConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), nullable=False, index=True)
-    display_name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
 
     # Agent personality and behavior
@@ -99,7 +98,6 @@ class AgentConfig(Base):
         return {
             "id": self.id,
             "name": self.name,
-            "display_name": self.display_name,
             "description": self.description,
             "system_prompt": self.system_prompt,
             "model": self.model,

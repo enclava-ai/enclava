@@ -5,7 +5,7 @@ services:
     ports:
       - "80:80"  # Main application access (nginx proxy)
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro,z
     depends_on:
       - enclava-backend
       - enclava-frontend
@@ -25,8 +25,8 @@ services:
       - enclava-postgres
     command: ["/usr/local/bin/migrate.sh"]
     volumes:
-      - ./backend:/app
-      - ./.env:/app/.env
+      - ./backend:/app:z
+      - ./.env:/app/.env:z
     networks:
       - enclava-net
     restart: "no"  # Run once and exit
@@ -58,13 +58,14 @@ services:
       - privatemode-proxy
     # Removed external port mapping - access through nginx proxy
     volumes:
-      - ./backend:/app
-      - ./logs:/app/logs
-      - ./plugins:/plugins
-      # Docker socket for code execution sandbox
-      # SECURITY NOTE: This allows the backend to spawn Docker containers
+      - ./backend:/app:z
+      - ./logs:/app/logs:z
+      - ./plugins:/plugins:z
+      # Container socket for code execution sandbox
+      # SECURITY NOTE: This allows the backend to spawn containers
       # In production, consider using Docker-in-Docker or restricting permissions
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Works with: Docker, Podman (with podman-docker), or set CONTAINER_SOCK for custom path
+      - ${CONTAINER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
     networks:
       - enclava-net
     restart: unless-stopped
@@ -85,7 +86,7 @@ services:
     ports:
       - "3002:3000"  # Direct frontend access for development
     volumes:
-      - ./frontend:/app
+      - ./frontend:/app:z
       - enclava-frontend-node-modules:/app/node_modules
     networks:
       - enclava-net
@@ -103,7 +104,7 @@ services:
       - POSTGRES_PASSWORD=enclava_pass
     volumes:
       - enclava-postgres-data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d
+      - ./backend/migrations:/docker-entrypoint-initdb.d:z
     networks:
       - enclava-net
     restart: unless-stopped

@@ -389,6 +389,26 @@ class MCPClient:
                 "arguments": arguments
             })
 
+            # Handle common MCP server errors with user-friendly messages
+            if isinstance(result, dict) and result.get("isError"):
+                error_content = result.get("content", [])
+                if isinstance(error_content, list):
+                    for item in error_content:
+                        if isinstance(item, dict) and "text" in item:
+                            error_text = item.get("text", "")
+                            # Provide helpful context for common errors
+                            if "Chunk too big" in error_text or "too large" in error_text.lower():
+                                return {
+                                    "output": None,
+                                    "error_message": f"The requested content is too large for the MCP server to return. Try requesting a smaller portion or specific sections. Original error: {error_text}",
+                                    "status": "failed"
+                                }
+                            return {
+                                "output": None,
+                                "error_message": error_text,
+                                "status": "failed"
+                            }
+
             # Handle MCP tool call response formats
             # MCP spec: result contains "content" array with text/image/resource items
             if isinstance(result, dict):
@@ -438,8 +458,12 @@ class MCPClient:
             }
 
         except RuntimeError as e:
+            error_str = str(e)
+            # Provide helpful context for common MCP server errors
+            if "Chunk too big" in error_str or "too large" in error_str.lower():
+                error_str = f"The requested content is too large for the MCP server. Try requesting specific sections or a smaller scope. Original error: {error_str}"
             return {
                 "output": None,
-                "error_message": str(e),
+                "error_message": error_str,
                 "status": "failed"
             }

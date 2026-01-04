@@ -94,7 +94,6 @@ interface NewApiKeyData {
 interface AgentConfig {
   id: number;
   name: string;
-  display_name: string;
   description?: string;
 }
 
@@ -587,7 +586,7 @@ function ApiKeysContent() {
                         className="rounded"
                       />
                       <Label htmlFor={`agent-${agent.id}`} className="text-sm">
-                        {agent.display_name || agent.name}
+                        {agent.name}
                       </Label>
                     </div>
                   ))}

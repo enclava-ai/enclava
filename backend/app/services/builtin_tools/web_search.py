@@ -27,7 +27,18 @@ class WebSearchTool(BuiltinTool):
 
     name = "web_search"
     display_name = "Web Search"  # Required by _convert_tools_to_openai_format
-    description = "Search the internet for current information, news, and real-time data"
+    description = """Search the public internet for current information, news, and real-time data.
+
+USE THIS TOOL WHEN:
+- User needs real-time or current information (news, weather, live data)
+- Looking up public websites, documentation, or general web content
+- No specific MCP tool is configured for the data source
+- User asks about topics not covered by internal documents or specialized tools
+
+DO NOT USE THIS TOOL WHEN:
+- User asks about internal documents or uploaded files (use rag_search instead)
+- A specialized MCP tool exists for that data source (e.g., deepwiki for GitHub repos)
+- The information is already available in the conversation context"""
     parameters_schema = {
         "type": "object",
         "properties": {

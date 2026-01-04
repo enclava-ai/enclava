@@ -168,17 +168,6 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning(f"Built-in tools registration failed: {exc}")
 
-    # Initialize agent chatbot instance (required for agent conversations)
-    from app.services.agent_init import initialize_agent_chatbot_instance
-
-    try:
-        await initialize_agent_chatbot_instance()
-        logger.info("Agent chatbot instance initialized successfully")
-    except Exception as exc:
-        logger.error(f"Agent chatbot instance initialization failed: {exc}")
-        # This is critical for agent functionality, so we should raise
-        raise
-
     # Initialize document processor
     from app.services.document_processor import document_processor
 

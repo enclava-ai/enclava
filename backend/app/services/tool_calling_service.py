@@ -16,6 +16,23 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
+# Tool usage preamble to help LLM choose the right tools
+TOOL_USAGE_PREAMBLE = """## Tool Usage Guidelines
+
+You have access to tools. Choose the most appropriate tool based on the user's request.
+
+### Tool Selection Principles:
+1. **MCP Tools First**: Use MCP tools (names containing a dot like "deepwiki.read_wiki_structure") for their specific domains. These are specialized tools for specific data sources.
+2. **rag_search**: ONLY use for internal/uploaded documents and knowledge bases. Do NOT use for external websites, GitHub repos, or public information.
+3. **web_search**: Use for general internet queries when no specialized MCP tool exists for that data source.
+4. **User Intent**: If the user explicitly mentions a tool or data source, prioritize that tool.
+
+### Error Handling:
+- If a tool returns "too large" or "chunk too big", request smaller/more specific portions instead of retrying the same query.
+- If a tool fails repeatedly, explain the limitation and suggest alternatives.
+- Do not keep retrying the same failed approach.
+"""
+
 
 class ToolCallingService:
     """Service for LLM tool calling integration"""
@@ -31,6 +48,45 @@ class ToolCallingService:
         if isinstance(user, dict):
             return int(user.get("id"))
         return int(user.id)
+
+    def _generate_tool_preamble(self, tools: List[Dict[str, Any]]) -> str:
+        """Generate a tool usage preamble with available tools summary.
+
+        Args:
+            tools: List of tools in OpenAI format
+
+        Returns:
+            Formatted preamble string with tool summary
+        """
+        if not tools:
+            return ""
+
+        # Categorize tools for the summary
+        mcp_tools = []
+        builtin_tools = []
+
+        for tool in tools:
+            func = tool.get("function", {})
+            name = func.get("name", "")
+            desc = func.get("description", "")[:100]  # Truncate long descriptions
+
+            if "." in name:
+                # MCP tool
+                server_name = name.split(".")[0]
+                mcp_tools.append(f"- {name}: {desc}")
+            else:
+                builtin_tools.append(f"- {name}: {desc}")
+
+        # Build tool summary
+        summary_parts = []
+        if mcp_tools:
+            summary_parts.append("**Specialized MCP Tools (use these first for their domains):**\n" + "\n".join(mcp_tools))
+        if builtin_tools:
+            summary_parts.append("**Built-in Tools:**\n" + "\n".join(builtin_tools))
+
+        tool_summary = "\n\n".join(summary_parts)
+
+        return TOOL_USAGE_PREAMBLE + f"\n### Available Tools:\n{tool_summary}"
 
     async def create_chat_completion_with_tools(
         self,
@@ -61,6 +117,21 @@ class ToolCallingService:
             request.tools = await self._convert_tools_to_openai_format(available_tools)
 
         messages = request.messages.copy()
+
+        # Inject tool usage preamble if tools are available
+        if request.tools:
+            preamble = self._generate_tool_preamble(request.tools)
+            if preamble:
+                # Insert preamble as the first system message (after any existing system message)
+                preamble_message = ChatMessage(role="system", content=preamble)
+                # Find insertion point - after first system message if exists
+                insert_idx = 0
+                if messages and messages[0].role == "system":
+                    insert_idx = 1
+                messages.insert(insert_idx, preamble_message)
+                # Update request with preamble-augmented messages
+                request.messages = messages
+
         tool_call_count = 0
 
         while tool_call_count < max_tool_calls:

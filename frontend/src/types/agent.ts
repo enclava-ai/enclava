@@ -48,7 +48,6 @@ export interface RagCollection {
 export interface AgentConfig {
   id: number
   name: string
-  display_name: string
   description?: string
   system_prompt: string
   model: string
@@ -79,7 +78,6 @@ export interface Tool {
 // API Request Types
 export interface CreateAgentConfigRequest {
   name: string
-  display_name: string
   description?: string
   system_prompt: string
   model?: string
