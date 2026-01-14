@@ -70,8 +70,6 @@ venv_memory_monitor/
 to_delete/
 security-review.md
 features-plan.md
-AGENTS.md
-CLAUDE.md
 backend/CURL_VERIFICATION_EXAMPLES.md
 backend/OPENAI_COMPATIBILITY_GUIDE.md
 backend/production-deployment-guide.md
