@@ -432,7 +432,7 @@ export function MCPServerManager() {
                     placeholder="Enter API key if required"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Will be encrypted and stored securely
+                    Stored securely on the server
                   </p>
                 </div>
 
@@ -766,7 +766,7 @@ export function MCPServerManager() {
                 <p className="text-xs text-muted-foreground mt-1">
                   {editingServer?.has_api_key
                     ? "Leave empty to keep the current API key"
-                    : "Will be encrypted and stored securely"}
+                    : "Stored securely on the server"}
                 </p>
               </div>
 

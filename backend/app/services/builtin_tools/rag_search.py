@@ -7,7 +7,7 @@ and token budget management (OpenAI file_search compatible).
 
 import hashlib
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from .base import BuiltinTool, ToolExecutionContext, ToolResult
 
 logger = logging.getLogger(__name__)

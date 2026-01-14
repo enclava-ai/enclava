@@ -8,19 +8,17 @@ budget enforcement, and state management.
 import json
 import logging
 import time
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Union
+from datetime import datetime
+from typing import Dict, Any, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.response import Response
 from app.models.conversation import Conversation
 from app.models.agent_config import AgentConfig
-from app.models.api_key import APIKey
 from app.schemas.responses import ResponseCreateRequest, ResponseObject, TokenUsage
 from app.services.responses.translator import ItemMessageTranslator
 from app.services.tool_calling_service import ToolCallingService
-from app.services.llm.service import llm_service
 from app.services.llm.models import ChatRequest, ChatMessage
 from app.services.budget_enforcement import BudgetEnforcementService
 

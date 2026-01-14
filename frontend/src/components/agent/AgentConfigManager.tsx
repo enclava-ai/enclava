@@ -33,8 +33,8 @@ import { useToast } from "@/hooks/use-toast"
 import { AgentChatInterface } from "./AgentChatInterface"
 import { MCPServerManager } from "./MCPServerManager"
 import ModelSelector from "@/components/playground/ModelSelector"
-import { agentApi, toolApi, mcpServerApi, apiClient } from "@/lib/api-client"
-import type { AgentConfig, CreateAgentConfigRequest, Tool, RagCollection } from "@/types/agent"
+import { agentApi, mcpServerApi, apiClient } from "@/lib/api-client"
+import type { AgentConfig, CreateAgentConfigRequest, RagCollection } from "@/types/agent"
 import { BUILTIN_TOOLS, AGENT_CATEGORIES } from "@/types/agent"
 import type { AvailableMCPServersResponse } from "@/types/mcp-server"
 
@@ -96,7 +96,6 @@ const getPromptTemplate = (category: string): string => {
 export function AgentConfigManager() {
   const [mainTab, setMainTab] = useState<string>("agents")
   const [agents, setAgents] = useState<AgentConfig[]>([])
-  const [availableTools, setAvailableTools] = useState<Tool[]>([])
   const [availableMCPServers, setAvailableMCPServers] = useState<AvailableMCPServersResponse["servers"]>([])
   const [ragCollections, setRagCollections] = useState<RagCollection[]>([])
   const [loading, setLoading] = useState(true)
@@ -149,7 +148,6 @@ export function AgentConfigManager() {
 
   useEffect(() => {
     loadAgents()
-    loadTools()
     loadMCPServers()
     loadRagCollections()
   }, [])
@@ -166,15 +164,6 @@ export function AgentConfigManager() {
       })
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadTools = async () => {
-    try {
-      const data = await toolApi.listTools()
-      setAvailableTools(data.tools || [])
-    } catch (error) {
-      console.error('Failed to load tools:', error)
     }
   }
 

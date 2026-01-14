@@ -6,6 +6,7 @@ Background task for archiving expired responses and cleaning up old archived res
 
 import logging
 from datetime import datetime, timedelta
+from typing import Dict
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -137,26 +138,27 @@ class ResponseArchivalTask:
             Number of orphaned responses deleted
         """
         try:
-            # Find responses with previous_response_id that don't exist
-            stmt = select(Response).where(
-                Response.previous_response_id.isnot(None)
+            from sqlalchemy.orm import aliased
+
+            # Use a subquery to find orphaned responses in a single query
+            # (avoids N+1 query pattern)
+            PreviousResponse = aliased(Response)
+
+            # Find responses where previous_response_id points to a non-existent response
+            orphaned_stmt = (
+                select(Response.id)
+                .outerjoin(
+                    PreviousResponse,
+                    Response.previous_response_id == PreviousResponse.id
+                )
+                .where(
+                    Response.previous_response_id.isnot(None),
+                    PreviousResponse.id.is_(None)  # Previous response doesn't exist
+                )
             )
 
-            result = await self.db.execute(stmt)
-            responses = result.scalars().all()
-
-            orphaned_ids = []
-
-            for response in responses:
-                # Check if previous response exists
-                prev_stmt = select(Response).where(
-                    Response.id == response.previous_response_id
-                )
-                prev_result = await self.db.execute(prev_stmt)
-                prev_response = prev_result.scalar_one_or_none()
-
-                if not prev_response:
-                    orphaned_ids.append(response.id)
+            result = await self.db.execute(orphaned_stmt)
+            orphaned_ids = [row[0] for row in result.fetchall()]
 
             # Delete orphaned responses
             if orphaned_ids:

@@ -7,7 +7,7 @@ connection testing, and tool discovery.
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, validator, HttpUrl
+from pydantic import BaseModel, Field, validator
 import re
 
 

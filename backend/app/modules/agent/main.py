@@ -9,7 +9,6 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Union
 from pydantic import BaseModel, Field
-from enum import Enum
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession

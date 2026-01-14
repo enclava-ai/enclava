@@ -5,7 +5,7 @@ Provides CRUD operations for MCP server configurations,
 connection testing, and tool discovery.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 

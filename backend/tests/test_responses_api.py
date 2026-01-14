@@ -65,12 +65,6 @@ class TestResponsesAPI:
 
         assert data["status"] == "completed"
         assert "output" in data
-
-        # Check if tool was called (look for function_call items)
-        has_tool_call = any(
-            item.get("type") == "function_call"
-            for item in data["output"]
-        )
         # Tool may or may not be called depending on LLM decision
         # Just verify response structure is correct
 

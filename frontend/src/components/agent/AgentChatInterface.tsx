@@ -111,7 +111,6 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
   const [messages, setMessages] = useState<AgentChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
 
@@ -131,7 +130,6 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
   useEffect(() => {
     // Reset conversation when switching agents
     setMessages([])
-    setConversationId(undefined)
   }, [agentConfigId])
 
   const sendMessage = useCallback(async () => {
