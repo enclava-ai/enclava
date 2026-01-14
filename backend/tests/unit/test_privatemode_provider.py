@@ -106,8 +106,8 @@ async def test_create_completion_with_tools_in_request(provider):
         mock_session.post = MagicMock(return_value=mock_context)
         mock_get_session.return_value = mock_session
 
-        # Execute request
-        response = await provider.create_chat_completion(request)
+        # Execute request (response not needed - we're verifying the request payload)
+        await provider.create_chat_completion(request)
 
         # Verify tools and tool_choice were sent in payload
         call_args = mock_session.post.call_args
@@ -318,8 +318,8 @@ async def test_tool_message_serialization(provider):
         mock_session.post = MagicMock(return_value=mock_context)
         mock_get_session.return_value = mock_session
 
-        # Execute request
-        response = await provider.create_chat_completion(request)
+        # Execute request (response not needed - we're verifying the request payload)
+        await provider.create_chat_completion(request)
 
         # Verify message serialization
         call_args = mock_session.post.call_args

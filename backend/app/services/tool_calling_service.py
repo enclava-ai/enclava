@@ -71,8 +71,7 @@ class ToolCallingService:
             desc = func.get("description", "")[:100]  # Truncate long descriptions
 
             if "." in name:
-                # MCP tool
-                server_name = name.split(".")[0]
+                # MCP tool (format: server_name.tool_name)
                 mcp_tools.append(f"- {name}: {desc}")
             else:
                 builtin_tools.append(f"- {name}: {desc}")

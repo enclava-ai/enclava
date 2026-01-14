@@ -210,12 +210,14 @@ class AgentModule(BaseModule):
         ]
 
     async def process_request(
-        self, request_type: str, data: Dict[str, Any], context: Dict[str, Any]
+        self, request: Dict[str, Any], context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Process agent requests"""
+        request_type = request.get("request_type", "chat")
+
         if request_type == "chat":
             # Handle chat requests
-            chat_request = AgentChatRequest(**data)
+            chat_request = AgentChatRequest(**request)
             user_id = context.get("user_id")
             db = context.get("db")
 
