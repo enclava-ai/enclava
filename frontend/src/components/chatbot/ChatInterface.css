@@ -71,47 +71,48 @@
   }
 }
 
-/* Dark mode improvements for chat interface */
+/* Dark mode improvements for chat interface - matching website theme */
 .dark .chat-message-assistant {
-  background-color: rgb(51 65 85); /* slate-700 */
-  color: white !important;
+  background-color: hsl(var(--card)); /* dark navy card background */
+  color: hsl(var(--foreground)) !important;
 }
 
 .dark .chat-message-assistant * {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
 }
 
 .dark .chat-message-user {
-  /* User messages keep their primary color */
+  /* User messages use primary color gradient */
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
 }
 
 .dark .chat-input {
-  background-color: rgb(30 41 59); /* slate-800 */
-  color: white !important;
-  border-color: rgb(71 85 105); /* slate-600 */
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border));
 }
 
 .dark .chat-input::placeholder {
-  color: rgb(148 163 184); /* slate-400 */
+  color: hsl(var(--muted-foreground));
 }
 
 .dark .chat-timestamp {
-  color: rgb(148 163 184); /* slate-400 */
+  color: hsl(var(--muted-foreground));
 }
 
 .dark .chat-thinking {
-  background-color: rgb(51 65 85); /* slate-700 */
-  color: white !important;
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground)) !important;
 }
 
 .dark .chat-thinking * {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
 }
 
-/* Ensure ALL text in markdown content is white in dark mode */
+/* Ensure ALL text in markdown content uses theme colors in dark mode */
 .dark .markdown-content,
 .dark .markdown-content * {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
 }
 
 .dark .markdown-content p,
@@ -130,33 +131,33 @@
 .dark .markdown-content i,
 .dark .markdown-content a,
 .dark .markdown-content blockquote {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
 }
 
 .dark .markdown-content code {
-  background-color: rgb(30 41 59); /* slate-800 */
-  color: white !important;
-  border-color: rgb(71 85 105); /* slate-600 */
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border));
 }
 
 .dark .markdown-content pre,
 .dark .markdown-content pre * {
-  background-color: rgb(30 41 59); /* slate-800 */
-  color: white !important;
-  border-color: rgb(71 85 105); /* slate-600 */
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border));
 }
 
-/* Make sure bold text is white */
+/* Make sure bold text uses theme foreground */
 .dark strong,
 .dark b {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
   font-weight: bold;
 }
 
 /* Prose styles override for dark mode */
 .dark .prose,
 .dark .prose-sm {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
 }
 
 .dark .prose h1,
@@ -171,7 +172,7 @@
 .dark .prose-sm h4,
 .dark .prose-sm h5,
 .dark .prose-sm h6 {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
   font-weight: bold;
 }
 
@@ -179,7 +180,7 @@
 .dark .prose-sm strong,
 .dark .prose b,
 .dark .prose-sm b {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
   font-weight: bold;
 }
 
@@ -187,5 +188,5 @@
 .dark .prose-sm em,
 .dark .prose i,
 .dark .prose-sm i {
-  color: white !important;
+  color: hsl(var(--foreground)) !important;
 }
