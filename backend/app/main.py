@@ -159,6 +159,15 @@ async def lifespan(app: FastAPI):
     app.state.module_manager = module_manager
     logger.info("Module manager initialized successfully")
 
+    # Register built-in tools (RAG search, web search, code execution)
+    from app.services.builtin_tools import register_builtin_tools
+
+    try:
+        register_builtin_tools()
+        logger.info("Built-in tools registered successfully")
+    except Exception as exc:
+        logger.warning(f"Built-in tools registration failed: {exc}")
+
     # Initialize document processor
     from app.services.document_processor import document_processor
 

@@ -1,11 +1,12 @@
 services:
   # Nginx reverse proxy - Main application entry point
   enclava-nginx:
+    container_name: enclava-nginx
     image: nginx:alpine
     ports:
-      - "80:80"  # Main application access (nginx proxy)
+      - "1080:80"  # Main application access (nginx proxy)
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro,z
     depends_on:
       - enclava-backend
       - enclava-frontend
@@ -15,6 +16,7 @@ services:
 
   # Database migration service - runs once to apply migrations
   enclava-migrate:
+    container_name: enclava-migrate
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -25,15 +27,16 @@ services:
       - enclava-postgres
     command: ["/usr/local/bin/migrate.sh"]
     volumes:
-      - ./backend:/app
-      - ./.env:/app/.env
+      - ./backend:/app:z
+      - ./.env:/app/.env:z
     networks:
       - enclava-net
     restart: "no"  # Run once and exit
 
   # Main application backend
   enclava-backend:
-    build: 
+    container_name: enclava-backend
+    build:
       context: ./backend
       dockerfile: Dockerfile
     environment:
@@ -46,6 +49,12 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - LOG_LLM_PROMPTS=${LOG_LLM_PROMPTS:-false}
       - BASE_URL=${BASE_URL}
+      # Agent & Tool Calling System - Web Search
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
+      # Agent & Tool Calling System - MCP Servers (pass all MCP_* env vars)
+      # Example: MCP_ORDER_API_URL, MCP_ORDER_API_KEY, MCP_WEATHER_URL, etc.
+      # Container socket path (for code execution sandbox, if enabled)
+      - CONTAINER_SOCK=${CONTAINER_SOCK:-}
     depends_on:
       - enclava-migrate
       - enclava-postgres
@@ -54,15 +63,23 @@ services:
       - privatemode-proxy
     # Removed external port mapping - access through nginx proxy
     volumes:
-      - ./backend:/app
-      - ./logs:/app/logs
-      - ./plugins:/plugins
+      - ./backend:/app:z
+      - ./logs:/app/logs:z
+      - ./plugins:/plugins:z
+      # Container socket for code execution sandbox (optional)
+      # SECURITY NOTE: This allows the backend to spawn containers
+      # In production, consider using Docker-in-Docker or restricting permissions
+      #
+      # For Docker: CONTAINER_SOCK=/var/run/docker.sock
+      # For Podman rootless: CONTAINER_SOCK=/run/user/$(id -u)/podman/podman.sock
+      # Leave unset to disable container execution features
     networks:
       - enclava-net
     restart: unless-stopped
 
   # Next.js frontend
   enclava-frontend:
+    container_name: enclava-frontend
     image: node:18-alpine
     working_dir: /app
     command: sh -c "npm ci --ignore-scripts && npm run dev"
@@ -77,7 +94,7 @@ services:
     ports:
       - "3002:3000"  # Direct frontend access for development
     volumes:
-      - ./frontend:/app
+      - ./frontend:/app:z
       - enclava-frontend-node-modules:/app/node_modules
     networks:
       - enclava-net
@@ -88,6 +105,7 @@ services:
 
   # PostgreSQL database
   enclava-postgres:
+    container_name: enclava-postgres
     image: postgres:16
     environment:
       - POSTGRES_DB=enclava_db
@@ -95,13 +113,14 @@ services:
       - POSTGRES_PASSWORD=enclava_pass
     volumes:
       - enclava-postgres-data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d
+      - ./backend/migrations:/docker-entrypoint-initdb.d:z
     networks:
       - enclava-net
     restart: unless-stopped
 
   # Redis for caching and message queue
   enclava-redis:
+    container_name: enclava-redis
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes:
@@ -112,6 +131,7 @@ services:
 
   # Qdrant vector database
   enclava-qdrant:
+    container_name: enclava-qdrant
     image: qdrant/qdrant:latest
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
@@ -127,6 +147,7 @@ services:
 
   # Privatemode.ai service (optional - for confidential models)
   privatemode-proxy:
+    container_name: privatemode-proxy
     image: ghcr.io/edgelesssys/privatemode/privatemode-proxy:latest
     environment:
       - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}

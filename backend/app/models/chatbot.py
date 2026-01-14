@@ -85,8 +85,13 @@ class ChatbotMessage(Base):
     )
 
     # Message content
-    role = Column(String(20), nullable=False)  # 'user', 'assistant', 'system'
-    content = Column(Text, nullable=False)
+    role = Column(String(20), nullable=False)  # 'user', 'assistant', 'system', 'tool'
+    content = Column(Text, nullable=True)  # CHANGED: Nullable for tool-call messages
+
+    # Tool-related fields (for function calling support)
+    tool_calls = Column(JSON, nullable=True)  # List of tool calls made by assistant
+    tool_call_id = Column(String(100), nullable=True)  # For tool response messages
+    tool_name = Column(String(100), nullable=True)  # Which tool was called
 
     # Metadata
     timestamp = Column(DateTime, default=datetime.utcnow)

@@ -223,6 +223,11 @@ class PrivateModeProvider(BaseLLMProvider):
                         "role": msg.role,
                         "content": msg.content,
                         **({"name": msg.name} if msg.name else {}),
+                        **({"tool_calls": [
+                            {"id": tc.id, "type": tc.type, "function": tc.function}
+                            for tc in msg.tool_calls
+                        ]} if msg.tool_calls else {}),
+                        **({"tool_call_id": msg.tool_call_id} if msg.tool_call_id else {}),
                     }
                     for msg in request.messages
                 ],
@@ -241,6 +246,12 @@ class PrivateModeProvider(BaseLLMProvider):
                 payload["presence_penalty"] = request.presence_penalty
             if request.stop is not None:
                 payload["stop"] = request.stop
+
+            # Add tools and tool_choice for function calling
+            if request.tools:
+                payload["tools"] = request.tools
+            if request.tool_choice:
+                payload["tool_choice"] = request.tool_choice
 
             # Add user tracking
             payload["user"] = f"user_{request.user_id}"
@@ -266,11 +277,27 @@ class PrivateModeProvider(BaseLLMProvider):
                     choices = []
                     for choice_data in data.get("choices", []):
                         message_data = choice_data.get("message", {})
+
+                        # Parse tool_calls if present
+                        tool_calls = None
+                        if "tool_calls" in message_data and message_data["tool_calls"]:
+                            from ..models import ToolCall
+                            tool_calls = [
+                                ToolCall(
+                                    id=tc.get("id"),
+                                    type=tc.get("type", "function"),
+                                    function=tc.get("function", {})
+                                )
+                                for tc in message_data.get("tool_calls", [])
+                            ]
+
                         choice = ChatChoice(
                             index=choice_data.get("index", 0),
                             message=ChatMessage(
                                 role=message_data.get("role", "assistant"),
-                                content=message_data.get("content", ""),
+                                content=message_data.get("content"),  # Can be None with tool calls
+                                tool_calls=tool_calls,
+                                tool_call_id=message_data.get("tool_call_id"),
                             ),
                             finish_reason=choice_data.get("finish_reason"),
                         )
@@ -348,6 +375,11 @@ class PrivateModeProvider(BaseLLMProvider):
                         "role": msg.role,
                         "content": msg.content,
                         **({"name": msg.name} if msg.name else {}),
+                        **({"tool_calls": [
+                            {"id": tc.id, "type": tc.type, "function": tc.function}
+                            for tc in msg.tool_calls
+                        ]} if msg.tool_calls else {}),
+                        **({"tool_call_id": msg.tool_call_id} if msg.tool_call_id else {}),
                     }
                     for msg in request.messages
                 ],
@@ -366,6 +398,12 @@ class PrivateModeProvider(BaseLLMProvider):
                 payload["presence_penalty"] = request.presence_penalty
             if request.stop is not None:
                 payload["stop"] = request.stop
+
+            # Add tools and tool_choice for function calling
+            if request.tools:
+                payload["tools"] = request.tools
+            if request.tool_choice:
+                payload["tool_choice"] = request.tool_choice
 
             # Add user tracking
             payload["user"] = f"user_{request.user_id}"

@@ -81,11 +81,23 @@ class User(Base):
     created_tools = relationship(
         "Tool", back_populates="created_by", cascade="all, delete-orphan"
     )
+    created_agent_configs = relationship(
+        "AgentConfig", back_populates="created_by", cascade="all, delete-orphan", foreign_keys="AgentConfig.created_by_user_id"
+    )
+    created_mcp_servers = relationship(
+        "MCPServer", back_populates="created_by", cascade="all, delete-orphan", foreign_keys="MCPServer.created_by_user_id"
+    )
     tool_executions = relationship(
         "ToolExecution", back_populates="executed_by", cascade="all, delete-orphan"
     )
     notifications = relationship(
         "Notification", back_populates="user", cascade="all, delete-orphan"
+    )
+    responses = relationship(
+        "Response", back_populates="user", cascade="all, delete-orphan"
+    )
+    conversations = relationship(
+        "Conversation", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self):

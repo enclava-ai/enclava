@@ -3,14 +3,18 @@ Tool calling API endpoints
 Integration between LLM and tool execution
 """
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_
+from pydantic import BaseModel, Field
 
 from app.db.database import get_db
 from app.core.security import get_current_user
+from app.services.api_key_auth import get_api_key_context
 from app.services.tool_calling_service import ToolCallingService
-from app.services.llm.models import ChatRequest, ChatResponse
+from app.services.llm.models import ChatRequest, ChatResponse, ChatMessage
 from app.schemas.tool_calling import (
     ToolCallRequest,
     ToolCallResponse,
@@ -19,6 +23,7 @@ from app.schemas.tool_calling import (
     ToolValidationResponse,
     ToolHistoryResponse,
 )
+from app.models.agent_config import AgentConfig
 
 router = APIRouter()
 
@@ -164,3 +169,50 @@ async def get_available_tools(
     openai_tools = await service._convert_tools_to_openai_format(tools)
 
     return {"tools": openai_tools, "count": len(openai_tools)}
+
+
+@router.get("/agent/configs")
+async def list_agent_configs(
+    category: Optional[str] = Query(None),
+    is_public: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """List agent configurations accessible to the user.
+
+    This endpoint is used by the API keys page to list available agents
+    for access restriction configuration.
+    """
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+
+    # Build query for agents accessible to the user
+    stmt = select(AgentConfig).where(
+        or_(
+            AgentConfig.created_by_user_id == user_id,
+            AgentConfig.is_public == True
+        )
+    )
+
+    if category:
+        stmt = stmt.where(AgentConfig.category == category)
+    if is_public is not None:
+        stmt = stmt.where(AgentConfig.is_public == is_public)
+
+    stmt = stmt.order_by(AgentConfig.created_at.desc())
+
+    result = await db.execute(stmt)
+    configs = result.scalars().all()
+
+    return {
+        "configs": [
+            {
+                "id": cfg.id,
+                "name": cfg.name,
+                "description": cfg.description,
+            }
+            for cfg in configs
+        ],
+        "count": len(configs)
+    }

@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.db.database import async_session_factory
+from app.db.database import async_session_factory, get_pool_status
 from app.services.embedding_service import embedding_service
 from app.core.config import settings
 
@@ -67,6 +67,77 @@ class HealthChecker:
                 "error": str(e),
                 "timestamp": datetime.utcnow().isoformat(),
                 "details": {"connection": "failed", "error_type": type(e).__name__},
+            }
+
+    def check_pool_health(self) -> Dict[str, Any]:
+        """Check database connection pool health"""
+        try:
+            pool_status = get_pool_status()
+
+            # Analyze pool status for potential issues
+            issues = []
+            pool_health = "healthy"
+
+            # Check async pool
+            async_pool = pool_status.get("async_pool", {})
+            if "error" not in async_pool:
+                async_checked_out = async_pool.get("checked_out", 0)
+                async_overflow = async_pool.get("overflow", 0)
+                async_max = pool_status["config"]["async_max_connections"]
+
+                # Warning if using more than 70% of max connections
+                if async_checked_out > async_max * 0.7:
+                    pool_health = "warning"
+                    issues.append(f"Async pool high utilization: {async_checked_out}/{async_max}")
+
+                # Critical if using more than 90%
+                if async_checked_out > async_max * 0.9:
+                    pool_health = "critical"
+                    issues.append(f"Async pool near exhaustion: {async_checked_out}/{async_max}")
+
+                # Warning if overflow is being used
+                if async_overflow > 0:
+                    if pool_health == "healthy":
+                        pool_health = "warning"
+                    issues.append(f"Async pool overflow in use: {async_overflow}")
+
+            # Check sync pool
+            sync_pool = pool_status.get("sync_pool", {})
+            if "error" not in sync_pool:
+                sync_checked_out = sync_pool.get("checked_out", 0)
+                sync_overflow = sync_pool.get("overflow", 0)
+                sync_max = pool_status["config"]["sync_max_connections"]
+
+                # Warning if using more than 70% of max connections
+                if sync_checked_out > sync_max * 0.7:
+                    if pool_health == "healthy":
+                        pool_health = "warning"
+                    issues.append(f"Sync pool high utilization: {sync_checked_out}/{sync_max}")
+
+                # Critical if using more than 90%
+                if sync_checked_out > sync_max * 0.9:
+                    pool_health = "critical"
+                    issues.append(f"Sync pool near exhaustion: {sync_checked_out}/{sync_max}")
+
+                # Warning if overflow is being used
+                if sync_overflow > 0:
+                    if pool_health == "healthy":
+                        pool_health = "warning"
+                    issues.append(f"Sync pool overflow in use: {sync_overflow}")
+
+            return {
+                "status": pool_health,
+                "timestamp": datetime.utcnow().isoformat(),
+                "pool_status": pool_status,
+                "issues": issues,
+            }
+
+        except Exception as e:
+            logger.error(f"Pool health check failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def check_memory_health(self) -> Dict[str, Any]:
@@ -255,6 +326,7 @@ class HealthChecker:
         """Get comprehensive health status"""
         checks = {
             "database": await self.check_database_health(),
+            "database_pool": self.check_pool_health(),
             "memory": await self.check_memory_health(),
             "connections": await self.check_connection_health(),
             "embedding_service": await self.check_embedding_service_health(),
@@ -358,4 +430,17 @@ async def embedding_service_health_check():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Embedding service health check failed: {str(e)}",
+        )
+
+
+@router.get("/health/pool")
+async def database_pool_health_check():
+    """Database connection pool health check"""
+    try:
+        return health_checker.check_pool_health()
+    except Exception as e:
+        logger.error(f"Database pool health check failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database pool health check failed: {str(e)}",
         )

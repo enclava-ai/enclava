@@ -58,6 +58,7 @@ interface ApiKey {
   is_unlimited: boolean;
   allowed_models: string[];
   allowed_chatbots: string[];
+  allowed_agents: string[];
 }
 
 interface Model {
@@ -87,6 +88,13 @@ interface NewApiKeyData {
   budget_type?: "total" | "monthly";
   allowed_models: string[];
   allowed_chatbots: string[];
+  allowed_agents: string[];
+}
+
+interface AgentConfig {
+  id: number;
+  name: string;
+  description?: string;
 }
 
 const PERMISSION_OPTIONS = [
@@ -109,6 +117,7 @@ function ApiKeysContent() {
   const [editKeyData, setEditKeyData] = useState<Partial<ApiKey>>({});
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [availableChatbots, setAvailableChatbots] = useState<any[]>([]);
+  const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([]);
 
   const [newKeyData, setNewKeyData] = useState<NewApiKeyData>({
     name: "",
@@ -120,12 +129,14 @@ function ApiKeysContent() {
     budget_type: "monthly",
     allowed_models: [],
     allowed_chatbots: [],
+    allowed_agents: [],
   });
 
   useEffect(() => {
     fetchApiKeys();
     fetchAvailableModels();
     fetchAvailableChatbots();
+    fetchAvailableAgents();
     
     // Check URL parameters for auto-opening create dialog
     const chatbotId = searchParams.get('chatbot');
@@ -188,6 +199,15 @@ function ApiKeysContent() {
     }
   };
 
+  const fetchAvailableAgents = async () => {
+    try {
+      const result = await apiClient.get("/api-internal/v1/tool-calling/agent/configs") as any;
+      setAvailableAgents(result.configs || []);
+    } catch (error) {
+      setAvailableAgents([]);
+    }
+  };
+
   const handleCreateApiKey = async () => {
     try {
       setActionLoading("create");
@@ -210,6 +230,7 @@ function ApiKeysContent() {
         budget_type: "monthly",
         allowed_models: [],
         allowed_chatbots: [],
+        allowed_agents: [],
       });
 
       await fetchApiKeys();
@@ -535,6 +556,42 @@ function ApiKeysContent() {
                   ))}
                   {availableChatbots.length === 0 && (
                     <p className="text-sm text-muted-foreground">No chatbots available</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Agent Restrictions */}
+              <div className="space-y-2">
+                <Label>Agent Restrictions (Optional)</Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Leave empty to allow all agents, or select specific agents to restrict access.
+                </p>
+                <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                  {availableAgents.map((agent) => (
+                    <div key={agent.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`agent-${agent.id}`}
+                        checked={newKeyData.allowed_agents.includes(String(agent.id))}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          const agentId = String(agent.id);
+                          setNewKeyData(prev => ({
+                            ...prev,
+                            allowed_agents: checked
+                              ? [...prev.allowed_agents, agentId]
+                              : prev.allowed_agents.filter(a => a !== agentId)
+                          }));
+                        }}
+                        className="rounded"
+                      />
+                      <Label htmlFor={`agent-${agent.id}`} className="text-sm">
+                        {agent.name}
+                      </Label>
+                    </div>
+                  ))}
+                  {availableAgents.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No agents available</p>
                   )}
                 </div>
               </div>

@@ -749,6 +749,134 @@ async def delete_chatbot(
         )
 
 
+# Tool configuration endpoints
+
+
+class ToolConfigRequest(BaseModel):
+    """Tool configuration update request"""
+
+    enabled: Optional[bool] = None
+    builtin_tools: Optional[List[str]] = None
+    mcp_servers: Optional[List[str]] = None
+    include_custom_tools: Optional[bool] = None
+    tool_choice: Optional[str] = None
+    max_iterations: Optional[int] = None
+
+
+@router.get("/tools/config/{chatbot_id}")
+async def get_tool_config(
+    chatbot_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get tool configuration for a chatbot"""
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request("get_tool_config", {"user_id": user_id, "chatbot_id": chatbot_id})
+
+    try:
+        # Get chatbot and verify ownership
+        result = await db.execute(
+            select(ChatbotInstance)
+            .where(ChatbotInstance.id == chatbot_id)
+            .where(ChatbotInstance.created_by == str(user_id))
+        )
+        chatbot = result.scalar_one_or_none()
+
+        if not chatbot:
+            raise HTTPException(
+                status_code=404, detail="Chatbot not found or access denied"
+            )
+
+        # Extract tool config from existing config JSON
+        from app.modules.chatbot.main import get_tool_config as extract_tool_config
+
+        tool_config = extract_tool_config(chatbot.config)
+
+        return {
+            "chatbot_id": chatbot_id,
+            "tool_config": tool_config
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_api_request("get_tool_config_error", {"error": str(e), "user_id": user_id})
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get tool config: {str(e)}"
+        )
+
+
+@router.put("/tools/config/{chatbot_id}")
+async def update_tool_config(
+    chatbot_id: str,
+    request: ToolConfigRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update tool configuration for a chatbot"""
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
+    log_api_request(
+        "update_tool_config",
+        {"user_id": user_id, "chatbot_id": chatbot_id, "config": request.dict(exclude_unset=True)},
+    )
+
+    try:
+        # Get chatbot and verify ownership
+        result = await db.execute(
+            select(ChatbotInstance)
+            .where(ChatbotInstance.id == chatbot_id)
+            .where(ChatbotInstance.created_by == str(user_id))
+        )
+        chatbot = result.scalar_one_or_none()
+
+        if not chatbot:
+            raise HTTPException(
+                status_code=404, detail="Chatbot not found or access denied"
+            )
+
+        # Get current config
+        config = chatbot.config.copy()
+
+        # Get current tool config or create default
+        tool_config = config.get("tools", {})
+
+        # Update only provided fields
+        update_data = request.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            tool_config[key] = value
+
+        # Update config with new tool config
+        config["tools"] = tool_config
+
+        # Save updated config
+        await db.execute(
+            update(ChatbotInstance)
+            .where(ChatbotInstance.id == chatbot_id)
+            .values(config=config, updated_at=datetime.utcnow())
+        )
+
+        await db.commit()
+
+        return {
+            "message": "Tool config updated successfully",
+            "chatbot_id": chatbot_id,
+            "tool_config": tool_config
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        log_api_request("update_tool_config_error", {"error": str(e), "user_id": user_id})
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update tool config: {str(e)}"
+        )
+
+
 @router.post("/external/{chatbot_id}/chat")
 async def external_chat_with_chatbot(
     chatbot_id: str,

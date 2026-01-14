@@ -136,6 +136,7 @@ class CachedAPIKeyService:
                     "budget_limit_cents": api_key.budget_limit_cents,
                     "budget_type": api_key.budget_type,
                     "allowed_chatbots": api_key.allowed_chatbots,
+                    "allowed_agents": api_key.allowed_agents,
                 },
                 "user_data": {
                     "id": user.id,
@@ -143,7 +144,7 @@ class CachedAPIKeyService:
                     "username": user.username,
                     "is_active": user.is_active,
                     "is_superuser": user.is_superuser,
-                    "role": user.role,
+                    "role_id": user.role_id,  # Use column instead of relationship to avoid lazy loading
                     "created_at": user.created_at.isoformat()
                     if user.created_at
                     else None,

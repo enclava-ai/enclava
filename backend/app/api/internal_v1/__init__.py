@@ -20,6 +20,7 @@ from ..v1.llm_internal import router as llm_internal_router
 from ..v1.chatbot import router as chatbot_router
 from .debugging import router as debugging_router
 from ..v1.endpoints.user_management import router as user_management_router
+from ..v1.endpoints.tool_calling import router as tool_calling_router
 
 # Create internal API router
 internal_api_router = APIRouter()
@@ -106,4 +107,9 @@ internal_api_router.include_router(
 # Include user management routes (advanced user and role management)
 internal_api_router.include_router(
     user_management_router, prefix="/user-management", tags=["internal-user-management"]
+)
+
+# Include tool-calling routes (agent configurations and tool execution)
+internal_api_router.include_router(
+    tool_calling_router, prefix="/tool-calling", tags=["internal-tool-calling"]
 )

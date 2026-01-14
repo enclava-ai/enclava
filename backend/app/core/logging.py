@@ -41,10 +41,12 @@ def setup_logging() -> None:
         level=getattr(logging, settings.LOG_LEVEL.upper()),
     )
 
-    # Set specific loggers
+    # Set specific loggers to reduce noise
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
@@ -152,4 +154,4 @@ def log_api_request(
         **kwargs,
     }
 
-    logger.info("API request", **log_data)
+    logger.debug("API request", **log_data)
