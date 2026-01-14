@@ -1,10 +1,17 @@
 """
 Database connection and session management
+
+This module manages database connections with optimized pool settings:
+- Primary async pool (asyncpg): 30 + 50 overflow = 80 max connections
+- Legacy sync pool (psycopg2): 5 + 10 overflow = 15 max connections
+- Total: 95 max connections (under PostgreSQL default of 100)
+
+Pool monitoring is available via get_pool_status() function.
 """
 
 import logging
-from typing import AsyncGenerator
-from sqlalchemy import create_engine, MetaData
+from typing import AsyncGenerator, Dict, Any
+from sqlalchemy import create_engine, MetaData, event
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -14,14 +21,27 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Pool metrics tracking
+_pool_metrics = {
+    "async_checkouts": 0,
+    "async_checkins": 0,
+    "async_overflow": 0,
+    "sync_checkouts": 0,
+    "sync_checkins": 0,
+    "sync_overflow": 0,
+}
+
 # Create async engine with optimized connection pooling
+# This is the PRIMARY engine - most operations should use async sessions
+# Pool sizing: 30 base + 50 overflow = 80 max connections
+# Note: PostgreSQL default max_connections=100, leave headroom for admin/monitoring
 engine = create_async_engine(
     settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
     echo=settings.APP_DEBUG,
     future=True,
     pool_pre_ping=True,
-    pool_size=50,  # Increased from 20 for better concurrency
-    max_overflow=100,  # Increased from 30 for burst capacity
+    pool_size=30,  # Base pool size for steady-state operations
+    max_overflow=50,  # Burst capacity for high load
     pool_recycle=3600,  # Recycle connections every hour
     pool_timeout=30,  # Max time to get connection from pool
     connect_args={
@@ -40,14 +60,17 @@ async_session_factory = async_sessionmaker(
     expire_on_commit=False,
 )
 
-# Create synchronous engine and session for budget enforcement (optimized)
+# Create synchronous engine for legacy code paths and startup operations
+# IMPORTANT: This pool should be MINIMAL - prefer async operations for all new code
+# Most budget enforcement, chatbot, and API operations now use async sessions
+# Pool sizing: 5 base + 10 overflow = 15 max connections
 sync_engine = create_engine(
     settings.DATABASE_URL,
     echo=settings.APP_DEBUG,
     future=True,
     pool_pre_ping=True,
-    pool_size=25,  # Increased from 10 for better performance
-    max_overflow=50,  # Increased from 20 for burst capacity
+    pool_size=5,  # Minimal - only for startup/migrations/legacy paths
+    max_overflow=10,  # Small burst for edge cases
     pool_recycle=3600,  # Recycle connections every hour
     pool_timeout=30,  # Max time to get connection from pool
     connect_args={
@@ -57,6 +80,7 @@ sync_engine = create_engine(
 )
 
 # Create sync session factory
+# NOTE: Prefer async_session_factory for all new code
 SessionLocal = sessionmaker(
     bind=sync_engine,
     expire_on_commit=False,
@@ -64,6 +88,106 @@ SessionLocal = sessionmaker(
 
 # Create base class for models
 Base = declarative_base()
+
+
+# ============================================================================
+# Pool Monitoring
+# ============================================================================
+
+def _setup_pool_monitoring():
+    """Set up event listeners for pool monitoring"""
+
+    # Sync engine pool events
+    @event.listens_for(sync_engine, "checkout")
+    def sync_checkout(dbapi_conn, connection_record, connection_proxy):
+        _pool_metrics["sync_checkouts"] += 1
+        pool = sync_engine.pool
+        if pool.overflow() > 0:
+            _pool_metrics["sync_overflow"] = pool.overflow()
+            logger.debug(f"Sync pool checkout (overflow: {pool.overflow()})")
+
+    @event.listens_for(sync_engine, "checkin")
+    def sync_checkin(dbapi_conn, connection_record):
+        _pool_metrics["sync_checkins"] += 1
+
+    # Note: Async engine pool events work on the underlying sync engine
+    # We access it via engine.sync_engine for event registration
+    try:
+        sync_async_engine = engine.sync_engine
+
+        @event.listens_for(sync_async_engine, "checkout")
+        def async_checkout(dbapi_conn, connection_record, connection_proxy):
+            _pool_metrics["async_checkouts"] += 1
+            pool = sync_async_engine.pool
+            if pool.overflow() > 0:
+                _pool_metrics["async_overflow"] = pool.overflow()
+                logger.debug(f"Async pool checkout (overflow: {pool.overflow()})")
+
+        @event.listens_for(sync_async_engine, "checkin")
+        def async_checkin(dbapi_conn, connection_record):
+            _pool_metrics["async_checkins"] += 1
+
+    except Exception as e:
+        logger.warning(f"Could not set up async pool monitoring: {e}")
+
+
+def get_pool_status() -> Dict[str, Any]:
+    """
+    Get current status of database connection pools.
+
+    Returns:
+        Dict containing pool statistics for both async and sync engines
+    """
+    try:
+        # Get async pool status
+        async_pool = engine.sync_engine.pool
+        async_status = {
+            "size": async_pool.size(),
+            "checked_in": async_pool.checkedin(),
+            "checked_out": async_pool.checkedout(),
+            "overflow": async_pool.overflow(),
+            "invalid": async_pool.invalidatedcount() if hasattr(async_pool, 'invalidatedcount') else 0,
+        }
+    except Exception as e:
+        async_status = {"error": str(e)}
+
+    try:
+        # Get sync pool status
+        sync_pool = sync_engine.pool
+        sync_status = {
+            "size": sync_pool.size(),
+            "checked_in": sync_pool.checkedin(),
+            "checked_out": sync_pool.checkedout(),
+            "overflow": sync_pool.overflow(),
+            "invalid": sync_pool.invalidatedcount() if hasattr(sync_pool, 'invalidatedcount') else 0,
+        }
+    except Exception as e:
+        sync_status = {"error": str(e)}
+
+    return {
+        "async_pool": async_status,
+        "sync_pool": sync_status,
+        "metrics": _pool_metrics.copy(),
+        "config": {
+            "async_pool_size": 30,
+            "async_max_overflow": 50,
+            "async_max_connections": 80,
+            "sync_pool_size": 5,
+            "sync_max_overflow": 10,
+            "sync_max_connections": 15,
+            "total_max_connections": 95,
+        }
+    }
+
+
+def log_pool_status():
+    """Log current pool status (useful for debugging)"""
+    status = get_pool_status()
+    logger.info(f"Database pool status: {status}")
+
+
+# Initialize pool monitoring
+_setup_pool_monitoring()
 
 # Metadata for migrations
 metadata = MetaData()

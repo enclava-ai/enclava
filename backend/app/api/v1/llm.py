@@ -9,7 +9,6 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.services.api_key_auth import (
@@ -33,12 +32,12 @@ from app.services.llm.exceptions import (
     SecurityError,
     ValidationError,
 )
-from app.services.budget_enforcement import (
-    check_budget_for_request,
-    record_request_usage,
-    BudgetEnforcementService,
-    atomic_check_and_reserve_budget,
-    atomic_finalize_usage,
+from app.services.async_budget_enforcement import (
+    AsyncBudgetEnforcementService,
+    async_check_budget_for_request,
+    async_record_request_usage,
+    async_atomic_check_and_reserve_budget,
+    async_atomic_finalize_usage,
 )
 from app.services.cost_calculator import CostCalculator, estimate_request_cost
 from app.utils.exceptions import AuthenticationError, AuthorizationError
@@ -289,143 +288,134 @@ async def create_chat_completion(
         else:
             estimated_tokens += 150  # Default response length estimate
 
-        # Get a synchronous session for budget enforcement
-        from app.db.database import SessionLocal
-
-        sync_db = SessionLocal()
-
-        try:
-            # Atomic budget check and reservation (only for API key users)
-            warnings = []
-            reserved_budget_ids = []
-            if auth_type == "api_key" and api_key:
-                (
-                    is_allowed,
-                    error_message,
-                    budget_warnings,
-                    budget_ids,
-                ) = atomic_check_and_reserve_budget(
-                    sync_db,
-                    api_key,
-                    chat_request.model,
-                    int(estimated_tokens),
-                    "chat/completions",
-                )
-
-                if not is_allowed:
-                    raise HTTPException(
-                        status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                        detail=f"Budget exceeded: {error_message}",
-                    )
-                warnings = budget_warnings
-                reserved_budget_ids = budget_ids
-
-            # Convert messages to LLM service format
-            llm_messages = [
-                LLMChatMessage(role=msg.role, content=msg.content)
-                for msg in chat_request.messages
-            ]
-
-            # Create LLM service request
-            llm_request = ChatRequest(
-                model=chat_request.model,
-                messages=llm_messages,
-                temperature=chat_request.temperature,
-                max_tokens=chat_request.max_tokens,
-                top_p=chat_request.top_p,
-                frequency_penalty=chat_request.frequency_penalty,
-                presence_penalty=chat_request.presence_penalty,
-                stop=chat_request.stop,
-                stream=chat_request.stream or False,
-                user_id=str(context.get("user_id", "anonymous")),
-                api_key_id=context.get("api_key_id", 0)
-                if auth_type == "api_key"
-                else 0,
+        # Atomic budget check and reservation (only for API key users) - fully async
+        warnings = []
+        reserved_budget_ids = []
+        if auth_type == "api_key" and api_key:
+            (
+                is_allowed,
+                error_message,
+                budget_warnings,
+                budget_ids,
+            ) = await async_atomic_check_and_reserve_budget(
+                db,
+                api_key,
+                chat_request.model,
+                int(estimated_tokens),
+                "chat/completions",
             )
 
-            # Make request to LLM service
-            llm_response = await llm_service.create_chat_completion(llm_request)
+            if not is_allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail=f"Budget exceeded: {error_message}",
+                )
+            warnings = budget_warnings
+            reserved_budget_ids = budget_ids
 
-            # Convert LLM service response to API format
-            response = {
-                "id": llm_response.id,
-                "object": llm_response.object,
-                "created": llm_response.created,
-                "model": llm_response.model,
-                "choices": [
-                    {
-                        "index": choice.index,
-                        "message": {
-                            "role": choice.message.role,
-                            "content": choice.message.content,
-                        },
-                        "finish_reason": choice.finish_reason,
-                    }
-                    for choice in llm_response.choices
-                ],
-                "usage": {
-                    "prompt_tokens": llm_response.usage.prompt_tokens
-                    if llm_response.usage
-                    else 0,
-                    "completion_tokens": llm_response.usage.completion_tokens
-                    if llm_response.usage
-                    else 0,
-                    "total_tokens": llm_response.usage.total_tokens
-                    if llm_response.usage
-                    else 0,
+        # Convert messages to LLM service format
+        llm_messages = [
+            LLMChatMessage(role=msg.role, content=msg.content)
+            for msg in chat_request.messages
+        ]
+
+        # Create LLM service request
+        llm_request = ChatRequest(
+            model=chat_request.model,
+            messages=llm_messages,
+            temperature=chat_request.temperature,
+            max_tokens=chat_request.max_tokens,
+            top_p=chat_request.top_p,
+            frequency_penalty=chat_request.frequency_penalty,
+            presence_penalty=chat_request.presence_penalty,
+            stop=chat_request.stop,
+            stream=chat_request.stream or False,
+            user_id=str(context.get("user_id", "anonymous")),
+            api_key_id=context.get("api_key_id", 0)
+            if auth_type == "api_key"
+            else 0,
+        )
+
+        # Make request to LLM service
+        llm_response = await llm_service.create_chat_completion(llm_request)
+
+        # Convert LLM service response to API format
+        response = {
+            "id": llm_response.id,
+            "object": llm_response.object,
+            "created": llm_response.created,
+            "model": llm_response.model,
+            "choices": [
+                {
+                    "index": choice.index,
+                    "message": {
+                        "role": choice.message.role,
+                        "content": choice.message.content,
+                    },
+                    "finish_reason": choice.finish_reason,
                 }
+                for choice in llm_response.choices
+            ],
+            "usage": {
+                "prompt_tokens": llm_response.usage.prompt_tokens
                 if llm_response.usage
-                else {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                else 0,
+                "completion_tokens": llm_response.usage.completion_tokens
+                if llm_response.usage
+                else 0,
+                "total_tokens": llm_response.usage.total_tokens
+                if llm_response.usage
+                else 0,
             }
+            if llm_response.usage
+            else {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        }
 
-            # Calculate actual cost and update usage
-            usage = response.get("usage", {})
-            input_tokens = usage.get("prompt_tokens", 0)
-            output_tokens = usage.get("completion_tokens", 0)
-            total_tokens = usage.get("total_tokens", input_tokens + output_tokens)
+        # Calculate actual cost and update usage
+        usage = response.get("usage", {})
+        input_tokens = usage.get("prompt_tokens", 0)
+        output_tokens = usage.get("completion_tokens", 0)
+        total_tokens = usage.get("total_tokens", input_tokens + output_tokens)
 
-            # Calculate accurate cost
-            actual_cost_cents = CostCalculator.calculate_cost_cents(
-                chat_request.model, input_tokens, output_tokens
+        # Calculate accurate cost
+        actual_cost_cents = CostCalculator.calculate_cost_cents(
+            chat_request.model, input_tokens, output_tokens
+        )
+
+        # Finalize actual usage in budgets (only for API key users) - fully async
+        if auth_type == "api_key" and api_key:
+            await async_atomic_finalize_usage(
+                db,
+                reserved_budget_ids,
+                api_key,
+                chat_request.model,
+                input_tokens,
+                output_tokens,
+                "chat/completions",
             )
 
-            # Finalize actual usage in budgets (only for API key users)
-            if auth_type == "api_key" and api_key:
-                atomic_finalize_usage(
-                    sync_db,
-                    reserved_budget_ids,
-                    api_key,
-                    chat_request.model,
-                    input_tokens,
-                    output_tokens,
-                    "chat/completions",
-                )
-
-                # Update API key usage statistics
-                auth_service = APIKeyAuthService(db)
-                await auth_service.update_usage_stats(
-                    context, total_tokens, actual_cost_cents
-                )
-
-            # Set analytics data for middleware
-            set_analytics_data(
-                model=chat_request.model,
-                request_tokens=input_tokens,
-                response_tokens=output_tokens,
-                total_tokens=total_tokens,
-                cost_cents=actual_cost_cents,
-                budget_ids=reserved_budget_ids,
-                budget_warnings=warnings,
+            # Update API key usage statistics
+            auth_service = APIKeyAuthService(db)
+            await auth_service.update_usage_stats(
+                context, total_tokens, actual_cost_cents
             )
 
-            # Add budget warnings to response if any
-            if warnings:
-                response["budget_warnings"] = warnings
+        # Set analytics data for middleware
+        set_analytics_data(
+            model=chat_request.model,
+            request_tokens=input_tokens,
+            response_tokens=output_tokens,
+            total_tokens=total_tokens,
+            cost_cents=actual_cost_cents,
+            budget_ids=reserved_budget_ids,
+            budget_warnings=warnings,
+        )
 
-            return response
+        # Add budget warnings to response if any
+        if warnings:
+            response["budget_warnings"] = warnings
 
-        finally:
-            sync_db.close()
+        return response
 
     except HTTPException:
         raise
@@ -500,87 +490,80 @@ async def create_embedding(
         # Estimate token usage for budget checking
         estimated_tokens = len(request.input.split()) * 1.3  # Rough token estimation
 
-        # Convert AsyncSession to Session for budget enforcement
-        sync_db = Session(bind=db.bind.sync_engine)
+        # Check budget compliance before making request - fully async
+        is_allowed, error_message, warnings = await async_check_budget_for_request(
+            db, api_key, request.model, int(estimated_tokens), "embeddings"
+        )
 
-        try:
-            # Check budget compliance before making request
-            is_allowed, error_message, warnings = check_budget_for_request(
-                sync_db, api_key, request.model, int(estimated_tokens), "embeddings"
+        if not is_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Budget exceeded: {error_message}",
             )
 
-            if not is_allowed:
-                raise HTTPException(
-                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail=f"Budget exceeded: {error_message}",
-                )
+        # Create LLM service request
+        llm_request = LLMEmbeddingRequest(
+            model=request.model,
+            input=request.input,
+            encoding_format=request.encoding_format,
+            user_id=str(context["user_id"]),
+            api_key_id=context["api_key_id"],
+        )
 
-            # Create LLM service request
-            llm_request = LLMEmbeddingRequest(
-                model=request.model,
-                input=request.input,
-                encoding_format=request.encoding_format,
-                user_id=str(context["user_id"]),
-                api_key_id=context["api_key_id"],
-            )
+        # Make request to LLM service
+        llm_response = await llm_service.create_embedding(llm_request)
 
-            # Make request to LLM service
-            llm_response = await llm_service.create_embedding(llm_request)
-
-            # Convert LLM service response to API format
-            response = {
-                "object": llm_response.object,
-                "data": [
-                    {
-                        "object": emb.object,
-                        "index": emb.index,
-                        "embedding": emb.embedding,
-                    }
-                    for emb in llm_response.data
-                ],
-                "model": llm_response.model,
-                "usage": {
-                    "prompt_tokens": llm_response.usage.prompt_tokens
-                    if llm_response.usage
-                    else 0,
-                    "total_tokens": llm_response.usage.total_tokens
-                    if llm_response.usage
-                    else 0,
+        # Convert LLM service response to API format
+        response = {
+            "object": llm_response.object,
+            "data": [
+                {
+                    "object": emb.object,
+                    "index": emb.index,
+                    "embedding": emb.embedding,
                 }
+                for emb in llm_response.data
+            ],
+            "model": llm_response.model,
+            "usage": {
+                "prompt_tokens": llm_response.usage.prompt_tokens
                 if llm_response.usage
-                else {
-                    "prompt_tokens": int(estimated_tokens),
-                    "total_tokens": int(estimated_tokens),
-                },
+                else 0,
+                "total_tokens": llm_response.usage.total_tokens
+                if llm_response.usage
+                else 0,
             }
+            if llm_response.usage
+            else {
+                "prompt_tokens": int(estimated_tokens),
+                "total_tokens": int(estimated_tokens),
+            },
+        }
 
-            # Calculate actual cost and update usage
-            usage = response.get("usage", {})
-            total_tokens = usage.get("total_tokens", int(estimated_tokens))
+        # Calculate actual cost and update usage
+        usage = response.get("usage", {})
+        total_tokens = usage.get("total_tokens", int(estimated_tokens))
 
-            # Calculate accurate cost (embeddings typically use input tokens only)
-            actual_cost_cents = CostCalculator.calculate_cost_cents(
-                request.model, total_tokens, 0
-            )
+        # Calculate accurate cost (embeddings typically use input tokens only)
+        actual_cost_cents = CostCalculator.calculate_cost_cents(
+            request.model, total_tokens, 0
+        )
 
-            # Record actual usage in budgets
-            record_request_usage(
-                sync_db, api_key, request.model, total_tokens, 0, "embeddings"
-            )
+        # Record actual usage in budgets - fully async
+        await async_record_request_usage(
+            db, api_key, request.model, total_tokens, 0, "embeddings"
+        )
 
-            # Update API key usage statistics
-            await auth_service.update_usage_stats(
-                context, total_tokens, actual_cost_cents
-            )
+        # Update API key usage statistics
+        await auth_service.update_usage_stats(
+            context, total_tokens, actual_cost_cents
+        )
 
-            # Add budget warnings to response if any
-            if warnings:
-                response["budget_warnings"] = warnings
+        # Add budget warnings to response if any
+        if warnings:
+            response["budget_warnings"] = warnings
 
-            return response
-
-        finally:
-            sync_db.close()
+        return response
 
     except HTTPException:
         raise
@@ -726,16 +709,11 @@ async def get_budget_status(
                     detail="API key information not available",
                 )
 
-            # Convert AsyncSession to Session for budget enforcement
-            sync_db = Session(bind=db.bind.sync_engine)
+            # Get budget status using async service
+            budget_service = AsyncBudgetEnforcementService(db)
+            budget_status = await budget_service.get_budget_status(api_key)
 
-            try:
-                budget_service = BudgetEnforcementService(sync_db)
-                budget_status = budget_service.get_budget_status(api_key)
-
-                return {"object": "budget_status", "data": budget_status}
-            finally:
-                sync_db.close()
+            return {"object": "budget_status", "data": budget_status}
 
         elif auth_type == "jwt":
             # For JWT authentication, return user-level budget information

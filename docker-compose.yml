@@ -1,9 +1,10 @@
 services:
   # Nginx reverse proxy - Main application entry point
   enclava-nginx:
+    container_name: enclava-nginx
     image: nginx:alpine
     ports:
-      - "80:80"  # Main application access (nginx proxy)
+      - "1080:80"  # Main application access (nginx proxy)
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro,z
     depends_on:
@@ -15,6 +16,7 @@ services:
 
   # Database migration service - runs once to apply migrations
   enclava-migrate:
+    container_name: enclava-migrate
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -33,6 +35,7 @@ services:
 
   # Main application backend
   enclava-backend:
+    container_name: enclava-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -50,6 +53,8 @@ services:
       - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
       # Agent & Tool Calling System - MCP Servers (pass all MCP_* env vars)
       # Example: MCP_ORDER_API_URL, MCP_ORDER_API_KEY, MCP_WEATHER_URL, etc.
+      # Container socket path (for code execution sandbox, if enabled)
+      - CONTAINER_SOCK=${CONTAINER_SOCK:-}
     depends_on:
       - enclava-migrate
       - enclava-postgres
@@ -61,17 +66,20 @@ services:
       - ./backend:/app:z
       - ./logs:/app/logs:z
       - ./plugins:/plugins:z
-      # Container socket for code execution sandbox
+      # Container socket for code execution sandbox (optional)
       # SECURITY NOTE: This allows the backend to spawn containers
       # In production, consider using Docker-in-Docker or restricting permissions
-      # Works with: Docker, Podman (with podman-docker), or set CONTAINER_SOCK for custom path
-      - ${CONTAINER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+      #
+      # For Docker: CONTAINER_SOCK=/var/run/docker.sock
+      # For Podman rootless: CONTAINER_SOCK=/run/user/$(id -u)/podman/podman.sock
+      # Leave unset to disable container execution features
     networks:
       - enclava-net
     restart: unless-stopped
 
   # Next.js frontend
   enclava-frontend:
+    container_name: enclava-frontend
     image: node:18-alpine
     working_dir: /app
     command: sh -c "npm ci --ignore-scripts && npm run dev"
@@ -97,6 +105,7 @@ services:
 
   # PostgreSQL database
   enclava-postgres:
+    container_name: enclava-postgres
     image: postgres:16
     environment:
       - POSTGRES_DB=enclava_db
@@ -111,6 +120,7 @@ services:
 
   # Redis for caching and message queue
   enclava-redis:
+    container_name: enclava-redis
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes:
@@ -121,6 +131,7 @@ services:
 
   # Qdrant vector database
   enclava-qdrant:
+    container_name: enclava-qdrant
     image: qdrant/qdrant:latest
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
@@ -136,6 +147,7 @@ services:
 
   # Privatemode.ai service (optional - for confidential models)
   privatemode-proxy:
+    container_name: privatemode-proxy
     image: ghcr.io/edgelesssys/privatemode/privatemode-proxy:latest
     environment:
       - PRIVATEMODE_API_KEY=${PRIVATEMODE_API_KEY:-}

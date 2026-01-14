@@ -322,15 +322,14 @@ class ChatbotModule(BaseModule):
                 logger.warning(f"Could not lazy load RAG module: {e}")
 
     async def _load_prompt_templates(self):
-        """Load prompt templates from database"""
+        """Load prompt templates from database using async session"""
         try:
-            from app.db.database import SessionLocal
+            from app.db.database import async_session_factory
             from app.models.prompt_template import PromptTemplate
             from sqlalchemy import select
 
-            db = SessionLocal()
-            try:
-                result = db.execute(
+            async with async_session_factory() as db:
+                result = await db.execute(
                     select(PromptTemplate).where(PromptTemplate.is_active == True)
                 )
                 templates = result.scalars().all()
@@ -341,9 +340,6 @@ class ChatbotModule(BaseModule):
                 logger.info(
                     f"Loaded {len(self.system_prompts)} prompt templates from database"
                 )
-
-            finally:
-                db.close()
 
         except Exception as e:
             logger.warning(f"Could not load prompt templates from database: {e}")
@@ -699,7 +695,7 @@ class ChatbotModule(BaseModule):
         db_messages: List[DBMessage],
         config: ChatbotConfig,
         context: Optional[Dict] = None,
-        db: Session = None,
+        db=None,
     ) -> tuple[str, Optional[List]]:
         """Generate response using LLM with optional RAG"""
 
@@ -1214,12 +1210,10 @@ class ChatbotModule(BaseModule):
         logger.info(f"RAG module available: {self.rag_module is not None}")
 
         try:
-            # Create a minimal database session for the chat
-            from app.db.database import SessionLocal
+            # Use async database session for the chat
+            from app.db.database import async_session_factory
 
-            db = SessionLocal()
-
-            try:
+            async with async_session_factory() as db:
                 # Convert config dict to ChatbotConfig
                 config = ChatbotConfig(
                     name=chatbot_config.get("name", "Unknown"),
@@ -1258,9 +1252,6 @@ class ChatbotModule(BaseModule):
                     "conversation_id": None,
                     "message_id": f"msg_{uuid.uuid4()}",
                 }
-
-            finally:
-                db.close()
 
         except Exception as e:
             logger.error(f"Chat method failed: {e}")
@@ -1327,12 +1318,17 @@ class ChatbotModule(BaseModule):
         return re.sub(r"\\{\\{\\s*([^}]+)\\s*\\}\\}", replace_var, template)
 
     async def _get_qdrant_collection_name(
-        self, collection_identifier: str, db: Session
+        self, collection_identifier: str, db=None
     ) -> Optional[str]:
         """Get Qdrant collection name from RAG collection ID, name, or direct Qdrant collection"""
         try:
             from app.models.rag_collection import RagCollection
             from sqlalchemy import select
+            from sqlalchemy.ext.asyncio import AsyncSession
+            from app.db.database import async_session_factory
+
+            # Detect if db is an async session
+            is_async_session = db is not None and isinstance(db, AsyncSession)
 
             logger.info(
                 f"Looking up RAG collection with identifier: '{collection_identifier}'"
@@ -1375,6 +1371,22 @@ class ChatbotModule(BaseModule):
 
             rag_collection = None
 
+            # Helper to execute queries - handles sync, async, and no-session cases
+            async def execute_query(stmt):
+                if db is None:
+                    # No session provided - create new async session
+                    async with async_session_factory() as session:
+                        result = await session.execute(stmt)
+                        return result.scalar_one_or_none()
+                elif is_async_session:
+                    # Async session - await the execute
+                    result = await db.execute(stmt)
+                    return result.scalar_one_or_none()
+                else:
+                    # Sync session - don't await, execute returns Result directly
+                    result = db.execute(stmt)
+                    return result.scalar_one_or_none()
+
             # Then try PostgreSQL lookup by ID if numeric
             if collection_identifier.isdigit():
                 logger.info(f"Treating '{collection_identifier}' as collection ID")
@@ -1382,8 +1394,7 @@ class ChatbotModule(BaseModule):
                     RagCollection.id == int(collection_identifier),
                     RagCollection.is_active == True,
                 )
-                result = db.execute(stmt)
-                rag_collection = result.scalar_one_or_none()
+                rag_collection = await execute_query(stmt)
 
             # If not found by ID, try to look up by name in PostgreSQL
             if not rag_collection:
@@ -1394,8 +1405,7 @@ class ChatbotModule(BaseModule):
                     RagCollection.name == collection_identifier,
                     RagCollection.is_active == True,
                 )
-                result = db.execute(stmt)
-                rag_collection = result.scalar_one_or_none()
+                rag_collection = await execute_query(stmt)
 
             if rag_collection:
                 logger.info(
@@ -1418,39 +1428,93 @@ class ChatbotModule(BaseModule):
             return None
 
     async def _auto_register_collection(
-        self, collection_name: str, db: Session
+        self, collection_name: str, db=None
     ) -> None:
-        """Automatically register a Qdrant collection in the database"""
+        """Automatically register a Qdrant collection in the database.
+
+        Handles both sync and async sessions, or creates a new async session if none provided.
+        """
         try:
             from app.models.rag_collection import RagCollection
             from sqlalchemy import select
+            from sqlalchemy.ext.asyncio import AsyncSession
+            from app.db.database import async_session_factory
 
-            # Check if already registered
-            stmt = select(RagCollection).where(
-                RagCollection.qdrant_collection_name == collection_name
-            )
-            result = db.execute(stmt)
-            existing = result.scalar_one_or_none()
+            # Detect if db is an async session
+            is_async_session = db is not None and isinstance(db, AsyncSession)
 
-            if existing:
-                logger.info(
-                    f"Collection '{collection_name}' already registered in database"
+            if db is None:
+                # No session provided - create a new async session
+                async with async_session_factory() as session:
+                    stmt = select(RagCollection).where(
+                        RagCollection.qdrant_collection_name == collection_name
+                    )
+                    result = await session.execute(stmt)
+                    existing = result.scalar_one_or_none()
+
+                    if existing:
+                        logger.info(
+                            f"Collection '{collection_name}' already registered in database"
+                        )
+                        return
+
+                    display_name = collection_name.replace("-", " ").replace("_", " ").title()
+                    new_collection = RagCollection(
+                        name=display_name,
+                        qdrant_collection_name=collection_name,
+                        description=f"Auto-discovered collection from Qdrant: {collection_name}",
+                        is_active=True,
+                    )
+                    session.add(new_collection)
+                    await session.commit()
+
+            elif is_async_session:
+                # Async session provided
+                stmt = select(RagCollection).where(
+                    RagCollection.qdrant_collection_name == collection_name
                 )
-                return
+                result = await db.execute(stmt)
+                existing = result.scalar_one_or_none()
 
-            # Create a readable name from collection name
-            display_name = collection_name.replace("-", " ").replace("_", " ").title()
+                if existing:
+                    logger.info(
+                        f"Collection '{collection_name}' already registered in database"
+                    )
+                    return
 
-            # Auto-register the collection
-            new_collection = RagCollection(
-                name=display_name,
-                qdrant_collection_name=collection_name,
-                description=f"Auto-discovered collection from Qdrant: {collection_name}",
-                is_active=True,
-            )
+                display_name = collection_name.replace("-", " ").replace("_", " ").title()
+                new_collection = RagCollection(
+                    name=display_name,
+                    qdrant_collection_name=collection_name,
+                    description=f"Auto-discovered collection from Qdrant: {collection_name}",
+                    is_active=True,
+                )
+                db.add(new_collection)
+                await db.commit()
 
-            db.add(new_collection)
-            db.commit()
+            else:
+                # Sync session provided
+                stmt = select(RagCollection).where(
+                    RagCollection.qdrant_collection_name == collection_name
+                )
+                result = db.execute(stmt)
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    logger.info(
+                        f"Collection '{collection_name}' already registered in database"
+                    )
+                    return
+
+                display_name = collection_name.replace("-", " ").replace("_", " ").title()
+                new_collection = RagCollection(
+                    name=display_name,
+                    qdrant_collection_name=collection_name,
+                    description=f"Auto-discovered collection from Qdrant: {collection_name}",
+                    is_active=True,
+                )
+                db.add(new_collection)
+                db.commit()
 
             logger.info(
                 f"Auto-registered Qdrant collection '{collection_name}' in database"
