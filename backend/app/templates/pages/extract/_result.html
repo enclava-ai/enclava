@@ -3,11 +3,11 @@
 <h2 class="text-lg font-semibold mb-4">Results</h2>
 
 {% if success %}
-  {% if result.extracted_data %}
+  {% if result.data %}
   <div class="space-y-4">
     <!-- Extracted Fields -->
     <div class="space-y-2">
-      {% for key, value in result.extracted_data.items() %}
+      {% for key, value in result.data.items() %}
       <div class="flex items-start gap-2 p-3 bg-muted/50 rounded-md">
         <span class="font-medium text-sm min-w-[120px] shrink-0">{{ key }}:</span>
         <span class="text-sm">{{ value if value else '-' }}</span>
@@ -16,31 +16,29 @@
     </div>
 
     <!-- Metrics -->
-    {% if result.metrics %}
     <div class="pt-4 border-t">
       <h3 class="text-sm font-medium mb-2">Processing Metrics</h3>
       <div class="grid grid-cols-3 gap-4 text-sm">
-        {% if result.metrics.processing_time %}
+        {% if result.processing_time_ms %}
         <div>
           <span class="text-muted-foreground">Time:</span>
-          <span class="ml-1">{{ result.metrics.processing_time | round(2) }}s</span>
+          <span class="ml-1">{{ (result.processing_time_ms / 1000) | round(2) }}s</span>
         </div>
         {% endif %}
-        {% if result.metrics.tokens_used %}
+        {% if result.tokens_used %}
         <div>
           <span class="text-muted-foreground">Tokens:</span>
-          <span class="ml-1">{{ result.metrics.tokens_used | number }}</span>
+          <span class="ml-1">{{ result.tokens_used }}</span>
         </div>
         {% endif %}
-        {% if result.metrics.model %}
+        {% if result.cost_cents is defined %}
         <div>
-          <span class="text-muted-foreground">Model:</span>
-          <span class="ml-1">{{ result.metrics.model }}</span>
+          <span class="text-muted-foreground">Cost:</span>
+          <span class="ml-1">${{ (result.cost_cents / 100) | round(4) }}</span>
         </div>
         {% endif %}
       </div>
     </div>
-    {% endif %}
 
     <!-- Raw JSON Toggle -->
     <details class="pt-4 border-t">

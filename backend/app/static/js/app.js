@@ -206,6 +206,22 @@ document.body.addEventListener('htmx:afterRequest', function(event) {
   if (toastMessage) {
     showToast(toastMessage, toastType);
   }
+
+  // Reset file upload forms after successful submission
+  if (event.detail.successful && event.detail.elt.tagName === 'FORM') {
+    const form = event.detail.elt;
+    const fileInputs = form.querySelectorAll('input[type="file"]');
+    fileInputs.forEach(function(input) {
+      // Reset the file input
+      input.value = '';
+      // Clear the preview
+      const previewId = input.id + '-preview';
+      const preview = document.getElementById(previewId);
+      if (preview) {
+        preview.textContent = '';
+      }
+    });
+  }
 });
 
 document.body.addEventListener('htmx:responseError', function(event) {
