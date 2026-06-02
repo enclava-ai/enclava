@@ -24,7 +24,6 @@ ENV NODE_ENV=production
 
 # Ensure all dependencies are installed for build
 RUN npm install
-RUN npm install --save-dev autoprefixer
 RUN npm run build
 
 # Production image, copy all the files and run next
