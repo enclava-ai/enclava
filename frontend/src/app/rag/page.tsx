@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
-import { Plus, Database, Upload, Search, Trash2, FileText, AlertCircle } from "lucide-react"
+import { Plus, Database, Upload, Search, Trash2, FileText, AlertCircle, Plug, Settings, ExternalLink } from "lucide-react"
 import { CollectionManager } from "@/components/rag/collection-manager"
 import { DocumentUpload } from "@/components/rag/document-upload"
 import { DocumentBrowser } from "@/components/rag/document-browser"
@@ -49,11 +49,64 @@ interface CollectionStats {
   }
 }
 
+interface Connector {
+  id: string
+  name: string
+  type: string
+  status: 'active' | 'inactive' | 'error' | 'syncing'
+  last_sync?: string
+  document_count?: number
+  config?: Record<string, unknown>
+}
+
 export default function RAGPage() {
   return (
     <ProtectedRoute>
       <RAGPageContent />
     </ProtectedRoute>
+  )
+}
+
+function ConnectorSummaryCard({ connector }: { connector: Connector }) {
+  const statusColors = {
+    active: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+    inactive: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+    error: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+    syncing: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+  }
+
+  const formatLastSync = (date?: string) => {
+    if (!date) return 'Never'
+    const d = new Date(date)
+    return d.toLocaleDateString()
+  }
+
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-semibold">{connector.name}</CardTitle>
+          <Badge className={statusColors[connector.status]}>
+            {connector.status}
+          </Badge>
+        </div>
+        <CardDescription className="text-xs uppercase tracking-wide">
+          {connector.type}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Documents:</span>
+            <span className="font-medium">{connector.document_count || 0}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Last sync:</span>
+            <span className="font-medium">{formatLastSync(connector.last_sync)}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -64,6 +117,8 @@ function RAGPageContent() {
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("collections")
+  const [connectors, setConnectors] = useState<Connector[]>([])
+  const [connectorsLoading, setConnectorsLoading] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -85,14 +140,11 @@ function RAGPageContent() {
   const loadStats = async () => {
     try {
       const data = await apiClient.get('/api-internal/v1/rag/stats')
-      console.log('Stats API response:', data)
 
       // Check if the response has the expected structure
       if (data && data.stats && data.stats.collections) {
-        console.log('✓ Stats has collections property')
         setStats(data.stats)
       } else {
-        console.error('✗ Invalid stats structure:', data)
         // Set default empty stats to prevent error
         setStats({
           collections: { total: 0, active: 0 },
@@ -101,8 +153,7 @@ function RAGPageContent() {
           vectors: { total: 0 }
         })
       }
-    } catch (error) {
-      console.error('Error loading stats:', error)
+    } catch {
       // Set default empty stats on error
       setStats({
         collections: { total: 0, active: 0 },
@@ -130,6 +181,25 @@ function RAGPageContent() {
     loadCollections()
     loadStats()
   }
+
+  useEffect(() => {
+    const loadConnectors = async () => {
+      if (!user || user.role !== 'admin') return
+      setConnectorsLoading(true)
+      try {
+        const data = await apiClient.get<{ connectors: Connector[] }>('/api-internal/v1/connectors')
+        setConnectors(data.connectors || [])
+      } catch {
+        setConnectors([])
+      } finally {
+        setConnectorsLoading(false)
+      }
+    }
+
+    if (activeTab === 'connectors' && user) {
+      loadConnectors()
+    }
+  }, [activeTab, user])
 
   if (!user) {
     return (
@@ -229,6 +299,7 @@ function RAGPageContent() {
           <TabsTrigger value="collections">Collections</TabsTrigger>
           <TabsTrigger value="upload">Upload Documents</TabsTrigger>
           <TabsTrigger value="browse">Browse Documents</TabsTrigger>
+          <TabsTrigger value="connectors">Connectors</TabsTrigger>
         </TabsList>
 
         <TabsContent value="collections" className="space-y-4">
@@ -256,6 +327,77 @@ function RAGPageContent() {
             selectedCollection={selectedCollection}
             onCollectionSelected={setSelectedCollection}
           />
+        </TabsContent>
+
+        <TabsContent value="connectors" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Plug className="h-5 w-5" />
+                    Data Source Connectors
+                  </CardTitle>
+                  <CardDescription>
+                    Connect external data sources to automatically sync content into your knowledge base.
+                  </CardDescription>
+                </div>
+                {user?.role === 'admin' && (
+                  <Button asChild variant="outline">
+                    <a href="/admin/connectors">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Manage Connectors
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {user?.role !== 'admin' ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Plug className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Admin Access Required</h3>
+                  <p className="text-muted-foreground max-w-md">
+                    Connector management is available to admins only. Contact your admin to set up data source integrations.
+                  </p>
+                </div>
+              ) : connectorsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                </div>
+              ) : connectors.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Plug className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Connectors Configured</h3>
+                  <p className="text-muted-foreground max-w-md mb-6">
+                    No connectors configured. Connect Notion, GitHub, Slack, and more to automatically sync content into your knowledge base.
+                  </p>
+                  <Button asChild>
+                    <a href="/admin/connectors">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Set Up Connectors
+                    </a>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {connectors.map((connector) => (
+                      <ConnectorSummaryCard key={connector.id} connector={connector} />
+                    ))}
+                  </div>
+                  <div className="flex justify-center pt-4">
+                    <Button asChild variant="outline">
+                      <a href="/admin/connectors">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View All Connectors
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

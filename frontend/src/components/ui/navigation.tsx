@@ -76,6 +76,7 @@ const Navigation = () => {
     { href: "/settings", label: "System Settings" },
     { href: "/admin/users", label: "Users" },
     { href: "/admin/api-keys", label: "API Keys" },
+    { href: "/admin/connectors", label: "Connectors" },
   ];
 
   // Core navigation items that are always visible

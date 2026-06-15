@@ -87,6 +87,15 @@ class Settings(BaseSettings):
         "PLUGIN_ENCRYPTION_KEY"
     )  # Key for encrypting plugin secrets and configurations
 
+    # Connector OAuth settings
+    NOTION_CLIENT_ID: Optional[str] = os.getenv("NOTION_CLIENT_ID")
+    NOTION_CLIENT_SECRET: Optional[str] = os.getenv("NOTION_CLIENT_SECRET")
+    GITHUB_CLIENT_ID: Optional[str] = os.getenv("GITHUB_CLIENT_ID")
+    GITHUB_CLIENT_SECRET: Optional[str] = os.getenv("GITHUB_CLIENT_SECRET")
+    SLACK_BOT_TOKEN: Optional[str] = os.getenv("SLACK_BOT_TOKEN")  # for bot-token auth (non-OAuth)
+    LINEAR_API_KEY: Optional[str] = os.getenv("LINEAR_API_KEY")    # for API key auth (non-OAuth)
+    CONNECTOR_CREDENTIALS_KEY: Optional[str] = os.getenv("CONNECTOR_CREDENTIALS_KEY")
+
     # API Keys for LLM providers (only integrated providers: privatemode, redpill)
     PRIVATEMODE_API_KEY: Optional[str] = os.getenv("PRIVATEMODE_API_KEY")
     PRIVATEMODE_PROXY_URL: str = os.getenv(

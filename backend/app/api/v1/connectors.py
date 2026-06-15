@@ -7,14 +7,21 @@ delete, trigger sync) additionally require admin-level access.
 
 from __future__ import annotations
 
+import json
 import logging
+import secrets
 from typing import Any, Optional
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import core_cache
+from app.core.config import settings
 from app.core.security import get_current_user
 from app.db.database import get_db
 from app.models.connector_source import (
@@ -81,6 +88,12 @@ class ConnectorUpdate(BaseModel):
         except ValueError as exc:
             raise ValueError(str(exc)) from exc
         return v
+
+
+class OAuthAuthorizeRequest(BaseModel):
+    connector_type: str   # "notion" or "github"
+    collection_id: int
+    connector_name: Optional[str] = None  # optional name override
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +335,226 @@ async def list_sync_jobs(
     jobs = result.scalars().all()
 
     return {"success": True, "jobs": [j.to_dict() for j in jobs]}
+
+
+@router.post("/connectors/oauth/authorize")
+async def oauth_authorize(
+    data: OAuthAuthorizeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Initiate an OAuth authorization flow for a connector.  Requires admin."""
+    _require_admin(current_user)
+
+    supported = {"notion", "github"}
+    if data.connector_type not in supported:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"connector_type must be one of: {sorted(supported)}",
+        )
+
+    # Verify target collection exists
+    collection = await db.get(RagCollection, data.collection_id)
+    if collection is None or not collection.is_active:
+        raise HTTPException(status_code=404, detail="Target collection not found")
+
+    # Validate provider credentials are configured
+    if data.connector_type == "notion":
+        if not settings.NOTION_CLIENT_ID:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Notion OAuth is not configured. "
+                    "Set NOTION_CLIENT_ID and NOTION_CLIENT_SECRET environment variables."
+                ),
+            )
+    elif data.connector_type == "github":
+        if not settings.GITHUB_CLIENT_ID:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "GitHub OAuth is not configured. "
+                    "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables."
+                ),
+            )
+
+    # Generate a CSRF-safe state token and store it in Redis
+    state = secrets.token_urlsafe(32)
+    state_data = {
+        "connector_type": data.connector_type,
+        "collection_id": data.collection_id,
+        "user_id": current_user.id,
+        "connector_name": data.connector_name,
+    }
+    await core_cache.set(f"oauth_state:{state}", state_data, ttl=600)
+
+    # Build provider-specific authorization URL
+    redirect_uri = (
+        f"{settings.BASE_URL}/api-internal/v1/connectors/oauth/callback"
+    )
+    if data.connector_type == "notion":
+        params = {
+            "client_id": settings.NOTION_CLIENT_ID,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "owner": "user",
+            "state": state,
+        }
+        oauth_url = f"https://api.notion.com/v1/oauth/authorize?{urlencode(params)}"
+    else:  # github
+        params = {
+            "client_id": settings.GITHUB_CLIENT_ID,
+            "redirect_uri": redirect_uri,
+            "scope": "repo,read:user",
+            "state": state,
+        }
+        oauth_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
+
+    return {"success": True, "oauth_url": oauth_url, "state": state}
+
+
+@router.get("/connectors/oauth/callback")
+async def oauth_callback(
+    db: AsyncSession = Depends(get_db),
+    code: Optional[str] = Query(default=None),
+    state: Optional[str] = Query(default=None),
+    error: Optional[str] = Query(default=None),
+) -> RedirectResponse:
+    """Handle OAuth provider callback.  The state token provides the auth context."""
+    base_admin_url = f"{settings.BASE_URL}/admin/rag"
+
+    # Provider signalled an error
+    if error:
+        return RedirectResponse(
+            url=f"{base_admin_url}?oauth_error={error}",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    if not state or not code:
+        return RedirectResponse(
+            url=f"{base_admin_url}?oauth_error=missing_state_or_code",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    # Retrieve and validate the state from Redis
+    state_data = await core_cache.get(f"oauth_state:{state}")
+    if not state_data:
+        return RedirectResponse(
+            url=f"{base_admin_url}?oauth_error=invalid_or_expired_state",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    # state_data may already be a dict (cache deserializes JSON automatically)
+    if isinstance(state_data, str):
+        try:
+            state_data = json.loads(state_data)
+        except json.JSONDecodeError:
+            return RedirectResponse(
+                url=f"{base_admin_url}?oauth_error=malformed_state",
+                status_code=status.HTTP_302_FOUND,
+            )
+
+    connector_type = state_data.get("connector_type")
+    collection_id = state_data.get("collection_id")
+    user_id = state_data.get("user_id")
+    connector_name = state_data.get("connector_name")
+
+    redirect_uri = (
+        f"{settings.BASE_URL}/api-internal/v1/connectors/oauth/callback"
+    )
+
+    # Exchange the authorization code for an access token
+    credentials: dict[str, Any] = {}
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            if connector_type == "notion":
+                import base64 as _b64
+
+                creds_str = f"{settings.NOTION_CLIENT_ID}:{settings.NOTION_CLIENT_SECRET}"
+                basic_token = _b64.b64encode(creds_str.encode()).decode()
+                resp = await client.post(
+                    "https://api.notion.com/v1/oauth/token",
+                    headers={
+                        "Authorization": f"Basic {basic_token}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "grant_type": "authorization_code",
+                        "code": code,
+                        "redirect_uri": redirect_uri,
+                    },
+                )
+                resp.raise_for_status()
+                token_data = resp.json()
+                credentials = {
+                    "access_token": token_data.get("access_token"),
+                    "bot_id": token_data.get("bot_id"),
+                    "workspace_id": token_data.get("workspace_id"),
+                    "workspace_name": token_data.get("workspace_name"),
+                }
+            elif connector_type == "github":
+                resp = await client.post(
+                    "https://github.com/login/oauth/access_token",
+                    headers={"Accept": "application/json"},
+                    json={
+                        "client_id": settings.GITHUB_CLIENT_ID,
+                        "client_secret": settings.GITHUB_CLIENT_SECRET,
+                        "code": code,
+                        "redirect_uri": redirect_uri,
+                    },
+                )
+                resp.raise_for_status()
+                token_data = resp.json()
+                if "error" in token_data:
+                    raise ValueError(token_data.get("error_description", token_data["error"]))
+                credentials = {
+                    "access_token": token_data.get("access_token"),
+                    "token_type": token_data.get("token_type"),
+                    "scope": token_data.get("scope"),
+                }
+            else:
+                return RedirectResponse(
+                    url=f"{base_admin_url}?oauth_error=unsupported_connector_type",
+                    status_code=status.HTTP_302_FOUND,
+                )
+    except Exception as exc:
+        logger.error("OAuth token exchange failed for %s: %s", connector_type, exc)
+        return RedirectResponse(
+            url=f"{base_admin_url}?oauth_error=token_exchange_failed",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    # Encrypt credentials and persist the connector
+    from app.services.connector_sync_service import encrypt_credentials
+
+    encrypted = encrypt_credentials(credentials)
+    name = connector_name or f"{connector_type.capitalize()} (OAuth)"
+    connector = ConnectorSource(
+        name=name,
+        connector_type=connector_type,
+        collection_id=collection_id,
+        config={},
+        encrypted_credentials=encrypted,
+        sync_frequency="PT1H",
+        status=ConnectorStatus.PENDING,
+        created_by_user_id=user_id,
+    )
+    db.add(connector)
+    await db.commit()
+    await db.refresh(connector)
+
+    # Clean up the one-time state token from Redis
+    await core_cache.delete(f"oauth_state:{state}")
+
+    return RedirectResponse(
+        url=(
+            f"{base_admin_url}"
+            f"?oauth_success=true"
+            f"&connector_id={connector.id}"
+            f"&tab=connectors"
+        ),
+        status_code=status.HTTP_302_FOUND,
+    )
 
 
 @router.get("/connectors/types/available")

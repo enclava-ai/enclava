@@ -1,65 +1,65 @@
 # Core framework
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.4.2
-pydantic-settings==2.0.3
+fastapi==0.115.14
+uvicorn[standard]==0.34.3
+pydantic==2.11.7
+pydantic-settings==2.10.1
 
 # Database
-sqlalchemy==2.0.23
-alembic==1.12.1
-psycopg2-binary==2.9.9
-asyncpg==0.29.0
+sqlalchemy==2.0.41
+alembic==1.16.2
+psycopg2-binary==2.9.10
+asyncpg==0.30.0
 
 # Redis (includes async support, no need for separate aioredis)
-redis==5.0.1
+redis==5.2.1
 
 # Authentication & Security
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 passlib[bcrypt]==1.7.4
-bcrypt==4.0.1
-python-multipart==0.0.6
-cryptography==41.0.7
-itsdangerous==2.1.2
+bcrypt==4.3.0
+python-multipart==0.0.20
+cryptography==45.0.5
+itsdangerous==2.2.0
 
 # HTTP Client
-httpx==0.25.2
-aiohttp==3.9.0
+httpx==0.28.1
+aiohttp==3.12.13
 
 # Docker integration (for tool execution)
-docker==7.0.0
+docker==7.1.0
 
 # Template engine (for notifications)
-jinja2==3.1.2
+jinja2==3.1.6
 
 # Background tasks
-celery==5.3.4
+celery==5.5.3
 flower==2.0.1
 
 # Validation & Serialization
-email-validator==2.1.0
-python-dateutil==2.8.2
-jsonschema==4.19.2
+email-validator==2.2.0
+python-dateutil==2.9.0.post0
+jsonschema==4.24.0
 
 # Logging & Monitoring
-structlog==23.2.0
-prometheus-client==0.19.0
-opentelemetry-api==1.21.0
-opentelemetry-sdk==1.21.0
-psutil==5.9.6
+structlog==25.4.0
+prometheus-client==0.22.1
+opentelemetry-api==1.34.1
+opentelemetry-sdk==1.34.1
+psutil==7.0.0
 
 # Vector Database
-qdrant-client==1.7.0
+qdrant-client==1.14.2
 
 # Text Processing
-tiktoken==0.5.1
+tiktoken==0.9.0
 numpy>=1.26.0
 
 # Basic document processing (lightweight)
-markitdown==0.0.1a2
-python-docx==1.1.0
+markitdown==0.1.2
+python-docx==1.2.0
 
 # Image processing for Extract module
-Pillow==10.2.0
+Pillow==11.3.0
 pdf2image==1.17.0
 
 # Advanced NLP processing (OPTIONAL - only for entity extraction)
@@ -69,25 +69,30 @@ pdf2image==1.17.0
 
 # Heavy ML dependencies (sentence-transformers will be installed separately)
 # Note: PyTorch is already installed in the base Docker image
-sentence-transformers==2.6.1  # Added back - needed for bitbox02_faq_local collection
+sentence-transformers==4.1.0
 # transformers==4.35.2  # REMOVED - already commented out
 
 # Configuration
-pyyaml==6.0.1
-python-dotenv==1.0.0
+pyyaml==6.0.3
+python-dotenv==1.1.0
 
 # Module System
-watchdog==3.0.0
+watchdog==6.0.0
 click==8.2.1
 
 # Development
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-black==23.11.0
-isort==5.12.0
-flake8==6.1.0
-mypy==1.7.1
+pytest==8.4.1
+pytest-asyncio==0.24.0
+pytest-cov==6.2.1
+black==25.1.0
+isort==6.0.1
+flake8==7.3.0
+mypy==1.16.1
 
 # API Documentation
-swagger-ui-bundle==0.0.9
+swagger-ui-bundle==1.1.0
+
+# Connector SDKs
+notion-client==2.3.0
+PyGithub==2.6.1
+slack-sdk==3.35.0
