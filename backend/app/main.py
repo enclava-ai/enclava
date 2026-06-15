@@ -226,6 +226,15 @@ async def lifespan(app: FastAPI):
             if isinstance(result, Exception):
                 logger.warning(f"Background startup task failed: {result}")
 
+    # Start connector sync scheduler
+    from app.tasks.connector_sync import connector_sync_scheduler
+
+    try:
+        await connector_sync_scheduler.start()
+        logger.info("Connector sync scheduler started")
+    except Exception as exc:
+        logger.warning(f"Connector sync scheduler failed to start: {exc}")
+
     logger.info("Platform started successfully")
 
     try:
@@ -233,6 +242,12 @@ async def lifespan(app: FastAPI):
     finally:
         # Cleanup
         logger.info("Shutting down platform...")
+
+        # Stop connector sync scheduler
+        try:
+            await connector_sync_scheduler.stop()
+        except Exception as exc:
+            logger.warning(f"Error stopping connector sync scheduler: {exc}")
 
         # Cleanup embedding service HTTP sessions
         from app.services.embedding_service import embedding_service

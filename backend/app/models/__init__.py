@@ -47,6 +47,13 @@ from .billing_audit_log import (
 from .extract_template import ExtractTemplate
 from .extract_job import ExtractJob
 from .extract_result import ExtractResult
+from .connector_source import (
+    ConnectorSource,
+    ConnectorSyncJob,
+    ConnectorType,
+    ConnectorStatus,
+    ConnectorSyncStatus,
+)
 
 __all__ = [
     "User",
@@ -93,4 +100,9 @@ __all__ = [
     "ExtractTemplate",
     "ExtractJob",
     "ExtractResult",
+    "ConnectorSource",
+    "ConnectorSyncJob",
+    "ConnectorType",
+    "ConnectorStatus",
+    "ConnectorSyncStatus",
 ]

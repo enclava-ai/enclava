@@ -79,9 +79,24 @@ class RagDocument(Base):
         nullable=False,
     )
 
+    # Connector provenance — set when a document was ingested via a ConnectorSource
+    connector_source_id = Column(
+        Integer,
+        ForeignKey("connector_sources.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # The external system's stable identifier (e.g. Notion page UUID, GitHub issue number)
+    external_id = Column(String(512), nullable=True, index=True)
+    # The last-modified timestamp from the external system; used for dedup
+    external_updated_at = Column(DateTime(timezone=True), nullable=True)
+
     # Soft delete
     is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    connector_source = relationship("ConnectorSource", foreign_keys=[connector_source_id])
 
     def to_dict(self):
         """Convert model to dictionary for API responses"""
@@ -103,6 +118,11 @@ class RagDocument(Base):
             "vector_count": self.vector_count,
             "chunk_size": self.chunk_size,
             "metadata": self.document_metadata or {},
+            "connector_source_id": self.connector_source_id,
+            "external_id": self.external_id,
+            "external_updated_at": self.external_updated_at.isoformat()
+            if self.external_updated_at
+            else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "processed_at": self.processed_at.isoformat()
             if self.processed_at

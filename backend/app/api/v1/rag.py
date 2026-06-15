@@ -16,9 +16,10 @@ from datetime import datetime, timezone
 from app.db.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.models.rag_collection import RagCollection
+from app.models.rag_collection import RagCollection, CollectionVisibility
 from app.services.rag_service import RAGService
 from app.utils.exceptions import APIException
+from app.utils.collection_access import can_user_access_collection, filter_accessible_collections
 
 # Import RAG module from module manager
 from app.services.module_manager import module_manager
@@ -33,6 +34,8 @@ router = APIRouter(tags=["RAG"])
 class CollectionCreate(BaseModel):
     name: str
     description: Optional[str] = None
+    visibility: Optional[str] = CollectionVisibility.TEAM
+    allowed_role_level: Optional[str] = None
 
 
 class CollectionResponse(BaseModel):
@@ -121,7 +124,11 @@ async def create_collection(
     try:
         rag_service = RAGService(db)
         collection = await rag_service.create_collection(
-            name=collection_data.name, description=collection_data.description
+            name=collection_data.name,
+            description=collection_data.description,
+            owner_user_id=current_user.id,
+            visibility=collection_data.visibility or CollectionVisibility.TEAM,
+            allowed_role_level=collection_data.allowed_role_level,
         )
 
         return {
@@ -216,6 +223,9 @@ async def get_collection(
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
 
+        if not can_user_access_collection(collection, current_user):
+            raise HTTPException(status_code=404, detail="Collection not found")
+
         return {"success": True, "collection": collection.to_dict()}
     except HTTPException:
         raise
@@ -288,6 +298,12 @@ async def get_documents(
                     else:
                         # Unknown collection identifier; return empty result instead of erroring out
                         return {"success": True, "documents": [], "total": 0}
+
+        # ACL check: if scoped to a collection, verify access
+        if collection_id_int is not None:
+            collection_row = await db.get(RagCollection, collection_id_int)
+            if collection_row and not can_user_access_collection(collection_row, current_user):
+                return {"success": True, "documents": [], "total": 0}
 
         rag_service = RAGService(db)
         documents = await rag_service.get_documents(
@@ -549,6 +565,7 @@ async def search_with_debug(
     score_threshold: float = 0.3,
     collection_name: str = None,
     config: Dict[str, Any] = None,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
@@ -558,6 +575,16 @@ async def search_with_debug(
     rag_module = module_manager.modules.get("rag")
     if not rag_module or not rag_module.enabled:
         raise HTTPException(status_code=503, detail="RAG module not initialized")
+
+    # ACL: if a specific collection is requested, verify the user can access it
+    if collection_name:
+        coll_row = await db.scalar(
+            select(RagCollection).where(
+                RagCollection.qdrant_collection_name == collection_name
+            )
+        ) if db else None
+        if coll_row and not can_user_access_collection(coll_row, current_user):
+            raise HTTPException(status_code=404, detail="Collection not found")
 
     debug_info = {}
     start_time = datetime.now(timezone.utc)

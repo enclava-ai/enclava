@@ -36,7 +36,12 @@ class RAGService:
     # Collection Operations
 
     async def create_collection(
-        self, name: str, description: Optional[str] = None
+        self,
+        name: str,
+        description: Optional[str] = None,
+        owner_user_id: Optional[int] = None,
+        visibility: Optional[str] = "team",
+        allowed_role_level: Optional[str] = None,
     ) -> RagCollection:
         """Create a new RAG collection"""
         logger.info(f"Attempting to create collection with name: '{name}'")
@@ -63,6 +68,9 @@ class RAGService:
             description=description,
             qdrant_collection_name=qdrant_name,
             status="active",
+            owner_user_id=owner_user_id,
+            visibility=visibility or "team",
+            allowed_role_level=allowed_role_level,
         )
 
         self.db.add(collection)

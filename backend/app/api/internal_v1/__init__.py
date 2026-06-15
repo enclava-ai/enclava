@@ -27,6 +27,7 @@ from .admin_audit import router as admin_audit_router
 from .usage_stats import router as usage_stats_router
 from .metrics import router as metrics_router
 from .providers import router as providers_router
+from ..v1.connectors import router as connectors_router
 
 # Create internal API router
 internal_api_router = APIRouter()
@@ -148,4 +149,9 @@ internal_api_router.include_router(
 # Include provider health routes (provider monitoring - admin only)
 internal_api_router.include_router(
     providers_router, prefix="/providers", tags=["internal-providers"]
+)
+
+# Include connector management routes (knowledge base connectors - admin only)
+internal_api_router.include_router(
+    connectors_router, prefix="/connectors", tags=["internal-connectors"]
 )
