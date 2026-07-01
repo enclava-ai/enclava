@@ -15,7 +15,7 @@
 
 - [x] **DS-01**: Light and dark theme tokens implement the Slate Mono palette while preserving existing chart and font variables.
 - [x] **DS-02**: Tailwind theme colors use the alpha-capable `hsl(var(--x) / <alpha-value>)` pattern and expose solid and soft status roles.
-- [ ] **DS-03**: Shared primitives exist for `StatusBadge`, `ConfirmDialog`, `PageHeader`, `EmptyState`, and composed skeletons.
+- [x] **DS-03**: Shared primitives exist for `StatusBadge`, `ConfirmDialog`, `PageHeader`, `EmptyState`, and composed skeletons.
 - [x] **DS-04**: Legacy palette cleanup is sequenced so `empire` and `enclava` definitions remain only until all usage is removed.
 
 ### Navigation and Information Architecture
@@ -89,7 +89,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLN-03 | Phase 1 | Complete |
 | DS-01 | Phase 2 | Complete |
 | DS-02 | Phase 2 | Complete |
-| DS-03 | Phase 2 | Pending |
+| DS-03 | Phase 2 | Complete |
 | DS-04 | Phase 2 | Complete |
 | NAV-01 | Phase 3 | Pending |
 | NAV-02 | Phase 3 | Pending |
