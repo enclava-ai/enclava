@@ -11,7 +11,7 @@ This milestone turns the existing Enclava frontend into a coherent professional 
 - Integer phases (1, 2, 3): Planned milestone work.
 - Decimal phases (2.1, 2.2): Urgent insertions if needed.
 
-- [ ] **Phase 1: Delete Deprecated Routes** - Remove dead/dev-only frontend routes and references before visual sweeps touch deleted code.
+- [x] **Phase 1: Delete Deprecated Routes** - Remove dead/dev-only frontend routes and references before visual sweeps touch deleted code. (completed 2026-07-01)
 - [ ] **Phase 2: Design System Foundation** - Add Slate Mono tokens, status vocabulary, and shared UX primitives.
 - [ ] **Phase 3: App Shell and LLM IA** - Replace top navigation with sidebar/drawer shell and move LLM under Settings.
 - [ ] **Phase 4: Color Sweep and Dashboard** - Remove hardcoded color systems and rework the dashboard IA.
@@ -40,7 +40,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02: Remove inbound references and verify the frontend remains import-clean.
+- [x] 01-02: Remove inbound references and verify the frontend remains import-clean.
 
 ### Phase 2: Design System Foundation
 
@@ -171,7 +171,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Delete Deprecated Routes | 1/2 | In Progress|  |
+| 1. Delete Deprecated Routes | 2/2 | Complete   | 2026-07-01 |
 | 2. Design System Foundation | 0/3 | Not started | - |
 | 3. App Shell and LLM IA | 0/3 | Not started | - |
 | 4. Color Sweep and Dashboard | 0/5 | Not started | - |

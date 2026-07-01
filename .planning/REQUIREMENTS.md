@@ -8,8 +8,8 @@
 ### Cleanup and Route Hygiene
 
 - [x] **CLN-01**: Deprecated frontend routes `chatbot`, `zammad`, `debug`, `test-auth`, and `rag-demo` are removed with sole-use components and obsolete API proxies.
-- [ ] **CLN-02**: Navigation, links, imports, and references no longer point to deleted routes.
-- [ ] **CLN-03**: The frontend build/lint surface has no dangling imports from deleted route code.
+- [x] **CLN-02**: Navigation, links, imports, and references no longer point to deleted routes.
+- [x] **CLN-03**: The frontend build/lint surface has no dangling imports from deleted route code.
 
 ### Design System Foundation
 
@@ -85,8 +85,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CLN-01 | Phase 1 | Complete |
-| CLN-02 | Phase 1 | Pending |
-| CLN-03 | Phase 1 | Pending |
+| CLN-02 | Phase 1 | Complete |
+| CLN-03 | Phase 1 | Complete |
 | DS-01 | Phase 2 | Pending |
 | DS-02 | Phase 2 | Pending |
 | DS-03 | Phase 2 | Pending |
