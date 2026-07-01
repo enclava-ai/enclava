@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const withA = (value) => `hsl(var(${value}) / <alpha-value>)`
+
 module.exports = {
   darkMode: ["class"],
   content: [
@@ -23,45 +25,76 @@ module.exports = {
         mono: ['var(--font-mono)'],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: withA("--border"),
+        input: withA("--input"),
+        ring: withA("--ring"),
+        "border-strong": withA("--border-strong"),
+        faint: withA("--faint"),
+        background: withA("--background"),
+        foreground: withA("--foreground"),
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: withA("--primary"),
+          foreground: withA("--primary-foreground"),
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: withA("--secondary"),
+          foreground: withA("--secondary-foreground"),
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: withA("--destructive"),
+          foreground: withA("--destructive-foreground"),
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: withA("--muted"),
+          foreground: withA("--muted-foreground"),
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: withA("--accent"),
+          foreground: withA("--accent-foreground"),
         },
+        "accent-soft": withA("--accent-soft"),
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: withA("--popover"),
+          foreground: withA("--popover-foreground"),
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: withA("--card"),
+          foreground: withA("--card-foreground"),
+        },
+        success: {
+          DEFAULT: withA("--success"),
+          foreground: withA("--success-foreground"),
+          soft: withA("--success-soft"),
+          "soft-foreground": withA("--success-soft-foreground"),
+          border: withA("--success-border"),
+        },
+        warning: {
+          DEFAULT: withA("--warning"),
+          foreground: withA("--warning-foreground"),
+          soft: withA("--warning-soft"),
+          "soft-foreground": withA("--warning-soft-foreground"),
+          border: withA("--warning-border"),
+        },
+        danger: {
+          DEFAULT: withA("--danger"),
+          foreground: withA("--danger-foreground"),
+          soft: withA("--danger-soft"),
+          "soft-foreground": withA("--danger-soft-foreground"),
+          border: withA("--danger-border"),
+        },
+        info: {
+          DEFAULT: withA("--info"),
+          foreground: withA("--info-foreground"),
+          soft: withA("--info-soft"),
+          "soft-foreground": withA("--info-soft-foreground"),
+          border: withA("--info-border"),
         },
         chart: {
-          1: "hsl(var(--chart-1))",
-          2: "hsl(var(--chart-2))",
-          3: "hsl(var(--chart-3))",
-          4: "hsl(var(--chart-4))",
-          5: "hsl(var(--chart-5))",
+          1: withA("--chart-1"),
+          2: withA("--chart-2"),
+          3: withA("--chart-3"),
+          4: withA("--chart-4"),
+          5: withA("--chart-5"),
         },
         // Enclava brand colors (cyan/teal palette matching website)
         enclava: {

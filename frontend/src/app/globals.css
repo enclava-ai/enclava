@@ -2,44 +2,53 @@
 @config "../../tailwind.config.js";
 
 @layer base {
-  /* Light Theme - Clean, professional with cyan/teal accents */
+  /* Light Theme - Slate Mono */
   :root {
-    /* Background: Clean off-white */
-    --background: 210 20% 98%;
-    /* Foreground: Dark navy for readability */
-    --foreground: 222 30% 12%;
-
-    /* Cards: Pure white for depth against off-white background */
+    --background: 210 14% 97%;
+    --foreground: 212 18% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 222 30% 12%;
-
+    --card-foreground: 212 18% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 30% 12%;
-
-    /* Primary: Electric cyan - slightly darker for light mode contrast */
-    --primary: 190 90% 38%;
+    --popover-foreground: 212 18% 14%;
+    --muted: 220 11% 95%;
+    --muted-foreground: 216 9% 42%;
+    --accent: 220 11% 95%;
+    --accent-foreground: 212 18% 14%;
+    --border: 220 12% 91%;
+    --input: 220 12% 91%;
+    --border-strong: 218 11% 85%;
+    --faint: 215 8% 58%;
+    --primary: 191 83% 32%;
     --primary-foreground: 0 0% 100%;
-
-    /* Secondary: Teal/Green - slightly darker for light mode */
-    --secondary: 160 84% 32%;
+    --secondary: 215 13% 28%;
     --secondary-foreground: 0 0% 100%;
+    --accent-soft: 191 27% 92%;
+    --ring: 191 83% 32%;
 
-    /* Muted: Light grays */
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-
-    --accent: 220 14% 96%;
-    --accent-foreground: 222 30% 12%;
-
-    --destructive: 0 84% 60%;
+    --success: 150 59% 30%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 144 28% 93%;
+    --success-soft-foreground: 152 45% 28%;
+    --success-border: 141 25% 82%;
+    --warning: 36 76% 31%;
+    --warning-foreground: 0 0% 100%;
+    --warning-soft: 42 66% 92%;
+    --warning-soft-foreground: 36 76% 31%;
+    --warning-border: 43 58% 78%;
+    --danger: 0 66% 47%;
+    --danger-foreground: 0 0% 100%;
+    --danger-soft: 0 62% 95%;
+    --danger-soft-foreground: 0 61% 39%;
+    --danger-border: 0 53% 86%;
+    --info: 212 64% 40%;
+    --info-foreground: 0 0% 100%;
+    --info-soft: 216 48% 94%;
+    --info-soft-foreground: 211 61% 36%;
+    --info-border: 213 49% 85%;
+    --destructive: 0 66% 47%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 190 90% 38%;
-
-    /* Slightly squarer for enterprise feel */
-    --radius: 0.3rem;
+    --radius: 0.5rem;
 
     /* Chart colors */
     --chart-1: 220 70% 50%;
@@ -54,41 +63,51 @@
     --font-mono: "JetBrains Mono", ui-monospace, monospace;
   }
 
-  /* Dark Theme - Rich navy with cyan/teal accents (matching website) */
+  /* Dark Theme - Slate Mono */
   .dark {
-    /* Background: Rich, professional dark navy */
-    --background: 222 30% 12%;
-    /* Foreground: High contrast off-white */
-    --foreground: 210 20% 98%;
-
-    /* Cards: Slightly lighter than background for depth */
-    --card: 222 30% 15%;
-    --card-foreground: 210 20% 98%;
-
-    --popover: 222 30% 15%;
-    --popover-foreground: 210 20% 98%;
-
-    /* Primary: Electric cyan - cypherpunk accent */
-    --primary: 190 90% 45%;
-    --primary-foreground: 222 47% 10%;
-
-    /* Secondary: Teal/Green */
-    --secondary: 160 84% 39%;
+    --background: 218 17% 9%;
+    --foreground: 214 16% 91%;
+    --card: 218 17% 13%;
+    --card-foreground: 214 16% 91%;
+    --popover: 218 17% 13%;
+    --popover-foreground: 214 16% 91%;
+    --muted: 217 15% 17%;
+    --muted-foreground: 215 10% 63%;
+    --accent: 217 15% 17%;
+    --accent-foreground: 214 16% 91%;
+    --border: 216 13% 23%;
+    --input: 216 13% 23%;
+    --border-strong: 218 11% 28%;
+    --faint: 215 7% 45%;
+    --primary: 189 45% 50%;
+    --primary-foreground: 193 75% 9%;
+    --secondary: 214 8% 51%;
     --secondary-foreground: 0 0% 100%;
+    --accent-soft: 193 38% 15%;
+    --ring: 189 45% 50%;
 
-    /* Muted: Darker grays for dark mode */
-    --muted: 217 20% 20%;
-    --muted-foreground: 215 15% 75%;
-
-    --accent: 217 20% 20%;
-    --accent-foreground: 210 20% 98%;
-
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 20% 98%;
-
-    --border: 217 20% 20%;
-    --input: 217 20% 20%;
-    --ring: 190 90% 45%;
+    --success: 150 45% 55%;
+    --success-foreground: 153 77% 8%;
+    --success-soft: 151 33% 12%;
+    --success-soft-foreground: 148 43% 72%;
+    --success-border: 149 30% 23%;
+    --warning: 42 62% 61%;
+    --warning-foreground: 43 71% 10%;
+    --warning-soft: 48 40% 12%;
+    --warning-soft-foreground: 42 65% 72%;
+    --warning-border: 47 41% 22%;
+    --danger: 0 59% 70%;
+    --danger-foreground: 0 47% 11%;
+    --danger-soft: 0 26% 14%;
+    --danger-soft-foreground: 0 65% 81%;
+    --danger-border: 0 28% 25%;
+    --info: 209 61% 66%;
+    --info-foreground: 208 77% 14%;
+    --info-soft: 211 39% 14%;
+    --info-soft-foreground: 210 62% 76%;
+    --info-border: 209 35% 25%;
+    --destructive: 0 59% 70%;
+    --destructive-foreground: 0 47% 11%;
   }
 }
 
