@@ -132,10 +132,10 @@ export default function AdminUsageOverviewPage() {
           <div className="flex items-center space-x-2">
             <Badge variant="outline">{getPeriodLabel()}</Badge>
           </div>
-          <Button variant="outline" size="icon" onClick={fetchOverview}>
+          <Button variant="outline" size="icon" onClick={fetchOverview} aria-label="Refresh usage overview">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" aria-label="Export usage overview">
             <Download className="h-4 w-4" />
           </Button>
         </div>

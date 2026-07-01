@@ -308,6 +308,7 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
                           size="sm"
                           onClick={() => removeFile(file.id)}
                           className="h-8 w-8 p-0"
+                          aria-label={`Remove ${file.file.name} from upload queue`}
                         >
                           <X className="h-4 w-4" />
                         </Button>

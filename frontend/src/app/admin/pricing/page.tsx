@@ -497,7 +497,7 @@ export default function AdminPricingPage() {
             Manage provider pricing, set overrides, and sync from APIs
           </p>
         </div>
-        <Button variant="outline" size="icon" onClick={fetchAllData} disabled={loading}>
+        <Button variant="outline" size="icon" onClick={fetchAllData} disabled={loading} aria-label="Refresh pricing data">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>

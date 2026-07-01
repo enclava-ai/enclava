@@ -194,7 +194,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 07-03: Run accessibility pass and document final UX guardrail conventions.
+- [x] 07-03: Run accessibility pass and document final UX guardrail conventions.
 
 ## Progress
 
@@ -209,7 +209,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Color Sweep and Dashboard | 5/5 | Complete    | 2026-07-01 |
 | 5. SPA Navigation and API Client Plumbing | 2/2 | Complete    | 2026-07-01 |
 | 6. Toasts and Confirmations | 2/2 | Complete    | 2026-07-01 |
-| 7. Loading, Empty, and Accessibility Polish | 2/3 | In progress | - |
+| 7. Loading, Empty, and Accessibility Polish | 3/3 | In review | - |
 
 ---
 *Roadmap created: 2026-07-01 from `design-proposal/IMPLEMENTATION_PLAN.md`*

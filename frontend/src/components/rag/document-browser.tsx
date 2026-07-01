@@ -420,6 +420,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0"
+                          aria-label={`View document ${document.original_filename}`}
                           onClick={() => setSelectedDocument(document)}
                         >
                           <Eye className="h-4 w-4" />
@@ -490,6 +491,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0"
+                      aria-label={`Download document ${document.original_filename}`}
                       onClick={() => handleDownloadDocument(document)}
                     >
                       <Download className="h-4 w-4" />
@@ -499,6 +501,11 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0 hover:bg-info-soft"
+                      aria-label={
+                        document.status === 'processed'
+                          ? `${document.original_filename} is already processed`
+                          : `Reprocess document ${document.original_filename}`
+                      }
                       onClick={() => handleReprocessDocument(document.id)}
                       disabled={reprocessing === document.id || document.status === 'processed'}
                       title={document.status === 'processed' ? "Document already processed" : "Reprocess document"}
@@ -516,6 +523,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0 hover:bg-danger-soft"
+                          aria-label={`Delete document ${document.original_filename}`}
                         >
                           <Trash2 className="h-4 w-4 text-danger" />
                         </Button>

@@ -279,6 +279,7 @@ export function CollectionManager({
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 hover:bg-danger-soft"
+                            aria-label={`Delete collection ${collection.name}`}
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Trash2 className="h-4 w-4 text-danger" />

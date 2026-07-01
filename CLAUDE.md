@@ -131,3 +131,11 @@ Copy `.env.example` to `.env`. Required variables:
 - Use `apiClient` from `@/lib/api-client` for API calls (enforced by ESLint)
 - Path aliases: `@/` maps to `./src/`
 - No `console.log` statements allowed (ESLint error)
+
+### Frontend UX Conventions
+- Use semantic design tokens and Tailwind roles (`bg-background`, `text-foreground`, `border-border`, `text-muted-foreground`, status tokens) instead of raw palette utilities or legacy `empire-*`/`enclava-*` classes.
+- Use `StatusBadge` for severity/state. Use neutral `Badge` variants for categories, labels, and metadata that are not status.
+- Use shared skeleton primitives from `@/components/ui/skeletons` for initial page/list loading. Keep spinners for inline button, upload, refresh, and row-level busy states.
+- Use `EmptyState` from `@/components/ui/empty-state` for high-traffic zero states, with value copy and a primary action.
+- Use the project `useToast` API from `@/hooks/use-toast` and themed confirmations through `useConfirm`; do not add native `confirm`, `alert`, or `prompt`.
+- Run `npm run check:colors` and `npm run check:plumbing` from `frontend/` before shipping frontend UX changes.

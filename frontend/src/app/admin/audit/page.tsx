@@ -391,7 +391,7 @@ export default function AdminAuditPage() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon" onClick={fetchAllLogs} disabled={loading}>
+          <Button variant="outline" size="icon" onClick={fetchAllLogs} disabled={loading} aria-label="Refresh audit logs">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <Button variant="outline" onClick={handleExport} disabled={auditLogs.length === 0}>
