@@ -687,16 +687,16 @@ export function TemplateManager() {
                   role="button"
                   tabIndex={0}
                   aria-label="Upload a sample document. Supported formats: PDF, JPG, PNG. Maximum size: 10MB"
-                  className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:border-gray-400"
+                  className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 hover:border-primary"
                   onClick={() => wizardFileInputRef.current?.click()}
                   onKeyDown={handleWizardFileKeyDown}
                 >
-                  <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <div className="space-y-2">
                     <p className="text-lg font-medium">
                       Upload a sample document
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       PDF, JPG, or PNG (max 10MB)
                     </p>
                   </div>

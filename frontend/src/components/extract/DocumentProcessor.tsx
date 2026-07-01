@@ -202,7 +202,7 @@ export function DocumentProcessor() {
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 dragOver
                   ? 'border-primary bg-primary/5'
-                  : 'border-gray-300 hover:border-gray-400'
+                  : 'border-border hover:border-primary'
               } cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -210,15 +210,15 @@ export function DocumentProcessor() {
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={handleKeyDown}
             >
-              <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <div className="space-y-2">
                 <p className="text-lg font-medium">
                   {dragOver ? 'Drop file here' : 'Drop file here or click to browse'}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Supported: JPG, PNG, PDF
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Maximum file size: 10MB
                 </p>
               </div>

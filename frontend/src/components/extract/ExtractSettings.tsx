@@ -124,7 +124,7 @@ export function ExtractSettings() {
               Models are loaded from your configured Enclava platform providers.
             </p>
             {settings && !settings.default_model && availableModels.length > 0 && (
-              <div className="text-sm text-amber-600 dark:text-amber-500">
+              <div className="text-sm text-warning-soft-foreground">
                 ⓘ Auto-selecting first available vision model: <strong>{availableModels[0].id}</strong>
               </div>
             )}

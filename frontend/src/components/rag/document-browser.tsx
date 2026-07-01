@@ -217,23 +217,23 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
     const iconClass = "h-4 w-4"
     switch (fileType.toLowerCase()) {
       case 'pdf':
-        return <FileText className={`${iconClass} text-red-500`} />
+        return <FileText className={`${iconClass} text-danger`} />
       case 'docx':
       case 'doc':
-        return <FileText className={`${iconClass} text-blue-500`} />
+        return <FileText className={`${iconClass} text-info`} />
       case 'xlsx':
       case 'xls':
-        return <FileText className={`${iconClass} text-green-500`} />
+        return <FileText className={`${iconClass} text-success`} />
       default:
-        return <FileIcon className={`${iconClass} text-gray-500`} />
+        return <FileIcon className={`${iconClass} text-muted-foreground`} />
     }
   }
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      processed: 'bg-green-100 text-green-800',
-      processing: 'bg-yellow-100 text-yellow-800',
-      error: 'bg-red-100 text-red-800'
+      processed: 'bg-success-soft text-success-soft-foreground',
+      processing: 'bg-warning-soft text-warning-soft-foreground',
+      error: 'bg-danger-soft text-danger-soft-foreground'
     }
     
     return (
@@ -448,7 +448,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                             {selectedDocument.converted_content && (
                               <div>
                                 <h4 className="font-medium mb-2">Converted Content</h4>
-                                <div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
+                                <div className="bg-muted p-4 rounded-lg max-h-96 overflow-y-auto">
                                   <pre className="text-sm whitespace-pre-wrap">
                                     {selectedDocument.converted_content.substring(0, 2000)}
                                     {selectedDocument.converted_content.length > 2000 && "..."}
@@ -473,7 +473,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 hover:bg-blue-100"
+                      className="h-8 w-8 p-0 hover:bg-info-soft"
                       onClick={() => handleReprocessDocument(document.id)}
                       disabled={reprocessing === document.id || document.status === 'processed'}
                       title={document.status === 'processed' ? "Document already processed" : "Reprocess document"}
@@ -481,7 +481,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                       {reprocessing === document.id ? (
                         <RefreshCw className="h-4 w-4 animate-spin" />
                       ) : (
-                        <RefreshCw className={`h-4 w-4 ${document.status === 'processed' ? 'text-gray-400' : ''}`} />
+                        <RefreshCw className={`h-4 w-4 ${document.status === 'processed' ? 'text-muted-foreground' : ''}`} />
                       )}
                     </Button>
 
@@ -490,9 +490,9 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 hover:bg-red-100"
+                          className="h-8 w-8 p-0 hover:bg-danger-soft"
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className="h-4 w-4 text-danger" />
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -506,7 +506,7 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => handleDeleteDocument(document.id)}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-danger text-danger-foreground hover:bg-danger/90"
                             disabled={deleting === document.id}
                           >
                             {deleting === document.id ? "Deleting..." : "Delete"}

@@ -184,11 +184,11 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
     switch (status) {
       case 'uploading':
       case 'processing':
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+        return <Loader2 className="h-4 w-4 animate-spin text-info" />
       case 'completed':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />
+        return <CheckCircle2 className="h-4 w-4 text-success" />
       case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />
+        return <AlertCircle className="h-4 w-4 text-danger" />
       default:
         return <FileText className="h-4 w-4" />
     }
@@ -196,10 +196,10 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      uploading: 'bg-blue-100 text-blue-800',
-      processing: 'bg-yellow-100 text-yellow-800',
-      completed: 'bg-green-100 text-green-800',
-      error: 'bg-red-100 text-red-800'
+      uploading: 'bg-info-soft text-info-soft-foreground',
+      processing: 'bg-warning-soft text-warning-soft-foreground',
+      completed: 'bg-success-soft text-success-soft-foreground',
+      error: 'bg-danger-soft text-danger-soft-foreground'
     }
     
     return (
@@ -242,22 +242,22 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
               dragOver 
                 ? 'border-primary bg-primary/5' 
-                : 'border-gray-300 hover:border-gray-400'
+                : 'border-border hover:border-primary'
             } ${!targetCollection ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => targetCollection && fileInputRef.current?.click()}
           >
-            <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <div className="space-y-2">
               <p className="text-lg font-medium">
                 {dragOver ? 'Drop files here' : 'Drop files here or click to browse'}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Supports: PDF, Word, Excel, Text, Markdown, HTML, JSON, CSV
               </p>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 Maximum file size: 10MB per file
               </p>
             </div>
@@ -272,7 +272,7 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
           </div>
 
           {!targetCollection && (
-            <div className="text-center text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+            <div className="text-center text-sm text-warning-soft-foreground bg-warning-soft p-3 rounded-lg">
               <AlertCircle className="h-4 w-4 inline mr-2" />
               Please select a collection before uploading documents
             </div>
@@ -295,7 +295,7 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
                       {getStatusIcon(file.status)}
                       <div>
                         <p className="text-sm font-medium">{file.file.name}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           {(file.file.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
@@ -320,11 +320,11 @@ export function DocumentUpload({ collections, selectedCollection, onDocumentUplo
                   )}
                   
                   {file.error && (
-                    <p className="text-sm text-red-600 mt-2">{file.error}</p>
+                    <p className="text-sm text-danger mt-2">{file.error}</p>
                   )}
                   
                   {file.status === 'processing' && (
-                    <p className="text-sm text-blue-600 mt-2">
+                    <p className="text-sm text-info mt-2">
                       Converting document and extracting content...
                     </p>
                   )}

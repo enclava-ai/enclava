@@ -74,21 +74,21 @@ export function CollectionManager({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'active':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />
+        return <CheckCircle2 className="h-4 w-4 text-success" />
       case 'indexing':
-        return <Clock className="h-4 w-4 text-yellow-500 animate-spin" />
+        return <Clock className="h-4 w-4 text-warning animate-spin" />
       case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />
+        return <AlertCircle className="h-4 w-4 text-danger" />
       default:
-        return <Database className="h-4 w-4 text-gray-500" />
+        return <Database className="h-4 w-4 text-muted-foreground" />
     }
   }
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      active: 'bg-green-100 text-green-800',
-      indexing: 'bg-yellow-100 text-yellow-800',
-      error: 'bg-red-100 text-red-800'
+      active: 'bg-success-soft text-success-soft-foreground',
+      indexing: 'bg-warning-soft text-warning-soft-foreground',
+      error: 'bg-danger-soft text-danger-soft-foreground'
     }
     
     return (
@@ -101,7 +101,7 @@ export function CollectionManager({
   const getSourceBadge = (collection: Collection) => {
     if (collection.is_managed === false || collection.source === 'qdrant') {
       return (
-        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+        <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
           <ExternalLink className="h-3 w-3 mr-1" />
           External
         </Badge>
@@ -187,12 +187,12 @@ export function CollectionManager({
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader>
-                <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+                <div className="h-3 bg-muted rounded w-1/2"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                <div className="h-3 bg-muted rounded w-full mb-2"></div>
+                <div className="h-3 bg-muted rounded w-2/3"></div>
               </CardContent>
             </Card>
           ))}
@@ -291,10 +291,10 @@ export function CollectionManager({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 hover:bg-red-100"
+                            className="h-8 w-8 p-0 hover:bg-danger-soft"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Trash2 className="h-4 w-4 text-danger" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
@@ -308,7 +308,7 @@ export function CollectionManager({
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDeleteCollection(collection.id)}
-                              className="bg-red-600 hover:bg-red-700"
+                              className="bg-danger text-danger-foreground hover:bg-danger/90"
                               disabled={deleting === collection.id}
                             >
                               {deleting === collection.id ? "Deleting..." : "Delete"}
@@ -344,7 +344,7 @@ export function CollectionManager({
                     <span className="font-medium">{formatDate(collection.created_at)}</span>
                   </div>
                   {isExternalCollection(collection) && (
-                    <div className="pt-1 border-t border-gray-100">
+                    <div className="pt-1 border-t border-border">
                       <p className="text-xs text-muted-foreground italic">
                         External collection - managed outside this system
                       </p>

@@ -69,10 +69,10 @@ export default function RAGPage() {
 
 function ConnectorSummaryCard({ connector }: { connector: Connector }) {
   const statusColors = {
-    active: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-    inactive: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-    error: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-    syncing: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+    active: 'bg-success-soft text-success-soft-foreground',
+    inactive: 'bg-muted text-muted-foreground',
+    error: 'bg-danger-soft text-danger-soft-foreground',
+    syncing: 'bg-info-soft text-info-soft-foreground',
   }
 
   const formatLastSync = (date?: string) => {
@@ -290,7 +290,7 @@ function RAGPageContent() {
               <Search className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">Healthy</div>
+              <div className="text-2xl font-bold text-success">Healthy</div>
               <p className="text-xs text-muted-foreground">
                 All systems operational
               </p>

@@ -115,7 +115,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-02: Sweep RAG, Extract, and related domain components.
+- [x] 04-02: Sweep RAG, Extract, and related domain components.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
