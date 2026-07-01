@@ -81,11 +81,17 @@ Plans:
   4. Active states, keyboard focus, and responsive layout work in both themes.
 
 **Plans**: 3 plans
-
 Plans:
+**Wave 1**
 
 - [ ] 03-01: Extract/preserve the nav model and build sidebar/topbar/mobile drawer components.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 03-02: Move the LLM route under Settings and add compatibility redirects.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 03-03: Integrate the shell in layout and verify desktop/mobile navigation parity.
 
 ### Phase 4: Color Sweep and Dashboard
