@@ -219,7 +219,7 @@ function AppShell({
                 <Menu className="h-4 w-4" aria-hidden="true" />
                 <span className="sr-only">Open navigation</span>
               </Button>
-              <DialogContent className="left-0 top-0 h-screen w-80 max-w-[calc(100vw-2rem)] translate-x-0 translate-y-0 rounded-none border-y-0 border-l-0 border-r border-border p-0 sm:rounded-none">
+              <DialogContent className="!left-0 !top-0 !h-screen !w-80 !max-w-[calc(100vw-2rem)] !translate-x-0 !translate-y-0 rounded-none border-y-0 border-l-0 border-r border-border p-0 sm:rounded-none">
                 <div className="flex h-full flex-col">
                   <div className="border-b border-border px-4 py-4">
                     <DialogTitle>Navigation</DialogTitle>

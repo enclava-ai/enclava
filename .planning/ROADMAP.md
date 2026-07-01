@@ -92,7 +92,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-03: Integrate the shell in layout and verify desktop/mobile navigation parity.
+- [x] 03-03: Integrate the shell in layout and verify desktop/mobile navigation parity.
 
 ### Phase 4: Color Sweep and Dashboard
 
