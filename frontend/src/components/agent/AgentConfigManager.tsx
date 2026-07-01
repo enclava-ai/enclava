@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { EmptyState } from "@/components/ui/empty-state"
 import {
   Plus,
   Settings,
@@ -857,19 +858,18 @@ export function AgentConfigManager() {
         })}
 
         {agents.length === 0 && !loading && (
-          <Card className="col-span-full">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Bot className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No agents yet</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Create your first AI agent with custom tools and capabilities.
-              </p>
+          <EmptyState
+            className="col-span-full"
+            icon={Bot}
+            title="Create your first agent"
+            description="Define an AI assistant with model settings, tools, and knowledge access for repeatable workflows."
+            action={
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Create Your First Agent
+                Create Agent
               </Button>
-            </CardContent>
-          </Card>
+            }
+          />
         )}
         </div>
         </TabsContent>

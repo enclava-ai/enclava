@@ -190,7 +190,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 07-02: Add designed empty states to high-traffic zero-state screens.
+- [x] 07-02: Add designed empty states to high-traffic zero-state screens.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -209,7 +209,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Color Sweep and Dashboard | 5/5 | Complete    | 2026-07-01 |
 | 5. SPA Navigation and API Client Plumbing | 2/2 | Complete    | 2026-07-01 |
 | 6. Toasts and Confirmations | 2/2 | Complete    | 2026-07-01 |
-| 7. Loading, Empty, and Accessibility Polish | 1/3 | In progress | - |
+| 7. Loading, Empty, and Accessibility Polish | 2/3 | In progress | - |
 
 ---
 *Roadmap created: 2026-07-01 from `design-proposal/IMPLEMENTATION_PLAN.md`*

@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageSkeleton } from "@/components/ui/skeletons";
+import { EmptyState } from "@/components/ui/empty-state";
 import { 
   Key, 
   Plus, 
@@ -697,21 +698,17 @@ function ApiKeysContent() {
       {/* API Keys List */}
       <div className="space-y-4">
         {apiKeys.length === 0 ? (
-          <Card>
-            <CardContent className="py-8">
-              <div className="text-center">
-                <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No API keys found</h3>
-                <p className="text-muted-foreground mb-4">
-                  Create your first API key to start using the platform
-                </p>
-                <Button onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create API Key
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Key}
+            title="Create your first API key"
+            description="Issue scoped keys for apps, agents, and extract workflows without sharing user credentials."
+            action={
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create API Key
+              </Button>
+            }
+          />
         ) : (
           apiKeys.map((apiKey) => (
             <Card key={apiKey.id}>

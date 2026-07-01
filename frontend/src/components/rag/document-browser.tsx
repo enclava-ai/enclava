@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Search, FileText, Trash2, Eye, Download, Calendar, Hash, FileIcon, Filter, RefreshCw } from "lucide-react"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Search, FileText, Trash2, Eye, Download, Calendar, Hash, FileIcon, Filter, RefreshCw, Upload } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api-client"
 import { config } from "@/lib/config"
@@ -44,9 +45,10 @@ interface DocumentBrowserProps {
   collections: Collection[]
   selectedCollection: string | null
   onCollectionSelected: (collectionId: string | null) => void
+  onUploadRequested: () => void
 }
 
-export function DocumentBrowser({ collections, selectedCollection, onCollectionSelected }: DocumentBrowserProps) {
+export function DocumentBrowser({ collections, selectedCollection, onCollectionSelected, onUploadRequested }: DocumentBrowserProps) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(false)
@@ -92,6 +94,19 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
     } finally {
       setLoading(false)
     }
+  }
+
+  const hasActiveFilters =
+    Boolean(searchTerm) ||
+    filterCollection !== "all" ||
+    filterType !== "all" ||
+    filterStatus !== "all"
+
+  const clearFilters = () => {
+    setSearchTerm("")
+    setFilterCollection(selectedCollection || "all")
+    setFilterType("all")
+    setFilterStatus("all")
   }
 
   const filterDocuments = () => {
@@ -336,17 +351,27 @@ export function DocumentBrowser({ collections, selectedCollection, onCollectionS
       {/* Documents List */}
       <div className="grid gap-4">
         {filteredDocuments.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Documents Found</h3>
-              <p className="text-muted-foreground text-center">
-                {searchTerm || filterCollection !== "all" || filterType !== "all" || filterStatus !== "all"
-                  ? "Try adjusting your search criteria or filters."
-                  : "Upload some documents to get started."}
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={FileText}
+            title={hasActiveFilters ? "No documents match your filters" : "Upload documents to build a knowledge base"}
+            description={
+              hasActiveFilters
+                ? "Adjust search or filters to broaden the document list."
+                : "Add PDFs, text, or other source files so agents can retrieve relevant context."
+            }
+            action={
+              hasActiveFilters ? (
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : (
+                <Button onClick={onUploadRequested}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Documents
+                </Button>
+              )
+            }
+          />
         ) : (
           filteredDocuments.map((document) => (
             <Card key={document.id} className="hover:shadow-md transition-shadow">

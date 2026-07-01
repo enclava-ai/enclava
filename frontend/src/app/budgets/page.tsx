@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { PageSkeleton } from "@/components/ui/skeletons";
+import { EmptyState } from "@/components/ui/empty-state";
 import { 
   DollarSign, 
   Plus, 
@@ -480,21 +481,17 @@ export default function BudgetsPage() {
       {/* Budgets List */}
       <div className="space-y-4">
         {budgets.length === 0 ? (
-          <Card>
-            <CardContent className="py-8">
-              <div className="text-center">
-                <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No budgets configured</h3>
-                <p className="text-muted-foreground mb-4">
-                  Create your first budget to start tracking spending
-                </p>
-                <Button onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Budget
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={DollarSign}
+            title="Start tracking spend"
+            description="Create a budget to monitor usage, alert on thresholds, and keep AI costs predictable."
+            action={
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Budget
+              </Button>
+            }
+          />
         ) : (
           budgets.map((budget) => {
             const usagePercentage = calculateUsagePercentage(budget.current_usage, budget.limit_amount);

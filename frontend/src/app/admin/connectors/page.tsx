@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { EmptyState } from "@/components/ui/empty-state"
 import { Plus, Link2, AlertCircle } from "lucide-react"
 import { ConnectorCard } from "@/components/connectors/ConnectorCard"
 import { AddConnectorDialog } from "@/components/connectors/AddConnectorDialog"
@@ -282,20 +283,17 @@ function ConnectorsPageContent() {
           <Skeleton className="h-[200px] w-full" />
         </div>
       ) : connectors.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Link2 className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No connectors yet</h3>
-            <p className="text-muted-foreground text-center mb-4 max-w-md">
-              Connect external data sources like Notion, GitHub, Slack, or Linear to automatically
-              sync content into your RAG collections.
-            </p>
+        <EmptyState
+          icon={Link2}
+          title="Connect your first data source"
+          description="Sync content from Notion, GitHub, Slack, or Linear into your searchable knowledge base."
+          action={
             <Button onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Your First Connector
+              Add Connector
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {connectors.map((connector) => (

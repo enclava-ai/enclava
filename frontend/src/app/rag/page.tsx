@@ -332,6 +332,7 @@ function RAGPageContent() {
             collections={collections}
             selectedCollection={selectedCollection}
             onCollectionSelected={setSelectedCollection}
+            onUploadRequested={() => setActiveTab("upload")}
           />
         </TabsContent>
 

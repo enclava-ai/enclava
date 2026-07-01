@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Progress } from "@/components/ui/progress"
 import { CardGridSkeleton } from "@/components/ui/skeletons"
+import { EmptyState } from "@/components/ui/empty-state"
 import { Plus, Database, Trash2, FileText, Calendar, AlertCircle, CheckCircle2, Clock, Settings, ExternalLink } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api-client"
@@ -241,19 +242,17 @@ export function CollectionManager({
       </div>
 
       {collections.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-8">
-            <Database className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Collections Yet</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Create your first collection to start organizing your documents.
-            </p>
+        <EmptyState
+          icon={Database}
+          title="Create your first collection"
+          description="Group documents by product, customer, or workflow so agents can search the right knowledge."
+          action={
             <Button onClick={() => setShowCreateDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Collection
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {collections.map((collection) => (
