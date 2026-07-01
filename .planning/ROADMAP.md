@@ -84,7 +84,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 03-01: Extract/preserve the nav model and build sidebar/topbar/mobile drawer components.
+- [x] 03-01: Extract/preserve the nav model and build sidebar/topbar/mobile drawer components.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

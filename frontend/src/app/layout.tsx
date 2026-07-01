@@ -74,12 +74,7 @@ export default function RootLayout({
             <ModulesProvider>
               <PluginProvider>
                 <ToastProvider>
-                  <div className="min-h-screen bg-background">
-                    <Navigation />
-                    <main className="container mx-auto px-4 py-8">
-                      {children}
-                    </main>
-                  </div>
+                  <Navigation>{children}</Navigation>
                   <Toaster />
                 </ToastProvider>
                 <HotToaster />
