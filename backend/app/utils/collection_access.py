@@ -64,7 +64,9 @@ def can_user_access_collection(
 
     # ----------------------------------------------------------------- private
     if visibility == CollectionVisibility.PRIVATE:
-        return collection.owner_user_id is not None and collection.owner_user_id == user.id
+        return (
+            collection.owner_user_id is not None and collection.owner_user_id == user.id
+        )
 
     # --------------------------------------------------------- role_required
     if visibility == CollectionVisibility.ROLE_REQUIRED:

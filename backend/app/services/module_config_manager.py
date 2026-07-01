@@ -2,12 +2,14 @@
 Module-specific configuration management service
 Works alongside the general ConfigManager for module discovery and schema validation
 """
+
 import json
-import yaml
-from typing import Dict, List, Any, Optional
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from jsonschema import validate, ValidationError, draft7_format_checker
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
+
+import yaml
+from jsonschema import ValidationError, draft7_format_checker, validate
 
 from app.core.logging import get_logger
 from app.utils.exceptions import ConfigurationError

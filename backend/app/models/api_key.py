@@ -1,21 +1,46 @@
 """
 API Key model
 """
+
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy import (
-    Column,
-    Integer,
-    BigInteger,
-    String,
-    DateTime,
-    Boolean,
-    Text,
     JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
     ForeignKey,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.types import TypeDecorator
+
 from app.db.database import Base, utc_now
+
+
+class UTCDateTime(TypeDecorator):
+    """Store naive UTC datetimes and return timezone-aware UTC values."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is not None:
+            return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 
 class APIKey(Base):
@@ -48,9 +73,6 @@ class APIKey(Base):
     allowed_models = Column(JSON, default=list)  # List of allowed LLM models
     allowed_endpoints = Column(JSON, default=list)  # List of allowed API endpoints
     allowed_ips = Column(JSON, default=list)  # IP whitelist
-    allowed_chatbots = Column(
-        JSON, default=list
-    )  # List of allowed chatbot IDs for chatbot-specific keys
     allowed_agents = Column(
         JSON, default=list
     )  # List of allowed agent config IDs for agent-specific keys
@@ -71,7 +93,7 @@ class APIKey(Base):
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     last_used_at = Column(DateTime, nullable=True)
-    expires_at = Column(DateTime, nullable=True)  # Optional expiration
+    expires_at = Column(UTCDateTime, nullable=True)  # Optional expiration
 
     # Soft delete columns (added in migration 017)
     deleted_at = Column(DateTime, nullable=True)
@@ -96,6 +118,45 @@ class APIKey(Base):
         "UsageRecord", back_populates="api_key", cascade="all, delete-orphan"
     )
 
+    def __init__(self, **kwargs):
+        legacy_budget_id = kwargs.pop("budget_id", None)
+        hashed_key = kwargs.pop("hashed_key", None)
+
+        key_hash = kwargs.get("key_hash") or hashed_key
+        if key_hash is not None:
+            kwargs.setdefault("key_hash", key_hash)
+            kwargs.setdefault("key_prefix", str(key_hash)[:8])
+
+        raw_id = kwargs.get("id")
+        if isinstance(raw_id, str) and not raw_id.isdigit():
+            kwargs.pop("id", None)
+        elif isinstance(raw_id, str):
+            kwargs["id"] = int(raw_id)
+
+        for int_field in ("user_id", "deleted_by_user_id"):
+            raw_value = kwargs.get(int_field)
+            if isinstance(raw_value, str) and raw_value.isdigit():
+                kwargs[int_field] = int(raw_value)
+
+        kwargs.setdefault("name", "API Key")
+        kwargs.setdefault("key_prefix", "unknown")
+        kwargs.setdefault("permissions", {})
+        kwargs.setdefault("scopes", [])
+        kwargs.setdefault("allowed_models", [])
+        kwargs.setdefault("allowed_endpoints", [])
+        kwargs.setdefault("allowed_ips", [])
+        kwargs.setdefault("allowed_agents", [])
+        kwargs.setdefault("allowed_extract_templates", [])
+        kwargs.setdefault("tags", [])
+        kwargs.setdefault("is_active", True)
+        kwargs.setdefault("is_unlimited", True)
+        kwargs.setdefault("total_requests", 0)
+        kwargs.setdefault("total_tokens", 0)
+        kwargs.setdefault("total_cost", 0)
+
+        super().__init__(**kwargs)
+        self._legacy_budget_id = legacy_budget_id
+
     def __repr__(self):
         return f"<APIKey(id={self.id}, name='{self.name}', user_id={self.user_id})>"
 
@@ -103,6 +164,22 @@ class APIKey(Base):
     def is_deleted(self) -> bool:
         """Check if the API key has been soft deleted"""
         return self.deleted_at is not None
+
+    @property
+    def usage_count(self) -> int:
+        return self.total_requests or 0
+
+    @usage_count.setter
+    def usage_count(self, value: int) -> None:
+        self.total_requests = value
+
+    @property
+    def budget_id(self):
+        return getattr(self, "_legacy_budget_id", None)
+
+    @budget_id.setter
+    def budget_id(self, value) -> None:
+        self._legacy_budget_id = value
 
     @property
     def is_active_and_not_deleted(self) -> bool:
@@ -125,16 +202,15 @@ class APIKey(Base):
             "allowed_models": self.allowed_models,
             "allowed_endpoints": self.allowed_endpoints,
             "allowed_ips": self.allowed_ips,
-            "allowed_chatbots": self.allowed_chatbots,
             "allowed_agents": self.allowed_agents,
             "allowed_extract_templates": self.allowed_extract_templates,
             "description": self.description,
             "tags": self.tags,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "last_used_at": self.last_used_at.isoformat()
-            if self.last_used_at
-            else None,
+            "last_used_at": (
+                self.last_used_at.isoformat() if self.last_used_at else None
+            ),
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
             "total_requests": self.total_requests,
             "total_tokens": self.total_tokens,
@@ -158,7 +234,8 @@ class APIKey(Base):
         """Check if the API key has expired"""
         if self.expires_at is None:
             return False
-        return utc_now() > self.expires_at
+        now = datetime.now(timezone.utc) if self.expires_at.tzinfo else utc_now()
+        return now > self.expires_at
 
     def is_valid(self) -> bool:
         """Check if the API key is valid, active, and not deleted"""
@@ -189,12 +266,6 @@ class APIKey(Base):
         if not self.allowed_ips:  # Empty list means all IPs allowed
             return True
         return ip_address in self.allowed_ips
-
-    def can_access_chatbot(self, chatbot_id: str) -> bool:
-        """Check if the API key can access a specific chatbot"""
-        if not self.allowed_chatbots:  # Empty list means all chatbots allowed
-            return True
-        return chatbot_id in self.allowed_chatbots
 
     def can_access_agent(self, agent_id: int) -> bool:
         """Check if the API key can access a specific agent config"""
@@ -299,16 +370,6 @@ class APIKey(Base):
         if ip_address in self.allowed_ips:
             self.allowed_ips.remove(ip_address)
 
-    def add_allowed_chatbot(self, chatbot_id: str):
-        """Add an allowed chatbot"""
-        if chatbot_id not in self.allowed_chatbots:
-            self.allowed_chatbots.append(chatbot_id)
-
-    def remove_allowed_chatbot(self, chatbot_id: str):
-        """Remove an allowed chatbot"""
-        if chatbot_id in self.allowed_chatbots:
-            self.allowed_chatbots.remove(chatbot_id)
-
     def add_allowed_agent(self, agent_id: int):
         """Add an allowed agent config"""
         agent_id_str = str(agent_id)
@@ -383,39 +444,6 @@ class APIKey(Base):
         )
 
     @classmethod
-    def create_chatbot_key(
-        cls,
-        user_id: int,
-        name: str,
-        key_hash: str,
-        key_prefix: str,
-        chatbot_id: str,
-        chatbot_name: str,
-    ) -> "APIKey":
-        """Create a chatbot-specific API key"""
-        return cls(
-            name=name,
-            key_hash=key_hash,
-            key_prefix=key_prefix,
-            user_id=user_id,
-            is_active=True,
-            permissions={"chatbot": True},
-            scopes=["chatbot.chat"],
-            rate_limit_per_minute=100,
-            rate_limit_per_hour=6000,
-            rate_limit_per_day=144000,
-            allowed_models=[],  # Will use chatbot's configured model
-            allowed_endpoints=[
-                f"/api/v1/chatbot/external/{chatbot_id}/chat",
-                f"/api/v1/chatbot/external/{chatbot_id}/chat/completions",
-            ],
-            allowed_ips=[],
-            allowed_chatbots=[chatbot_id],
-            description=f"API key for chatbot: {chatbot_name}",
-            tags=["chatbot", f"chatbot-{chatbot_id}"],
-        )
-
-    @classmethod
     def create_agent_key(
         cls,
         user_id: int,
@@ -439,7 +467,7 @@ class APIKey(Base):
             rate_limit_per_day=144000,
             allowed_models=[],  # Will use agent's configured model
             allowed_endpoints=[
-                f"/api/v1/tool-calling/agent/chat",
+                f"/agent/{agent_id}/v1/chat/completions",
             ],
             allowed_ips=[],
             allowed_agents=[str(agent_id)],
@@ -475,5 +503,6 @@ class APIKey(Base):
             allowed_ips=[],
             allowed_extract_templates=template_ids or [],
             description=f"API key for Extract: {', '.join(template_ids) if template_ids else 'all templates'}",
-            tags=["extract"] + ([f"template-{t}" for t in template_ids] if template_ids else []),
+            tags=["extract"]
+            + ([f"template-{t}" for t in template_ids] if template_ids else []),
         )

@@ -2,25 +2,24 @@
 Prompt Template API endpoints
 """
 
+import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
-from datetime import datetime, timezone
-import uuid
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db, utc_now
-from app.models.prompt_template import PromptTemplate, ChatbotPromptVariable
-from app.core.security import get_current_user
-from app.models.user import User
 from app.core.logging import log_api_request
+from app.core.security import get_current_user
+from app.db.database import get_db, utc_now
+from app.models.prompt_template import PromptTemplate, PromptVariable
+from app.models.user import User
+from app.services.llm.models import ChatMessage as LLMChatMessage
+from app.services.llm.models import ChatRequest as LLMChatRequest
 from app.services.llm.service import llm_service
-from app.services.llm.models import (
-    ChatRequest as LLMChatRequest,
-    ChatMessage as LLMChatMessage,
-)
 
 router = APIRouter()
 
@@ -56,7 +55,7 @@ class PromptVariableResponse(BaseModel):
 
 class ImprovePromptRequest(BaseModel):
     current_prompt: str
-    chatbot_type: str
+    agent_type: str
     improvement_instructions: Optional[str] = None
 
 
@@ -89,12 +88,12 @@ async def list_prompt_templates(
                 "is_default": template.is_default,
                 "is_active": template.is_active,
                 "version": template.version,
-                "created_at": template.created_at.isoformat()
-                if template.created_at
-                else None,
-                "updated_at": template.updated_at.isoformat()
-                if template.updated_at
-                else None,
+                "created_at": (
+                    template.created_at.isoformat() if template.created_at else None
+                ),
+                "updated_at": (
+                    template.updated_at.isoformat() if template.updated_at else None
+                ),
             }
             template_list.append(template_dict)
 
@@ -141,12 +140,12 @@ async def get_prompt_template(
             "is_default": template.is_default,
             "is_active": template.is_active,
             "version": template.version,
-            "created_at": template.created_at.isoformat()
-            if template.created_at
-            else None,
-            "updated_at": template.updated_at.isoformat()
-            if template.updated_at
-            else None,
+            "created_at": (
+                template.created_at.isoformat() if template.created_at else None
+            ),
+            "updated_at": (
+                template.updated_at.isoformat() if template.updated_at else None
+            ),
         }
 
     except HTTPException:
@@ -219,12 +218,16 @@ async def update_prompt_template(
             "is_default": updated_template.is_default,
             "is_active": updated_template.is_active,
             "version": updated_template.version,
-            "created_at": updated_template.created_at.isoformat()
-            if updated_template.created_at
-            else None,
-            "updated_at": updated_template.updated_at.isoformat()
-            if updated_template.updated_at
-            else None,
+            "created_at": (
+                updated_template.created_at.isoformat()
+                if updated_template.created_at
+                else None
+            ),
+            "updated_at": (
+                updated_template.updated_at.isoformat()
+                if updated_template.updated_at
+                else None
+            ),
         }
 
     except HTTPException:
@@ -292,12 +295,12 @@ async def create_prompt_template(
             "is_default": template.is_default,
             "is_active": template.is_active,
             "version": template.version,
-            "created_at": template.created_at.isoformat()
-            if template.created_at
-            else None,
-            "updated_at": template.updated_at.isoformat()
-            if template.updated_at
-            else None,
+            "created_at": (
+                template.created_at.isoformat() if template.created_at else None
+            ),
+            "updated_at": (
+                template.updated_at.isoformat() if template.updated_at else None
+            ),
         }
 
     except HTTPException:
@@ -324,9 +327,9 @@ async def list_prompt_variables(
 
     try:
         result = await db.execute(
-            select(ChatbotPromptVariable)
-            .where(ChatbotPromptVariable.is_active == True)
-            .order_by(ChatbotPromptVariable.variable_name)
+            select(PromptVariable)
+            .where(PromptVariable.is_active == True)
+            .order_by(PromptVariable.variable_name)
         )
         variables = result.scalars().all()
 
@@ -415,12 +418,12 @@ async def improve_prompt_with_ai(
     )
     log_api_request(
         "improve_prompt_with_ai",
-        {"user_id": user_id, "chatbot_type": request.chatbot_type},
+        {"user_id": user_id, "agent_type": request.agent_type},
     )
 
     try:
         # Create system message for improvement
-        system_message = """You are an expert prompt engineer. Your task is to improve the given prompt to make it more effective, clear, and specific for the intended chatbot type.
+        system_message = """You are an expert prompt engineer. Your task is to improve the given prompt to make it more effective, clear, and specific for the intended agent type.
 
 Guidelines for improvement:
 1. Make the prompt more specific and actionable
@@ -428,21 +431,21 @@ Guidelines for improvement:
 3. Improve clarity and reduce ambiguity
 4. Include appropriate tone and personality instructions
 5. Add specific behavior examples when helpful
-6. Ensure the prompt aligns with the chatbot type
+6. Ensure the prompt aligns with the agent type
 7. Keep the prompt professional and ethical
 8. Make it concise but comprehensive
 
 Return ONLY the improved prompt text without any additional explanation or formatting."""
 
         # Create user message with current prompt and context
-        user_message = f"""Chatbot Type: {request.chatbot_type}
+        user_message = f"""Agent Type: {request.agent_type}
 
 Current Prompt:
 {request.current_prompt}
 
 {f"Additional Instructions: {request.improvement_instructions}" if request.improvement_instructions else ""}
 
-Please improve this prompt to make it more effective for a {request.chatbot_type} chatbot."""
+Please improve this prompt to make it more effective for a {request.agent_type} agent."""
 
         messages = [
             {"role": "system", "content": system_message},
@@ -503,7 +506,7 @@ Please improve this prompt to make it more effective for a {request.chatbot_type
 async def seed_default_templates(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
-    """Seed default prompt templates for all chatbot types"""
+    """Seed default prompt templates for all agent types"""
     user_id = (
         current_user.get("id") if isinstance(current_user, dict) else current_user.id
     )
@@ -537,7 +540,7 @@ async def seed_default_templates(
             "prompt": "You are an experienced creative writing mentor and storytelling expert. Help with brainstorming ideas, character development, plot structure, dialogue, and creative expression. Be imaginative and inspiring while providing constructive, actionable feedback. Encourage experimentation with different writing styles and techniques. When reviewing work, balance praise for strengths with specific suggestions for improvement. Help writers find their unique voice while mastering fundamental storytelling principles.",
         },
         "custom": {
-            "name": "Custom Chatbot",
+            "name": "Custom Agent",
             "description": "Customizable AI assistant with user-defined behavior",
             "prompt": "You are a helpful AI assistant. Your personality, expertise, and behavior will be defined by the user through custom instructions. Follow the user's guidance on how to respond, what tone to use, and what role to play. Be adaptable and responsive to the specific needs and preferences outlined in your configuration.",
         },

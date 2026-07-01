@@ -7,20 +7,21 @@ These models support:
 """
 
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from sqlalchemy import (
-    Column,
-    Integer,
     BigInteger,
-    String,
-    DateTime,
     Boolean,
-    Text,
+    Column,
+    DateTime,
     ForeignKey,
+    Integer,
+    String,
+    Text,
 )
-from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base, utc_now
@@ -45,14 +46,18 @@ class ProviderPricing(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # Provider and model identification
-    provider_id = Column(String(50), nullable=False, index=True)  # 'privatemode', 'redpill', etc.
+    provider_id = Column(
+        String(50), nullable=False, index=True
+    )  # 'privatemode', 'redpill', etc.
     model_id = Column(String(255), nullable=False)  # Full model ID from provider
     model_name = Column(String(255), nullable=True)  # Human-readable name
 
     # Pricing (in cents per 1M tokens, in native currency)
     input_price_per_million_cents = Column(BigInteger, nullable=False)
     output_price_per_million_cents = Column(BigInteger, nullable=False)
-    currency = Column(String(3), nullable=False, default="USD")  # ISO 4217 currency code
+    currency = Column(
+        String(3), nullable=False, default="USD"
+    )  # ISO 4217 currency code
 
     # Source tracking
     price_source = Column(String(20), nullable=False)  # 'api_sync', 'manual', 'default'
@@ -85,6 +90,15 @@ class ProviderPricing(Base):
     # - idx_provider_pricing_overrides (partial, is_override = TRUE)
     # - provider_pricing_unique (provider_id, model_id, effective_from)
 
+    def __init__(self, **kwargs):
+        now = utc_now()
+        kwargs.setdefault("currency", "USD")
+        kwargs.setdefault("is_override", False)
+        kwargs.setdefault("effective_from", now)
+        kwargs.setdefault("created_at", now)
+        kwargs.setdefault("updated_at", now)
+        super().__init__(**kwargs)
+
     def __repr__(self):
         return (
             f"<ProviderPricing(id={self.id}, provider={self.provider_id}, "
@@ -101,8 +115,10 @@ class ProviderPricing(Base):
             "model_name": self.model_name,
             "input_price_per_million_cents": self.input_price_per_million_cents,
             "output_price_per_million_cents": self.output_price_per_million_cents,
-            "input_price_per_million_dollars": self.input_price_per_million_cents / 100.0,
-            "output_price_per_million_dollars": self.output_price_per_million_cents / 100.0,
+            "input_price_per_million_dollars": self.input_price_per_million_cents
+            / 100.0,
+            "output_price_per_million_dollars": self.output_price_per_million_cents
+            / 100.0,
             "currency": self.currency or "USD",
             "price_source": self.price_source,
             "is_override": self.is_override,
@@ -111,8 +127,12 @@ class ProviderPricing(Base):
             "context_length": self.context_length,
             "architecture": self.architecture,
             "quantization": self.quantization,
-            "effective_from": self.effective_from.isoformat() if self.effective_from else None,
-            "effective_until": self.effective_until.isoformat() if self.effective_until else None,
+            "effective_from": (
+                self.effective_from.isoformat() if self.effective_from else None
+            ),
+            "effective_until": (
+                self.effective_until.isoformat() if self.effective_until else None
+            ),
             "is_current": self.is_current,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -133,7 +153,9 @@ class ProviderPricing(Base):
         """Return output price in dollars per million tokens"""
         return self.output_price_per_million_cents / 100.0
 
-    def calculate_cost_cents(self, input_tokens: int, output_tokens: int) -> tuple[int, int, int]:
+    def calculate_cost_cents(
+        self, input_tokens: int, output_tokens: int
+    ) -> tuple[int, int, int]:
         """
         Calculate costs in cents from tokens.
 
@@ -148,19 +170,23 @@ class ProviderPricing(Base):
         """
         # Ceiling division: (a + b - 1) // b is equivalent to ceil(a / b)
         input_cost_cents = (
-            (input_tokens * self.input_price_per_million_cents + 999_999) // 1_000_000
-        )
+            input_tokens * self.input_price_per_million_cents + 999_999
+        ) // 1_000_000
         output_cost_cents = (
-            (output_tokens * self.output_price_per_million_cents + 999_999) // 1_000_000
-        )
+            output_tokens * self.output_price_per_million_cents + 999_999
+        ) // 1_000_000
         total_cost_cents = input_cost_cents + output_cost_cents
 
         return input_cost_cents, output_cost_cents, total_cost_cents
 
     def expire(self) -> None:
         """Mark this pricing as expired (no longer current)"""
-        self.effective_until = utc_now()
-        self.updated_at = utc_now()
+        expires_at = utc_now()
+        if self.effective_from and self.effective_from.tzinfo is not None:
+            expires_at = datetime.now(timezone.utc)
+
+        self.effective_until = expires_at
+        self.updated_at = expires_at
 
     @classmethod
     def create_from_api_sync(
@@ -239,7 +265,9 @@ class PricingAuditLog(Base):
     model_id = Column(String(255), nullable=False)
 
     # Action type
-    action = Column(String(20), nullable=False)  # 'create', 'update', 'sync', 'override', 'remove_override'
+    action = Column(
+        String(20), nullable=False
+    )  # 'create', 'update', 'sync', 'override', 'remove_override'
 
     # Old pricing values (null for create actions)
     old_input_price_per_million_cents = Column(BigInteger, nullable=True)
@@ -250,7 +278,9 @@ class PricingAuditLog(Base):
     new_output_price_per_million_cents = Column(BigInteger, nullable=False)
 
     # Source tracking
-    change_source = Column(String(20), nullable=False)  # 'api_sync', 'admin_manual', 'system_default'
+    change_source = Column(
+        String(20), nullable=False
+    )  # 'api_sync', 'admin_manual', 'system_default'
 
     # User who made the change (null for system/sync operations)
     changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

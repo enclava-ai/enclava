@@ -6,9 +6,18 @@ that periodically syncs documents into a RAG collection.
 
 from enum import Enum
 
-from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime, Boolean, JSON
-from sqlalchemy.sql import func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.db.database import Base
 
@@ -26,10 +35,10 @@ class ConnectorType(str, Enum):
 
 
 class ConnectorStatus(str, Enum):
-    ACTIVE = "active"       # syncing normally
-    PAUSED = "paused"       # manually paused
-    ERROR = "error"         # last sync failed
-    PENDING = "pending"     # created, never synced yet
+    ACTIVE = "active"  # syncing normally
+    PAUSED = "paused"  # manually paused
+    ERROR = "error"  # last sync failed
+    PENDING = "pending"  # created, never synced yet
 
 
 class ConnectorSyncStatus(str, Enum):
@@ -128,7 +137,9 @@ class ConnectorSource(Base):
             "config": self.config,
             "sync_frequency": self.sync_frequency,
             "status": self.status,
-            "last_synced_at": self.last_synced_at.isoformat() if self.last_synced_at else None,
+            "last_synced_at": (
+                self.last_synced_at.isoformat() if self.last_synced_at else None
+            ),
             "last_sync_status": self.last_sync_status,
             "last_sync_error": self.last_sync_error,
             "last_sync_docs_indexed": self.last_sync_docs_indexed,

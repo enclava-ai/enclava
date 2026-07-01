@@ -3,24 +3,24 @@ API v1 package
 """
 
 from fastapi import APIRouter
+
+from .analytics import router as analytics_router
+from .api_keys import router as api_keys_router
+from .audit import router as audit_router
 from .auth import router as auth_router
+from .budgets import router as budgets_router
+from .endpoints.tool_calling import router as tool_calling_router
+from .endpoints.tools import router as tools_router
+from .endpoints.user_management import router as user_management_router
+from .extract import router as extract_router
 from .llm import router as llm_router
 from .modules import router as modules_router
 from .platform import router as platform_router
-from .users import router as users_router
-from .api_keys import router as api_keys_router
-from .budgets import router as budgets_router
-from .audit import router as audit_router
-from .settings import router as settings_router
-from .analytics import router as analytics_router
-from .rag import router as rag_router
-from .chatbot import router as chatbot_router
-from .prompt_templates import router as prompt_templates_router
 from .plugin_registry import router as plugin_registry_router
-from .endpoints.tools import router as tools_router
-from .endpoints.tool_calling import router as tool_calling_router
-from .endpoints.user_management import router as user_management_router
-from .extract import router as extract_router
+from .prompt_templates import router as prompt_templates_router
+from .rag import router as rag_router
+from .settings import router as settings_router
+from .users import router as users_router
 
 # Create main API router
 api_router = APIRouter()
@@ -58,9 +58,6 @@ api_router.include_router(analytics_router, prefix="/analytics", tags=["analytic
 # Include RAG routes
 api_router.include_router(rag_router, prefix="/rag", tags=["rag"])
 
-# Include chatbot routes
-api_router.include_router(chatbot_router, prefix="/chatbot", tags=["chatbot"])
-
 # Include extract routes
 api_router.include_router(extract_router, prefix="/extract", tags=["extract"])
 
@@ -83,5 +80,7 @@ api_router.include_router(
 
 # Include admin user management routes
 api_router.include_router(
-    user_management_router, prefix="/admin/user-management", tags=["admin", "user-management"]
+    user_management_router,
+    prefix="/admin/user-management",
+    tags=["admin", "user-management"],
 )

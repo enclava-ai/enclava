@@ -7,11 +7,12 @@ OpenAI-compatible Conversations API for managing multi-turn conversations.
 import logging
 import secrets
 import time
-from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.models.conversation import Conversation
@@ -26,13 +27,16 @@ router = APIRouter()
 # Schemas
 # ============================================================================
 
+
 class ConversationCreateRequest(BaseModel):
     """Request to create a conversation"""
+
     metadata: Optional[Dict[str, Any]] = None
 
 
 class ConversationResponse(BaseModel):
     """Conversation response"""
+
     id: str
     object: str = "conversation"
     items: List[Dict[str, Any]]
@@ -43,6 +47,7 @@ class ConversationResponse(BaseModel):
 
 class ConversationListResponse(BaseModel):
     """List of conversations"""
+
     object: str = "list"
     data: List[ConversationResponse]
     has_more: bool = False
@@ -52,6 +57,7 @@ class ConversationListResponse(BaseModel):
 
 class ConversationItemsRequest(BaseModel):
     """Request to add items to conversation"""
+
     items: List[Dict[str, Any]]
 
 
@@ -59,18 +65,19 @@ class ConversationItemsRequest(BaseModel):
 # Endpoints
 # ============================================================================
 
+
 @router.post(
     "/conversations",
     response_model=ConversationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create Conversation",
     description="Create a new conversation for multi-turn interactions.",
-    tags=["Conversations API"]
+    tags=["Conversations API"],
 )
 async def create_conversation(
     request: ConversationCreateRequest,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> ConversationResponse:
     """Create a new conversation.
 
@@ -98,7 +105,7 @@ async def create_conversation(
             user_id=user.id,
             api_key_id=api_key.id,
             items=[],
-            conversation_metadata=request.metadata
+            conversation_metadata=request.metadata,
         )
 
         db.add(conversation)
@@ -114,7 +121,7 @@ async def create_conversation(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create conversation: {str(e)}"
+            detail=f"Failed to create conversation: {str(e)}",
         )
 
 
@@ -124,13 +131,13 @@ async def create_conversation(
     status_code=status.HTTP_200_OK,
     summary="List Conversations",
     description="List all conversations for the authenticated user.",
-    tags=["Conversations API"]
+    tags=["Conversations API"],
 )
 async def list_conversations(
     limit: int = Query(default=20, ge=1, le=100),
     after: Optional[str] = Query(default=None),
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> ConversationListResponse:
     """List conversations.
 
@@ -147,9 +154,12 @@ async def list_conversations(
         user = api_key_context.get("user")
 
         # Build query
-        stmt = select(Conversation).where(
-            Conversation.user_id == user.id
-        ).order_by(Conversation.created_at.desc()).limit(limit + 1)
+        stmt = (
+            select(Conversation)
+            .where(Conversation.user_id == user.id)
+            .order_by(Conversation.created_at.desc())
+            .limit(limit + 1)
+        )
 
         # Apply cursor if provided
         if after:
@@ -171,14 +181,14 @@ async def list_conversations(
             data=data,
             has_more=has_more,
             first_id=data[0].id if data else None,
-            last_id=data[-1].id if data else None
+            last_id=data[-1].id if data else None,
         )
 
     except Exception as e:
         logger.error(f"Error listing conversations: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list conversations: {str(e)}"
+            detail=f"Failed to list conversations: {str(e)}",
         )
 
 
@@ -188,12 +198,12 @@ async def list_conversations(
     status_code=status.HTTP_200_OK,
     summary="Get Conversation",
     description="Get a conversation by ID.",
-    tags=["Conversations API"]
+    tags=["Conversations API"],
 )
 async def get_conversation(
     conversation_id: str,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> ConversationResponse:
     """Get a conversation by ID.
 
@@ -212,8 +222,7 @@ async def get_conversation(
         user = api_key_context.get("user")
 
         stmt = select(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user.id
+            Conversation.id == conversation_id, Conversation.user_id == user.id
         )
         result = await db.execute(stmt)
         conversation = result.scalar_one_or_none()
@@ -221,7 +230,7 @@ async def get_conversation(
         if not conversation:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Conversation {conversation_id} not found"
+                detail=f"Conversation {conversation_id} not found",
             )
 
         return ConversationResponse(**conversation.to_dict())
@@ -232,7 +241,7 @@ async def get_conversation(
         logger.error(f"Error getting conversation: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get conversation: {str(e)}"
+            detail=f"Failed to get conversation: {str(e)}",
         )
 
 
@@ -241,12 +250,12 @@ async def get_conversation(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Conversation",
     description="Delete a conversation by ID.",
-    tags=["Conversations API"]
+    tags=["Conversations API"],
 )
 async def delete_conversation(
     conversation_id: str,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete a conversation.
 
@@ -262,8 +271,7 @@ async def delete_conversation(
         user = api_key_context.get("user")
 
         stmt = delete(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user.id
+            Conversation.id == conversation_id, Conversation.user_id == user.id
         )
         result = await db.execute(stmt)
         await db.commit()
@@ -271,7 +279,7 @@ async def delete_conversation(
         if result.rowcount == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Conversation {conversation_id} not found"
+                detail=f"Conversation {conversation_id} not found",
             )
 
         logger.info(f"Deleted conversation {conversation_id}")
@@ -283,7 +291,7 @@ async def delete_conversation(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete conversation: {str(e)}"
+            detail=f"Failed to delete conversation: {str(e)}",
         )
 
 
@@ -293,13 +301,13 @@ async def delete_conversation(
     status_code=status.HTTP_200_OK,
     summary="Add Items to Conversation",
     description="Add items to a conversation.",
-    tags=["Conversations API"]
+    tags=["Conversations API"],
 )
 async def add_conversation_items(
     conversation_id: str,
     request: ConversationItemsRequest,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> ConversationResponse:
     """Add items to a conversation.
 
@@ -319,8 +327,7 @@ async def add_conversation_items(
         user = api_key_context.get("user")
 
         stmt = select(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user.id
+            Conversation.id == conversation_id, Conversation.user_id == user.id
         )
         result = await db.execute(stmt)
         conversation = result.scalar_one_or_none()
@@ -328,7 +335,7 @@ async def add_conversation_items(
         if not conversation:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Conversation {conversation_id} not found"
+                detail=f"Conversation {conversation_id} not found",
             )
 
         # Add items
@@ -336,7 +343,9 @@ async def add_conversation_items(
         await db.commit()
         await db.refresh(conversation)
 
-        logger.info(f"Added {len(request.items)} items to conversation {conversation_id}")
+        logger.info(
+            f"Added {len(request.items)} items to conversation {conversation_id}"
+        )
 
         return ConversationResponse(**conversation.to_dict())
 
@@ -347,7 +356,7 @@ async def add_conversation_items(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add items: {str(e)}"
+            detail=f"Failed to add items: {str(e)}",
         )
 
 
@@ -357,12 +366,12 @@ async def add_conversation_items(
     status_code=status.HTTP_200_OK,
     summary="List Conversation Items",
     description="Get all items from a conversation.",
-    tags=["Conversations API"]
+    tags=["Conversations API"],
 )
 async def list_conversation_items(
     conversation_id: str,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get all items from a conversation.
 
@@ -381,8 +390,7 @@ async def list_conversation_items(
         user = api_key_context.get("user")
 
         stmt = select(Conversation).where(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user.id
+            Conversation.id == conversation_id, Conversation.user_id == user.id
         )
         result = await db.execute(stmt)
         conversation = result.scalar_one_or_none()
@@ -390,7 +398,7 @@ async def list_conversation_items(
         if not conversation:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Conversation {conversation_id} not found"
+                detail=f"Conversation {conversation_id} not found",
             )
 
         return conversation.items or []
@@ -401,5 +409,5 @@ async def list_conversation_items(
         logger.error(f"Error listing conversation items: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list items: {str(e)}"
+            detail=f"Failed to list items: {str(e)}",
         )

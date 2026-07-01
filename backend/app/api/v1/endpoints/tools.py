@@ -1,26 +1,28 @@
 """
 Tool management and execution API endpoints
 """
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
 from app.core.security import get_current_user
-from app.services.tool_management_service import ToolManagementService
-from app.services.tool_execution_service import ToolExecutionService
+from app.db.database import get_db
 from app.schemas.tool import (
-    ToolCreate,
-    ToolUpdate,
-    ToolResponse,
-    ToolListResponse,
-    ToolExecutionCreate,
-    ToolExecutionResponse,
-    ToolExecutionListResponse,
     ToolCategoryCreate,
     ToolCategoryResponse,
+    ToolCreate,
+    ToolExecutionCreate,
+    ToolExecutionListResponse,
+    ToolExecutionResponse,
+    ToolListResponse,
+    ToolResponse,
     ToolStatisticsResponse,
+    ToolUpdate,
 )
+from app.services.tool_execution_service import ToolExecutionService
+from app.services.tool_management_service import ToolManagementService
 
 router = APIRouter()
 
@@ -117,9 +119,7 @@ async def get_tool(
 
     # Resolve underlying User object if available
     user_obj = (
-        current_user.get("user_obj")
-        if isinstance(current_user, dict)
-        else current_user
+        current_user.get("user_obj") if isinstance(current_user, dict) else current_user
     )
 
     # Check if user can access this tool
@@ -277,9 +277,7 @@ async def get_execution(
     )
 
     # Get execution through list with filter to ensure permission check
-    executions = await service.get_tool_executions(
-        user_id=user_id, skip=0, limit=1
-    )
+    executions = await service.get_tool_executions(user_id=user_id, skip=0, limit=1)
 
     execution = next((e for e in executions if e.id == execution_id), None)
     if not execution:
@@ -333,9 +331,7 @@ async def create_category(
 ):
     """Create a new tool category (admin only)"""
     user_obj = (
-        current_user.get("user_obj")
-        if isinstance(current_user, dict)
-        else current_user
+        current_user.get("user_obj") if isinstance(current_user, dict) else current_user
     )
 
     if not user_obj or not user_obj.has_permission("manage_tools"):

@@ -2,29 +2,31 @@
 Plugin Database Isolation Infrastructure
 Provides isolated database schemas and secure database access for plugins
 """
+
 import asyncio
-import hashlib
 import concurrent.futures
+import hashlib
+import os
+import tempfile
 import time
-from typing import Dict, Any, List, Optional, AsyncGenerator
-from sqlalchemy import create_engine, text, MetaData, inspect
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.exc import SQLAlchemyError, ProgrammingError
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+from sqlalchemy import MetaData, create_engine, inspect, text
+from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import Session, sessionmaker
+
 from alembic import command
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-import tempfile
-import os
-from pathlib import Path
-
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.models.plugin import Plugin, PluginConfiguration
 from app.db.database import get_db
-from app.utils.exceptions import PluginError, DatabaseError
-
+from app.models.plugin import Plugin, PluginConfiguration
+from app.utils.exceptions import DatabaseError, PluginError
 
 logger = get_logger("plugin.database")
 
@@ -126,8 +128,8 @@ class PluginDatabaseManager:
     async def _create_schema_if_not_exists(self, schema_name: str):
         """Create database schema if it doesn't exist"""
         # Use synchronous database connection
-        from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.DATABASE_URL)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -160,8 +162,8 @@ class PluginDatabaseManager:
 
     async def _drop_schema(self, schema_name: str):
         """Drop database schema and all its contents"""
-        from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.DATABASE_URL)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -311,11 +313,13 @@ class PluginDatabaseManager:
                 pgpass_file = None
 
                 if parsed.password:
-                    import tempfile
                     import stat
+                    import tempfile
 
                     # Create temporary .pgpass file with secure permissions
-                    pgpass_fd, pgpass_path = tempfile.mkstemp(prefix='.pgpass_', suffix='')
+                    pgpass_fd, pgpass_path = tempfile.mkstemp(
+                        prefix=".pgpass_", suffix=""
+                    )
                     pgpass_file = Path(pgpass_path)
 
                     try:
@@ -457,11 +461,13 @@ class PluginDatabaseManager:
                     pgpass_file = None
 
                     if parsed.password:
-                        import tempfile
                         import stat
+                        import tempfile
 
                         # Create temporary .pgpass file with secure permissions
-                        pgpass_fd, pgpass_path = tempfile.mkstemp(prefix='.pgpass_', suffix='')
+                        pgpass_fd, pgpass_path = tempfile.mkstemp(
+                            prefix=".pgpass_", suffix=""
+                        )
                         pgpass_file = Path(pgpass_path)
 
                         try:
@@ -612,8 +618,8 @@ class PluginDatabaseManager:
             schema_name = f"plugin_{plugin_id}"
 
             # Use synchronous database connection for stats
-            from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
 
             engine = create_engine(settings.DATABASE_URL)
             SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -622,27 +628,23 @@ class PluginDatabaseManager:
             try:
                 # Get table count
                 result = db.execute(
-                    text(
-                        """
+                    text("""
                         SELECT COUNT(*) as table_count 
                         FROM information_schema.tables 
                         WHERE table_schema = :schema_name
-                    """
-                    ),
+                    """),
                     {"schema_name": schema_name},
                 )
                 table_count = result.fetchone()[0]
 
                 # Get schema size (PostgreSQL specific)
                 result = db.execute(
-                    text(
-                        """
+                    text("""
                         SELECT COALESCE(SUM(pg_total_relation_size(c.oid)), 0) as total_size
                         FROM pg_class c
                         JOIN pg_namespace n ON n.oid = c.relnamespace
                         WHERE n.nspname = :schema_name
-                    """
-                    ),
+                    """),
                     {"schema_name": schema_name},
                 )
 

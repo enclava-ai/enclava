@@ -2,7 +2,24 @@
  * Validation utilities with TypeScript support
  */
 
-import type { ValidationRule, ValidationRules, ValidationResult } from '@/types/chatbot'
+export interface ValidationRule<T = any> {
+  required?: boolean
+  minLength?: number
+  maxLength?: number
+  min?: number
+  max?: number
+  pattern?: RegExp
+  custom?: (value: T) => string | null
+}
+
+export type ValidationRules<T extends Record<string, any>> = {
+  [K in keyof T]?: ValidationRule<T[K]>
+}
+
+export interface ValidationResult {
+  isValid: boolean
+  errors: Record<string, string>
+}
 
 /**
  * Validates a single field against its rules
@@ -109,9 +126,9 @@ export function validateObject<T extends Record<string, any>>(
 }
 
 /**
- * Common validation rules for chatbot fields
+ * Common validation rules for agent fields
  */
-export const chatbotValidationRules = {
+export const agentValidationRules = {
   name: {
     required: true,
     minLength: 1,

@@ -7,25 +7,26 @@ Provides pre-configured AI agents with custom tool sets and prompts.
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-
-from fastapi import APIRouter, HTTPException, Depends, Query
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
 
+from app.core.config import settings
 from app.core.logging import get_logger
-from app.services.llm.service import llm_service
-from app.services.llm.models import ChatRequest, ChatMessage
-from app.services.base_module import BaseModule, Permission
-from app.models.user import User
-from app.models.agent_config import AgentConfig
-from app.models.agent_conversation import AgentConversation, AgentMessage
 from app.core.security import get_current_user
 from app.db.database import get_db, utc_now
-from app.services.api_key_auth import get_api_key_context, get_api_key_auth
+from app.models.agent_config import AgentConfig
+from app.models.agent_conversation import AgentConversation, AgentMessage
 from app.models.api_key import APIKey
+from app.models.user import User
+from app.services.api_key_auth import get_api_key_auth, get_api_key_context
+from app.services.base_module import BaseModule, Permission
+from app.services.llm.models import ChatMessage, ChatRequest
+from app.services.llm.service import llm_service
 from app.services.usage_recording import UsageRecordingService
 
 # Import protocols for type hints and dependency injection
@@ -48,8 +49,10 @@ def _get_user_id(user: Union[User, Dict[str, Any]]) -> int:
 # Pydantic Schemas
 # ============================================================================
 
+
 class AgentConfigCreate(BaseModel):
     """Schema for creating an agent config."""
+
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     system_prompt: str = Field(..., min_length=1)
@@ -69,6 +72,7 @@ class AgentConfigCreate(BaseModel):
 
 class AgentConfigUpdate(BaseModel):
     """Schema for updating an agent config."""
+
     name: Optional[str] = None
     description: Optional[str] = None
     system_prompt: Optional[str] = None
@@ -89,6 +93,7 @@ class AgentConfigUpdate(BaseModel):
 # Legacy request/response models (for internal process_request compatibility)
 class AgentChatRequest(BaseModel):
     """Request to chat with an agent (legacy format)."""
+
     agent_config_id: int
     message: str
     conversation_id: Optional[str] = None
@@ -96,6 +101,7 @@ class AgentChatRequest(BaseModel):
 
 class AgentChatResponse(BaseModel):
     """Response from chatting with an agent (legacy format)."""
+
     content: Optional[str]
     conversation_id: str
     tool_calls_made: List[Dict[str, Any]] = Field(default_factory=list)
@@ -105,6 +111,7 @@ class AgentChatResponse(BaseModel):
 # OpenAI-compatible models
 class ToolCall(BaseModel):
     """OpenAI-compatible tool call."""
+
     id: str = Field(..., description="Tool call identifier")
     type: str = Field(default="function", description="Tool call type")
     function: Dict[str, Any] = Field(..., description="Function call details")
@@ -112,14 +119,20 @@ class ToolCall(BaseModel):
 
 class ChatMessage(BaseModel):
     """OpenAI-compatible chat message."""
+
     role: str = Field(..., description="Message role (system, user, assistant)")
     content: Optional[str] = Field(None, description="Message content")
-    tool_calls: Optional[List[ToolCall]] = Field(None, description="Tool calls made by assistant")
-    tool_call_id: Optional[str] = Field(None, description="Tool call ID for tool responses")
+    tool_calls: Optional[List[ToolCall]] = Field(
+        None, description="Tool calls made by assistant"
+    )
+    tool_call_id: Optional[str] = Field(
+        None, description="Tool call ID for tool responses"
+    )
 
 
 class AgentChatCompletionRequest(BaseModel):
     """OpenAI-compatible chat completion request for agents."""
+
     messages: List[ChatMessage] = Field(..., description="List of messages")
     max_tokens: Optional[int] = Field(None, description="Maximum tokens to generate")
     temperature: Optional[float] = Field(None, description="Temperature for sampling")
@@ -132,6 +145,7 @@ class AgentChatCompletionRequest(BaseModel):
 
 class ChatChoice(BaseModel):
     """OpenAI-compatible chat choice."""
+
     index: int
     message: ChatMessage
     finish_reason: str
@@ -139,6 +153,7 @@ class ChatChoice(BaseModel):
 
 class ChatUsage(BaseModel):
     """OpenAI-compatible usage info."""
+
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
@@ -146,6 +161,7 @@ class ChatUsage(BaseModel):
 
 class AgentChatCompletionResponse(BaseModel):
     """OpenAI-compatible chat completion response."""
+
     id: str
     object: str = "chat.completion"
     created: int
@@ -157,6 +173,7 @@ class AgentChatCompletionResponse(BaseModel):
 # ============================================================================
 # Agent Module Implementation
 # ============================================================================
+
 
 class AgentModule(BaseModule):
     """Main agent module implementation"""
@@ -177,8 +194,10 @@ class AgentModule(BaseModule):
         """Initialize the agent module"""
         await super().initialize(**kwargs)
 
-        # Initialize the LLM service
-        await llm_service.initialize()
+        if settings.TESTING or settings.LLM_TEST_MODE:
+            logger.info("Skipping external LLM provider initialization in test mode")
+        else:
+            await llm_service.initialize()
 
         # Get RAG module dependency if not already injected
         if not self.rag_module:
@@ -197,6 +216,8 @@ class AgentModule(BaseModule):
         logger.info("Agent module initialized")
         logger.info(f"LLM service available: {llm_service._initialized}")
         logger.info(f"RAG module available: {self.rag_module is not None}")
+        self.initialized = True
+        return True
 
     async def cleanup(self):
         """Cleanup agent module resources"""
@@ -244,7 +265,7 @@ class AgentModule(BaseModule):
         self,
         config_id: int,
         current_user: Union[User, Dict[str, Any]],
-        db: AsyncSession
+        db: AsyncSession,
     ) -> AgentConfig:
         """Load agent config by ID with access control."""
         user_id = _get_user_id(current_user)
@@ -252,26 +273,21 @@ class AgentModule(BaseModule):
         stmt = select(AgentConfig).where(
             AgentConfig.id == config_id,
             or_(
-                AgentConfig.created_by_user_id == user_id,
-                AgentConfig.is_public == True
-            )
+                AgentConfig.created_by_user_id == user_id, AgentConfig.is_public == True
+            ),
         )
         result = await db.execute(stmt)
         config = result.scalar_one_or_none()
 
         if not config:
             raise HTTPException(
-                status_code=404,
-                detail="Agent config not found or access denied"
+                status_code=404, detail="Agent config not found or access denied"
             )
 
         return config
 
     async def load_conversation_history(
-        self,
-        conversation_id: str,
-        user_id: int,
-        db: AsyncSession
+        self, conversation_id: str, user_id: int, db: AsyncSession
     ) -> List[ChatMessage]:
         """Load conversation history from AgentMessage table.
 
@@ -280,7 +296,7 @@ class AgentModule(BaseModule):
         # Find conversation with ownership verification
         conv_stmt = select(AgentConversation).where(
             AgentConversation.id == conversation_id,
-            AgentConversation.user_id == str(user_id)
+            AgentConversation.user_id == str(user_id),
         )
         conv_result = await db.execute(conv_stmt)
         conversation = conv_result.scalar_one_or_none()
@@ -289,9 +305,11 @@ class AgentModule(BaseModule):
             return []
 
         # Load messages by timestamp
-        msg_stmt = select(AgentMessage).where(
-            AgentMessage.conversation_id == conversation.id
-        ).order_by(AgentMessage.timestamp)
+        msg_stmt = (
+            select(AgentMessage)
+            .where(AgentMessage.conversation_id == conversation.id)
+            .order_by(AgentMessage.timestamp)
+        )
         msg_result = await db.execute(msg_stmt)
         messages = msg_result.scalars().all()
 
@@ -301,7 +319,7 @@ class AgentModule(BaseModule):
                 role=msg.role,
                 content=msg.content,
                 tool_calls=msg.tool_calls,
-                tool_call_id=msg.tool_call_id
+                tool_call_id=msg.tool_call_id,
             )
             for msg in messages
         ]
@@ -311,7 +329,7 @@ class AgentModule(BaseModule):
         conversation_id: Optional[str],
         agent_config_id: int,
         user_id: int,
-        db: AsyncSession
+        db: AsyncSession,
     ) -> AgentConversation:
         """Get existing conversation or create new one.
 
@@ -321,7 +339,7 @@ class AgentModule(BaseModule):
             stmt = select(AgentConversation).where(
                 AgentConversation.id == conversation_id,
                 AgentConversation.user_id == str(user_id),
-                AgentConversation.agent_config_id == agent_config_id
+                AgentConversation.agent_config_id == agent_config_id,
             )
             result = await db.execute(stmt)
             conv = result.scalar_one_or_none()
@@ -335,7 +353,7 @@ class AgentModule(BaseModule):
             user_id=str(user_id),
             title="Agent Chat",
             created_at=utc_now(),
-            updated_at=utc_now()
+            updated_at=utc_now(),
         )
         db.add(new_conv)
         await db.commit()
@@ -348,7 +366,7 @@ class AgentModule(BaseModule):
         role: str,
         content: Optional[str],
         tool_calls: Optional[List[Dict[str, Any]]],
-        db: AsyncSession
+        db: AsyncSession,
     ) -> AgentMessage:
         """Save a message to the conversation."""
         msg = AgentMessage(
@@ -357,7 +375,7 @@ class AgentModule(BaseModule):
             role=role,
             content=content,
             tool_calls=tool_calls,
-            timestamp=utc_now()
+            timestamp=utc_now(),
         )
         db.add(msg)
         await db.commit()
@@ -369,10 +387,7 @@ class AgentModule(BaseModule):
     # ========================================================================
 
     async def create_agent_config(
-        self,
-        request: AgentConfigCreate,
-        user_id: int,
-        db: AsyncSession
+        self, request: AgentConfigCreate, user_id: int, db: AsyncSession
     ) -> Dict[str, Any]:
         """Create a new agent configuration."""
         # Build tools_config from individual fields
@@ -381,7 +396,7 @@ class AgentModule(BaseModule):
             "mcp_servers": request.mcp_servers,
             "include_custom_tools": request.include_custom_tools,
             "tool_choice": request.tool_choice,
-            "max_iterations": request.max_iterations
+            "max_iterations": request.max_iterations,
         }
 
         agent = AgentConfig(
@@ -399,7 +414,7 @@ class AgentModule(BaseModule):
             is_template=False,
             created_by_user_id=user_id,
             created_at=utc_now(),
-            updated_at=utc_now()
+            updated_at=utc_now(),
         )
 
         db.add(agent)
@@ -413,14 +428,13 @@ class AgentModule(BaseModule):
         user_id: int,
         category: Optional[str],
         is_public: Optional[bool],
-        db: AsyncSession
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """List agent configurations accessible to the user."""
         # Build query
         stmt = select(AgentConfig).where(
             or_(
-                AgentConfig.created_by_user_id == user_id,
-                AgentConfig.is_public == True
+                AgentConfig.created_by_user_id == user_id, AgentConfig.is_public == True
             )
         )
 
@@ -434,40 +448,46 @@ class AgentModule(BaseModule):
         result = await db.execute(stmt)
         configs = result.scalars().all()
 
-        return {
-            "configs": [cfg.to_dict() for cfg in configs],
-            "count": len(configs)
-        }
+        return {"configs": [cfg.to_dict() for cfg in configs], "count": len(configs)}
 
     async def update_agent_config(
-        self,
-        config_id: int,
-        request: AgentConfigUpdate,
-        user_id: int,
-        db: AsyncSession
+        self, config_id: int, request: AgentConfigUpdate, user_id: int, db: AsyncSession
     ) -> Dict[str, Any]:
         """Update an agent configuration."""
         # Get config and verify ownership
         stmt = select(AgentConfig).where(
-            AgentConfig.id == config_id,
-            AgentConfig.created_by_user_id == user_id
+            AgentConfig.id == config_id, AgentConfig.created_by_user_id == user_id
         )
         result = await db.execute(stmt)
         config = result.scalar_one_or_none()
 
         if not config:
             raise HTTPException(
-                status_code=404,
-                detail="Agent config not found or cannot be modified"
+                status_code=404, detail="Agent config not found or cannot be modified"
             )
 
         # Update fields
         update_data = request.dict(exclude_unset=True)
 
         # Handle tools_config fields
-        if any(k in update_data for k in ['builtin_tools', 'mcp_servers', 'include_custom_tools', 'tool_choice', 'max_iterations']):
+        if any(
+            k in update_data
+            for k in [
+                "builtin_tools",
+                "mcp_servers",
+                "include_custom_tools",
+                "tool_choice",
+                "max_iterations",
+            ]
+        ):
             tools_config = config.tools_config.copy()
-            for key in ['builtin_tools', 'mcp_servers', 'include_custom_tools', 'tool_choice', 'max_iterations']:
+            for key in [
+                "builtin_tools",
+                "mcp_servers",
+                "include_custom_tools",
+                "tool_choice",
+                "max_iterations",
+            ]:
                 if key in update_data:
                     tools_config[key] = update_data.pop(key)
             config.tools_config = tools_config
@@ -484,24 +504,19 @@ class AgentModule(BaseModule):
         return config.to_dict()
 
     async def delete_agent_config(
-        self,
-        config_id: int,
-        user_id: int,
-        db: AsyncSession
+        self, config_id: int, user_id: int, db: AsyncSession
     ) -> Dict[str, str]:
         """Delete an agent configuration."""
         # Get config and verify ownership
         stmt = select(AgentConfig).where(
-            AgentConfig.id == config_id,
-            AgentConfig.created_by_user_id == user_id
+            AgentConfig.id == config_id, AgentConfig.created_by_user_id == user_id
         )
         result = await db.execute(stmt)
         config = result.scalar_one_or_none()
 
         if not config:
             raise HTTPException(
-                status_code=404,
-                detail="Agent config not found or cannot be deleted"
+                status_code=404, detail="Agent config not found or cannot be deleted"
             )
 
         db.delete(config)  # delete() is synchronous in SQLAlchemy
@@ -518,13 +533,15 @@ class AgentModule(BaseModule):
         request: AgentChatRequest,
         current_user: Union[User, Dict[str, Any]],
         db: AsyncSession,
-        api_key_context: Optional[Dict[str, Any]] = None
+        api_key_context: Optional[Dict[str, Any]] = None,
     ) -> AgentChatResponse:
         """Chat with a pre-configured agent."""
         user_id = _get_user_id(current_user)
 
         # Load agent config
-        agent = await self.get_agent_config_by_id(request.agent_config_id, current_user, db)
+        agent = await self.get_agent_config_by_id(
+            request.agent_config_id, current_user, db
+        )
 
         # Check API key access restrictions if using API key authentication
         if api_key_context:
@@ -532,7 +549,7 @@ class AgentModule(BaseModule):
             if api_key and not api_key.can_access_agent(request.agent_config_id):
                 raise HTTPException(
                     status_code=403,
-                    detail="API key not authorized to access this agent"
+                    detail="API key not authorized to access this agent",
                 )
 
         # Get or create conversation
@@ -542,11 +559,7 @@ class AgentModule(BaseModule):
 
         # Save user message
         await self.save_agent_message(
-            conversation.id,
-            "user",
-            request.message,
-            None,
-            db
+            conversation.id, "user", request.message, None, db
         )
 
         # Load conversation history
@@ -569,14 +582,16 @@ class AgentModule(BaseModule):
         for tool_name in agent.tools_config.get("builtin_tools", []):
             tool = BuiltinToolRegistry.get(tool_name)
             if tool:
-                tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.parameters_schema
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": tool.parameters_schema,
+                        },
                     }
-                })
+                )
 
         # 2. Add MCP server tools
         mcp_servers = agent.tools_config.get("mcp_servers", [])
@@ -594,12 +609,15 @@ class AgentModule(BaseModule):
                             "function": {
                                 "name": f"{server_name}.{mcp_tool['function']['name']}",
                                 "description": enhanced_desc,
-                                "parameters": mcp_tool["function"].get("parameters", {
-                                    "type": "object",
-                                    "properties": {},
-                                    "required": []
-                                })
-                            }
+                                "parameters": mcp_tool["function"].get(
+                                    "parameters",
+                                    {
+                                        "type": "object",
+                                        "properties": {},
+                                        "required": [],
+                                    },
+                                ),
+                            },
                         }
                         tools.append(tool_copy)
 
@@ -610,8 +628,8 @@ class AgentModule(BaseModule):
             custom_tools = await tool_calling_service._get_available_tools_for_user(
                 current_user, include_builtin=False
             )
-            custom_tools_formatted = await tool_calling_service._convert_tools_to_openai_format(
-                custom_tools
+            custom_tools_formatted = (
+                await tool_calling_service._convert_tools_to_openai_format(custom_tools)
             )
             tools.extend(custom_tools_formatted)
 
@@ -620,11 +638,13 @@ class AgentModule(BaseModule):
             model=agent.model,
             messages=messages,
             tools=tools if tools else None,
-            tool_choice=agent.tools_config.get("tool_choice", "auto") if tools else None,
+            tool_choice=(
+                agent.tools_config.get("tool_choice", "auto") if tools else None
+            ),
             temperature=agent.temperature,  # Already 0.0-2.0 range
             max_tokens=agent.max_tokens,
             user_id=str(user_id),
-            api_key_id=None  # None = Internal/Playground usage (JWT auth)
+            api_key_id=None,  # None = Internal/Playground usage (JWT auth)
         )
 
         # Execute via ToolCallingService
@@ -633,7 +653,7 @@ class AgentModule(BaseModule):
             request=chat_request,
             user=current_user,
             max_tool_calls=agent.tools_config.get("max_iterations", 5),
-            tool_resources=agent.tool_resources
+            tool_resources=agent.tool_resources,
         )
 
         # Extract assistant message
@@ -643,20 +663,12 @@ class AgentModule(BaseModule):
         tool_calls_data = None
         if assistant_msg.tool_calls:
             tool_calls_data = [
-                {
-                    "id": tc.id,
-                    "type": tc.type,
-                    "function": tc.function
-                }
+                {"id": tc.id, "type": tc.type, "function": tc.function}
                 for tc in assistant_msg.tool_calls
             ]
 
         await self.save_agent_message(
-            conversation.id,
-            "assistant",
-            assistant_msg.content,
-            tool_calls_data,
-            db
+            conversation.id, "assistant", assistant_msg.content, tool_calls_data, db
         )
 
         # Update agent usage
@@ -672,11 +684,7 @@ class AgentModule(BaseModule):
         response_tool_calls = None
         if assistant_msg.tool_calls:
             response_tool_calls = [
-                ToolCall(
-                    id=tc.id,
-                    type=tc.type,
-                    function=tc.function
-                )
+                ToolCall(id=tc.id, type=tc.type, function=tc.function)
                 for tc in assistant_msg.tool_calls
             ]
 
@@ -694,16 +702,16 @@ class AgentModule(BaseModule):
                     message=ChatMessage(
                         role="assistant",
                         content=assistant_msg.content,
-                        tool_calls=response_tool_calls
+                        tool_calls=response_tool_calls,
                     ),
-                    finish_reason=finish_reason
+                    finish_reason=finish_reason,
                 )
             ],
             usage=ChatUsage(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                total_tokens=prompt_tokens + completion_tokens
-            )
+                total_tokens=prompt_tokens + completion_tokens,
+            ),
         )
 
     async def chat_completion_openai(
@@ -711,7 +719,7 @@ class AgentModule(BaseModule):
         agent_id: int,
         request: AgentChatCompletionRequest,
         api_key: APIKey,
-        db: AsyncSession
+        db: AsyncSession,
     ) -> AgentChatCompletionResponse:
         """OpenAI-compatible chat completion for agents with API key auth."""
         start_time = time.time()
@@ -721,8 +729,7 @@ class AgentModule(BaseModule):
         # Check if API key can access this agent
         if not api_key.can_access_agent(agent_id):
             raise HTTPException(
-                status_code=403,
-                detail="API key not authorized to access this agent"
+                status_code=403, detail="API key not authorized to access this agent"
             )
 
         # Create user context from API key
@@ -735,14 +742,14 @@ class AgentModule(BaseModule):
         user_messages = [msg for msg in request.messages if msg.role == "user"]
         if not user_messages:
             raise HTTPException(
-                status_code=400,
-                detail="No user message found in conversation"
+                status_code=400, detail="No user message found in conversation"
             )
 
         last_user_message = user_messages[-1].content
 
         # Get or create conversation using a hash of messages
         import hashlib
+
         conv_hash = hashlib.md5(
             str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()
         ).hexdigest()[:16]
@@ -753,11 +760,7 @@ class AgentModule(BaseModule):
 
         # Save user message
         await self.save_agent_message(
-            conversation.id,
-            "user",
-            last_user_message,
-            None,
-            db
+            conversation.id, "user", last_user_message, None, db
         )
 
         # Build messages for LLM - use request messages as history
@@ -781,21 +784,25 @@ class AgentModule(BaseModule):
         for tool_name in agent.tools_config.get("builtin_tools", []):
             tool = BuiltinToolRegistry.get(tool_name)
             if tool:
-                tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.parameters_schema
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": tool.parameters_schema,
+                        },
                     }
-                })
+                )
 
         # 2. Add MCP server tools
         mcp_servers = agent.tools_config.get("mcp_servers", [])
         if mcp_servers:
             mcp_service = MCPServerService(db)
             for server_name in mcp_servers:
-                server = await mcp_service.get_server_by_name(server_name, api_key.user_id)
+                server = await mcp_service.get_server_by_name(
+                    server_name, api_key.user_id
+                )
                 if server and server.is_active and server.cached_tools:
                     for mcp_tool in server.cached_tools:
                         # Enhance MCP tool description with server context
@@ -806,12 +813,15 @@ class AgentModule(BaseModule):
                             "function": {
                                 "name": f"{server_name}.{mcp_tool['function']['name']}",
                                 "description": enhanced_desc,
-                                "parameters": mcp_tool["function"].get("parameters", {
-                                    "type": "object",
-                                    "properties": {},
-                                    "required": []
-                                })
-                            }
+                                "parameters": mcp_tool["function"].get(
+                                    "parameters",
+                                    {
+                                        "type": "object",
+                                        "properties": {},
+                                        "required": [],
+                                    },
+                                ),
+                            },
                         }
                         tools.append(tool_copy)
 
@@ -822,31 +832,43 @@ class AgentModule(BaseModule):
             custom_tools = await tool_calling_service._get_available_tools_for_user(
                 user_context, include_builtin=False
             )
-            custom_tools_formatted = await tool_calling_service._convert_tools_to_openai_format(
-                custom_tools
+            custom_tools_formatted = (
+                await tool_calling_service._convert_tools_to_openai_format(custom_tools)
             )
             tools.extend(custom_tools_formatted)
 
         # Apply request overrides
-        temperature = request.temperature if request.temperature is not None else agent.temperature
-        max_tokens = request.max_tokens if request.max_tokens is not None else agent.max_tokens
+        temperature = (
+            request.temperature
+            if request.temperature is not None
+            else agent.temperature
+        )
+        max_tokens = (
+            request.max_tokens if request.max_tokens is not None else agent.max_tokens
+        )
 
         # Determine which provider will handle this model BEFORE making the request
         expected_provider = await llm_service.get_provider_for_model(agent.model)
 
         # Create chat request
-        from app.services.llm.models import ChatRequest as LLMChatRequest, ChatMessage as LLMChatMessage
-        llm_messages = [LLMChatMessage(role=m.role, content=m.content) for m in messages]
+        from app.services.llm.models import ChatMessage as LLMChatMessage
+        from app.services.llm.models import ChatRequest as LLMChatRequest
+
+        llm_messages = [
+            LLMChatMessage(role=m.role, content=m.content) for m in messages
+        ]
 
         chat_request = LLMChatRequest(
             model=agent.model,
             messages=llm_messages,
             tools=tools if tools else None,
-            tool_choice=agent.tools_config.get("tool_choice", "auto") if tools else None,
+            tool_choice=(
+                agent.tools_config.get("tool_choice", "auto") if tools else None
+            ),
             temperature=temperature,
             max_tokens=max_tokens,
             user_id=str(api_key.user_id),
-            api_key_id=api_key.id
+            api_key_id=api_key.id,
         )
 
         # Execute via ToolCallingService
@@ -855,7 +877,7 @@ class AgentModule(BaseModule):
             request=chat_request,
             user=user_context,
             max_tool_calls=agent.tools_config.get("max_iterations", 5),
-            tool_resources=agent.tool_resources
+            tool_resources=agent.tool_resources,
         )
 
         # Extract assistant message
@@ -865,20 +887,12 @@ class AgentModule(BaseModule):
         tool_calls_data = None
         if assistant_msg.tool_calls:
             tool_calls_data = [
-                {
-                    "id": tc.id,
-                    "type": tc.type,
-                    "function": tc.function
-                }
+                {"id": tc.id, "type": tc.type, "function": tc.function}
                 for tc in assistant_msg.tool_calls
             ]
 
         await self.save_agent_message(
-            conversation.id,
-            "assistant",
-            assistant_msg.content,
-            tool_calls_data,
-            db
+            conversation.id, "assistant", assistant_msg.content, tool_calls_data, db
         )
 
         # Update agent usage
@@ -912,18 +926,16 @@ class AgentModule(BaseModule):
         )
 
         # Update API key usage
-        api_key.update_usage(tokens_used=prompt_tokens + completion_tokens, cost_cents=0)
+        api_key.update_usage(
+            tokens_used=prompt_tokens + completion_tokens, cost_cents=0
+        )
         await db.commit()
 
         # Build tool_calls for response if present
         response_tool_calls = None
         if assistant_msg.tool_calls:
             response_tool_calls = [
-                ToolCall(
-                    id=tc.id,
-                    type=tc.type,
-                    function=tc.function
-                )
+                ToolCall(id=tc.id, type=tc.type, function=tc.function)
                 for tc in assistant_msg.tool_calls
             ]
 
@@ -941,16 +953,16 @@ class AgentModule(BaseModule):
                     message=ChatMessage(
                         role="assistant",
                         content=assistant_msg.content,
-                        tool_calls=response_tool_calls
+                        tool_calls=response_tool_calls,
                     ),
-                    finish_reason=finish_reason
+                    finish_reason=finish_reason,
                 )
             ],
             usage=ChatUsage(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                total_tokens=prompt_tokens + completion_tokens
-            )
+                total_tokens=prompt_tokens + completion_tokens,
+            ),
         )
 
     # ========================================================================
@@ -1016,7 +1028,7 @@ class AgentModule(BaseModule):
         # OpenAI-compatible chat completions endpoint (external API with API key auth)
         @router.post(
             "/{agent_id}/v1/chat/completions",
-            response_model=AgentChatCompletionResponse
+            response_model=AgentChatCompletionResponse,
         )
         async def agent_chat_completions(
             agent_id: int,
@@ -1029,8 +1041,7 @@ class AgentModule(BaseModule):
 
         # Internal chat endpoint (JWT auth for frontend)
         @router.post(
-            "/{agent_id}/chat/completions",
-            response_model=AgentChatCompletionResponse
+            "/{agent_id}/chat/completions", response_model=AgentChatCompletionResponse
         )
         async def agent_chat_completions_internal(
             agent_id: int,
@@ -1049,8 +1060,7 @@ class AgentModule(BaseModule):
             user_messages = [msg for msg in request.messages if msg.role == "user"]
             if not user_messages:
                 raise HTTPException(
-                    status_code=400,
-                    detail="No user message found in conversation"
+                    status_code=400, detail="No user message found in conversation"
                 )
 
             last_user_message = user_messages[-1].content
@@ -1064,11 +1074,12 @@ class AgentModule(BaseModule):
                 if api_key and not api_key.can_access_agent(agent_id):
                     raise HTTPException(
                         status_code=403,
-                        detail="API key not authorized to access this agent"
+                        detail="API key not authorized to access this agent",
                     )
 
             # Get or create conversation using a hash of messages
             import hashlib
+
             conv_hash = hashlib.md5(
                 str([f"{msg.role}:{msg.content}" for msg in request.messages]).encode()
             ).hexdigest()[:16]
@@ -1079,11 +1090,7 @@ class AgentModule(BaseModule):
 
             # Save user message
             await self.save_agent_message(
-                conversation.id,
-                "user",
-                last_user_message,
-                None,
-                db
+                conversation.id, "user", last_user_message, None, db
             )
 
             # Build messages for LLM
@@ -1105,14 +1112,16 @@ class AgentModule(BaseModule):
             for tool_name in agent.tools_config.get("builtin_tools", []):
                 tool = BuiltinToolRegistry.get(tool_name)
                 if tool:
-                    tools.append({
-                        "type": "function",
-                        "function": {
-                            "name": tool.name,
-                            "description": tool.description,
-                            "parameters": tool.parameters_schema
+                    tools.append(
+                        {
+                            "type": "function",
+                            "function": {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "parameters": tool.parameters_schema,
+                            },
                         }
-                    })
+                    )
 
             mcp_servers = agent.tools_config.get("mcp_servers", [])
             if mcp_servers:
@@ -1129,12 +1138,15 @@ class AgentModule(BaseModule):
                                 "function": {
                                     "name": f"{server_name}.{mcp_tool['function']['name']}",
                                     "description": enhanced_desc,
-                                    "parameters": mcp_tool["function"].get("parameters", {
-                                        "type": "object",
-                                        "properties": {},
-                                        "required": []
-                                    })
-                                }
+                                    "parameters": mcp_tool["function"].get(
+                                        "parameters",
+                                        {
+                                            "type": "object",
+                                            "properties": {},
+                                            "required": [],
+                                        },
+                                    ),
+                                },
                             }
                             tools.append(tool_copy)
 
@@ -1144,31 +1156,47 @@ class AgentModule(BaseModule):
                 custom_tools = await tool_calling_service._get_available_tools_for_user(
                     current_user, include_builtin=False
                 )
-                custom_tools_formatted = await tool_calling_service._convert_tools_to_openai_format(
-                    custom_tools
+                custom_tools_formatted = (
+                    await tool_calling_service._convert_tools_to_openai_format(
+                        custom_tools
+                    )
                 )
                 tools.extend(custom_tools_formatted)
 
             # Apply request overrides
-            temperature = request.temperature if request.temperature is not None else agent.temperature
-            max_tokens = request.max_tokens if request.max_tokens is not None else agent.max_tokens
+            temperature = (
+                request.temperature
+                if request.temperature is not None
+                else agent.temperature
+            )
+            max_tokens = (
+                request.max_tokens
+                if request.max_tokens is not None
+                else agent.max_tokens
+            )
 
             # Determine which provider will handle this model BEFORE making the request
             expected_provider = await llm_service.get_provider_for_model(agent.model)
 
             # Create chat request
-            from app.services.llm.models import ChatRequest as LLMChatRequest, ChatMessage as LLMChatMessage
-            llm_messages = [LLMChatMessage(role=m.role, content=m.content) for m in messages]
+            from app.services.llm.models import ChatMessage as LLMChatMessage
+            from app.services.llm.models import ChatRequest as LLMChatRequest
+
+            llm_messages = [
+                LLMChatMessage(role=m.role, content=m.content) for m in messages
+            ]
 
             chat_request = LLMChatRequest(
                 model=agent.model,
                 messages=llm_messages,
                 tools=tools if tools else None,
-                tool_choice=agent.tools_config.get("tool_choice", "auto") if tools else None,
+                tool_choice=(
+                    agent.tools_config.get("tool_choice", "auto") if tools else None
+                ),
                 temperature=temperature,
                 max_tokens=max_tokens,
                 user_id=str(user_id),
-                api_key_id=None  # None = Internal/Playground usage (JWT auth)
+                api_key_id=None,  # None = Internal/Playground usage (JWT auth)
             )
 
             # Execute via ToolCallingService
@@ -1177,7 +1205,7 @@ class AgentModule(BaseModule):
                 request=chat_request,
                 user=current_user,
                 max_tool_calls=agent.tools_config.get("max_iterations", 5),
-                tool_resources=agent.tool_resources
+                tool_resources=agent.tool_resources,
             )
 
             # Extract assistant message
@@ -1187,20 +1215,12 @@ class AgentModule(BaseModule):
             tool_calls_data = None
             if assistant_msg.tool_calls:
                 tool_calls_data = [
-                    {
-                        "id": tc.id,
-                        "type": tc.type,
-                        "function": tc.function
-                    }
+                    {"id": tc.id, "type": tc.type, "function": tc.function}
                     for tc in assistant_msg.tool_calls
                 ]
 
             await self.save_agent_message(
-                conversation.id,
-                "assistant",
-                assistant_msg.content,
-                tool_calls_data,
-                db
+                conversation.id, "assistant", assistant_msg.content, tool_calls_data, db
             )
 
             # Update agent usage
@@ -1209,7 +1229,9 @@ class AgentModule(BaseModule):
 
             # Get token counts
             prompt_tokens = response.usage.prompt_tokens if response.usage else 0
-            completion_tokens = response.usage.completion_tokens if response.usage else 0
+            completion_tokens = (
+                response.usage.completion_tokens if response.usage else 0
+            )
             latency_ms = int((time.time() - start_time) * 1000)
             # Use actual provider from response, fallback to expected provider
             actual_provider = getattr(response, "provider", None) or expected_provider
@@ -1234,7 +1256,11 @@ class AgentModule(BaseModule):
                 method="POST",
                 agent_config_id=agent_id,
                 is_streaming=False,
-                is_tool_calling=bool(assistant_msg.tool_calls) if assistant_msg.tool_calls else False,
+                is_tool_calling=(
+                    bool(assistant_msg.tool_calls)
+                    if assistant_msg.tool_calls
+                    else False
+                ),
                 message_count=len(request.messages),
                 latency_ms=latency_ms,
                 status="success",
@@ -1250,17 +1276,16 @@ class AgentModule(BaseModule):
                     ChatChoice(
                         index=0,
                         message=ChatMessage(
-                            role="assistant",
-                            content=assistant_msg.content or ""
+                            role="assistant", content=assistant_msg.content or ""
                         ),
-                        finish_reason="stop"
+                        finish_reason="stop",
                     )
                 ],
                 usage=ChatUsage(
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
-                    total_tokens=prompt_tokens + completion_tokens
-                )
+                    total_tokens=prompt_tokens + completion_tokens,
+                ),
             )
 
         return router
@@ -1269,6 +1294,7 @@ class AgentModule(BaseModule):
 # ============================================================================
 # Module Factory
 # ============================================================================
+
 
 def create_module(rag_service: Optional[RAGServiceProtocol] = None) -> AgentModule:
     """Factory function to create agent module instance"""

@@ -3,18 +3,20 @@ Response model for storing Responses API interactions
 """
 
 from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    Boolean,
-    DateTime,
-    JSON,
-    ForeignKey,
-    Index,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
 
 
@@ -45,10 +47,7 @@ class Response(Base):
 
     # Status
     status = Column(
-        String(20),
-        nullable=False,
-        default="completed",
-        index=True
+        String(20), nullable=False, default="completed", index=True
     )  # completed, failed, cancelled, incomplete
     error = Column(JSON, nullable=True)  # Error details if failed
 
@@ -62,7 +61,9 @@ class Response(Base):
     total_tokens = Column(Integer, nullable=False, default=0)
 
     # Storage configuration
-    store = Column(Boolean, nullable=False, default=True)  # Whether content was persisted
+    store = Column(
+        Boolean, nullable=False, default=True
+    )  # Whether content was persisted
 
     # Response metadata (named to avoid conflict with SQLAlchemy's reserved 'metadata')
     response_metadata = Column(JSON, nullable=True)
@@ -72,7 +73,9 @@ class Response(Base):
 
     # TTL and archival
     expires_at = Column(DateTime, nullable=True, index=True)  # TTL expiration
-    archived_at = Column(DateTime, nullable=True, index=True)  # NULL = active, set = archived
+    archived_at = Column(
+        DateTime, nullable=True, index=True
+    )  # NULL = active, set = archived
 
     # Relationships
     user = relationship("User", back_populates="responses", foreign_keys=[user_id])
@@ -82,16 +85,36 @@ class Response(Base):
     __table_args__ = (
         # Primary lookups
         Index("idx_responses_id", "id"),
-        Index("idx_responses_conversation_id", "conversation_id", postgresql_where=(conversation_id.isnot(None))),
-        Index("idx_responses_previous_response_id", "previous_response_id", postgresql_where=(previous_response_id.isnot(None))),
-
+        Index(
+            "idx_responses_conversation_id",
+            "conversation_id",
+            postgresql_where=(conversation_id.isnot(None)),
+        ),
+        Index(
+            "idx_responses_previous_response_id",
+            "previous_response_id",
+            postgresql_where=(previous_response_id.isnot(None)),
+        ),
         # Ownership lookups
-        Index("idx_responses_api_key_id", "api_key_id", postgresql_where=(api_key_id.isnot(None))),
-        Index("idx_responses_user_id", "user_id", postgresql_where=(user_id.isnot(None))),
-
+        Index(
+            "idx_responses_api_key_id",
+            "api_key_id",
+            postgresql_where=(api_key_id.isnot(None)),
+        ),
+        Index(
+            "idx_responses_user_id", "user_id", postgresql_where=(user_id.isnot(None))
+        ),
         # Archival/cleanup queries
-        Index("idx_responses_expires_at", "expires_at", postgresql_where=((expires_at.isnot(None)) & (archived_at.is_(None)))),
-        Index("idx_responses_archived_at", "archived_at", postgresql_where=(archived_at.isnot(None))),
+        Index(
+            "idx_responses_expires_at",
+            "expires_at",
+            postgresql_where=((expires_at.isnot(None)) & (archived_at.is_(None))),
+        ),
+        Index(
+            "idx_responses_archived_at",
+            "archived_at",
+            postgresql_where=(archived_at.isnot(None)),
+        ),
         Index("idx_responses_created_at", "created_at"),
         Index("idx_responses_status", "status"),
     )
@@ -115,7 +138,9 @@ class Response(Base):
                 "output_tokens": self.output_tokens,
                 "total_tokens": self.total_tokens,
             },
-            "conversation": {"id": self.conversation_id} if self.conversation_id else None,
+            "conversation": (
+                {"id": self.conversation_id} if self.conversation_id else None
+            ),
             "previous_response_id": self.previous_response_id,
             "metadata": self.response_metadata,
         }

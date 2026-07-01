@@ -3,17 +3,18 @@ Platform API routes for core platform operations
 Includes permissions, users, API keys, budgets, audit, etc.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from app.services.permission_manager import (
-    permission_registry,
-    Permission,
-    PermissionScope,
-)
 from app.core.logging import get_logger
 from app.core.security import get_current_user
+from app.services.permission_manager import (
+    Permission,
+    PermissionScope,
+    permission_registry,
+)
 
 logger = get_logger(__name__)
 

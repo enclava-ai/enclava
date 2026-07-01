@@ -2,22 +2,24 @@
 Plugin Sandbox Environment
 Provides secure execution environment for plugins with resource limits and monitoring
 """
-import os
-import sys
+
+import asyncio
 import importlib
 import importlib.util
+import os
 import resource
+import sys
 import threading
 import time
-import psutil
-import asyncio
-from typing import Dict, Any, Optional, List, Set
-from pathlib import Path
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+
+import psutil
 
 from app.core.logging import get_logger
-from app.utils.exceptions import SecurityError, PluginError
+from app.utils.exceptions import PluginError, SecurityError
 
 
 @dataclass
@@ -175,46 +177,87 @@ class PluginASTSecurityValidator:
 
     # Dangerous function names to detect
     DANGEROUS_FUNCTIONS = {
-        "eval", "exec", "compile", "__import__",
+        "eval",
+        "exec",
+        "compile",
+        "__import__",
         "open",  # Only block in certain contexts
         "input",  # Can hang plugins
     }
 
     # Dangerous attribute names
     DANGEROUS_ATTRIBUTES = {
-        "__builtins__", "__globals__", "__code__", "__closure__",
-        "__subclasses__", "__mro__", "__bases__", "__class__",
-        "__dict__", "__getattribute__", "__setattr__", "__delattr__",
-        "func_globals", "func_code",
+        "__builtins__",
+        "__globals__",
+        "__code__",
+        "__closure__",
+        "__subclasses__",
+        "__mro__",
+        "__bases__",
+        "__class__",
+        "__dict__",
+        "__getattribute__",
+        "__setattr__",
+        "__delattr__",
+        "func_globals",
+        "func_code",
     }
 
     # Dangerous module.function patterns (module, function)
     DANGEROUS_MODULE_CALLS = {
-        ("os", "system"), ("os", "popen"), ("os", "spawn"),
-        ("os", "spawnl"), ("os", "spawnle"), ("os", "spawnlp"),
-        ("os", "spawnlpe"), ("os", "spawnv"), ("os", "spawnve"),
-        ("os", "spawnvp"), ("os", "spawnvpe"), ("os", "fork"),
-        ("os", "forkpty"), ("os", "execl"), ("os", "execle"),
-        ("os", "execlp"), ("os", "execlpe"), ("os", "execv"),
-        ("os", "execve"), ("os", "execvp"), ("os", "execvpe"),
-        ("os", "remove"), ("os", "unlink"), ("os", "rmdir"),
-        ("subprocess", "run"), ("subprocess", "call"),
-        ("subprocess", "check_call"), ("subprocess", "check_output"),
-        ("subprocess", "Popen"), ("subprocess", "getoutput"),
+        ("os", "system"),
+        ("os", "popen"),
+        ("os", "spawn"),
+        ("os", "spawnl"),
+        ("os", "spawnle"),
+        ("os", "spawnlp"),
+        ("os", "spawnlpe"),
+        ("os", "spawnv"),
+        ("os", "spawnve"),
+        ("os", "spawnvp"),
+        ("os", "spawnvpe"),
+        ("os", "fork"),
+        ("os", "forkpty"),
+        ("os", "execl"),
+        ("os", "execle"),
+        ("os", "execlp"),
+        ("os", "execlpe"),
+        ("os", "execv"),
+        ("os", "execve"),
+        ("os", "execvp"),
+        ("os", "execvpe"),
+        ("os", "remove"),
+        ("os", "unlink"),
+        ("os", "rmdir"),
+        ("subprocess", "run"),
+        ("subprocess", "call"),
+        ("subprocess", "check_call"),
+        ("subprocess", "check_output"),
+        ("subprocess", "Popen"),
+        ("subprocess", "getoutput"),
         ("subprocess", "getstatusoutput"),
-        ("shutil", "rmtree"), ("shutil", "move"),
-        ("importlib", "import_module"), ("importlib", "__import__"),
-        ("ctypes", "CDLL"), ("ctypes", "cdll"),
-        ("socket", "socket"), ("socket", "create_connection"),
+        ("shutil", "rmtree"),
+        ("shutil", "move"),
+        ("importlib", "import_module"),
+        ("importlib", "__import__"),
+        ("ctypes", "CDLL"),
+        ("ctypes", "cdll"),
+        ("socket", "socket"),
+        ("socket", "create_connection"),
         ("multiprocessing", "Process"),
         ("threading", "Thread"),
-        ("gc", "get_objects"), ("gc", "get_referrers"),
+        ("gc", "get_objects"),
+        ("gc", "get_referrers"),
     }
 
     # Dangerous imports (module names)
     DANGEROUS_IMPORTS = {
-        "subprocess", "ctypes", "multiprocessing",
-        "socket", "mmap", "resource",
+        "subprocess",
+        "ctypes",
+        "multiprocessing",
+        "socket",
+        "mmap",
+        "resource",
     }
 
     def __init__(self):
@@ -263,9 +306,7 @@ class PluginASTSecurityValidator:
         # Direct function call: eval(), exec(), etc.
         if isinstance(func, ast.Name):
             if func.id in self.DANGEROUS_FUNCTIONS:
-                self.violations.append(
-                    f"Dangerous function call: {func.id}()"
-                )
+                self.violations.append(f"Dangerous function call: {func.id}()")
 
         # Attribute call: os.system(), subprocess.run(), etc.
         elif isinstance(func, ast.Attribute):
@@ -290,7 +331,10 @@ class PluginASTSecurityValidator:
             if len(node.args) >= 2:
                 second_arg = node.args[1]
                 if isinstance(second_arg, ast.Constant):
-                    if second_arg.value in self.DANGEROUS_FUNCTIONS | self.DANGEROUS_ATTRIBUTES:
+                    if (
+                        second_arg.value
+                        in self.DANGEROUS_FUNCTIONS | self.DANGEROUS_ATTRIBUTES
+                    ):
                         self.violations.append(
                             f"getattr() used to access dangerous name: {second_arg.value}"
                         )
@@ -298,30 +342,26 @@ class PluginASTSecurityValidator:
     def _check_attribute(self, node):
         """Check attribute access for dangerous patterns."""
         if node.attr in self.DANGEROUS_ATTRIBUTES:
-            self.violations.append(
-                f"Access to dangerous attribute: {node.attr}"
-            )
+            self.violations.append(f"Access to dangerous attribute: {node.attr}")
 
     def _check_import(self, node):
         """Check import statements."""
         for alias in node.names:
             module = alias.name.split(".")[0]
             if module in self.DANGEROUS_IMPORTS:
-                self.violations.append(
-                    f"Import of dangerous module: {module}"
-                )
+                self.violations.append(f"Import of dangerous module: {module}")
 
     def _check_import_from(self, node):
         """Check from...import statements."""
         if node.module:
             module = node.module.split(".")[0]
             if module in self.DANGEROUS_IMPORTS:
-                self.violations.append(
-                    f"Import from dangerous module: {module}"
-                )
+                self.violations.append(f"Import from dangerous module: {module}")
 
             # Check for platform internals
-            if node.module.startswith(("app.db", "app.models", "app.core", "app.services")):
+            if node.module.startswith(
+                ("app.db", "app.models", "app.core", "app.services")
+            ):
                 self.violations.append(
                     f"Import from protected platform module: {node.module}"
                 )
@@ -446,9 +486,11 @@ class PluginResourceMonitor:
 
             return {
                 "memory_mb": round(current_memory_mb, 2),
-                "memory_limit_mb": "unlimited"
-                if self.limits.max_memory_mb <= 0
-                else self.limits.max_memory_mb,
+                "memory_limit_mb": (
+                    "unlimited"
+                    if self.limits.max_memory_mb <= 0
+                    else self.limits.max_memory_mb
+                ),
                 "cpu_percent": round(cpu_percent, 2),
                 "cpu_limit_percent": self.limits.max_cpu_percent,
                 "execution_time_seconds": round(execution_time, 2),
@@ -688,9 +730,11 @@ class EnhancedPluginLoader:
         if sandbox_limits is None:
             # Use manifest limits if available
             sandbox_limits = SandboxLimits(
-                allowed_domains=manifest.spec.external_services.allowed_domains
-                if manifest.spec.external_services
-                else []
+                allowed_domains=(
+                    manifest.spec.external_services.allowed_domains
+                    if manifest.spec.external_services
+                    else []
+                )
             )
 
         sandbox = PluginSandbox(plugin_id, plugin_dir, sandbox_limits)

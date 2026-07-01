@@ -4,19 +4,20 @@ Unit tests for PrivateMode provider tool calling support.
 Tests Phase 0: Provider Tool Support
 """
 
-import pytest
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.llm.providers.privatemode import PrivateModeProvider
+import pytest
+
+from app.services.llm.config import ProviderConfig, ResilienceConfig
 from app.services.llm.models import (
-    ChatRequest,
     ChatMessage,
+    ChatRequest,
     ChatResponse,
     ToolCall,
 )
-from app.services.llm.config import ProviderConfig, ResilienceConfig
+from app.services.llm.providers.privatemode import PrivateModeProvider
 
 
 @pytest.fixture
@@ -51,12 +52,10 @@ async def test_create_completion_with_tools_in_request(provider):
                 "description": "Get weather for a location",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "location": {"type": "string"}
-                    },
-                    "required": ["location"]
-                }
-            }
+                    "properties": {"location": {"type": "string"}},
+                    "required": ["location"],
+                },
+            },
         }
     ]
 
@@ -92,7 +91,7 @@ async def test_create_completion_with_tools_in_request(provider):
         },
     }
 
-    with patch.object(provider, '_get_session') as mock_get_session:
+    with patch.object(provider, "_get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -111,12 +110,12 @@ async def test_create_completion_with_tools_in_request(provider):
 
         # Verify tools and tool_choice were sent in payload
         call_args = mock_session.post.call_args
-        payload = call_args.kwargs['json']
+        payload = call_args.kwargs["json"]
 
-        assert 'tools' in payload
-        assert payload['tools'] == tools
-        assert 'tool_choice' in payload
-        assert payload['tool_choice'] == "auto"
+        assert "tools" in payload
+        assert payload["tools"] == tools
+        assert "tool_choice" in payload
+        assert payload["tool_choice"] == "auto"
 
 
 @pytest.mark.asyncio
@@ -147,10 +146,10 @@ async def test_parse_response_with_tool_calls(provider):
                             "type": "function",
                             "function": {
                                 "name": "get_weather",
-                                "arguments": json.dumps({"location": "London"})
-                            }
+                                "arguments": json.dumps({"location": "London"}),
+                            },
                         }
-                    ]
+                    ],
                 },
                 "finish_reason": "tool_calls",
             }
@@ -162,7 +161,7 @@ async def test_parse_response_with_tool_calls(provider):
         },
     }
 
-    with patch.object(provider, '_get_session') as mock_get_session:
+    with patch.object(provider, "_get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -228,7 +227,7 @@ async def test_parse_response_no_tool_calls(provider):
         },
     }
 
-    with patch.object(provider, '_get_session') as mock_get_session:
+    with patch.object(provider, "_get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -268,9 +267,12 @@ async def test_tool_message_serialization(provider):
                     ToolCall(
                         id="call_123",
                         type="function",
-                        function={"name": "get_weather", "arguments": json.dumps({"location": "London"})}
+                        function={
+                            "name": "get_weather",
+                            "arguments": json.dumps({"location": "London"}),
+                        },
                     )
-                ]
+                ],
             ),
             ChatMessage(
                 role="tool",
@@ -304,7 +306,7 @@ async def test_tool_message_serialization(provider):
         },
     }
 
-    with patch.object(provider, '_get_session') as mock_get_session:
+    with patch.object(provider, "_get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -323,25 +325,25 @@ async def test_tool_message_serialization(provider):
 
         # Verify message serialization
         call_args = mock_session.post.call_args
-        payload = call_args.kwargs['json']
-        messages = payload['messages']
+        payload = call_args.kwargs["json"]
+        messages = payload["messages"]
 
         # First message: user
-        assert messages[0]['role'] == 'user'
-        assert messages[0]['content'] == 'Get weather'
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Get weather"
 
         # Second message: assistant with tool_calls
-        assert messages[1]['role'] == 'assistant'
-        assert messages[1]['content'] is None
-        assert 'tool_calls' in messages[1]
-        assert len(messages[1]['tool_calls']) == 1
-        assert messages[1]['tool_calls'][0]['id'] == 'call_123'
+        assert messages[1]["role"] == "assistant"
+        assert messages[1]["content"] is None
+        assert "tool_calls" in messages[1]
+        assert len(messages[1]["tool_calls"]) == 1
+        assert messages[1]["tool_calls"][0]["id"] == "call_123"
 
         # Third message: tool response
-        assert messages[2]['role'] == 'tool'
-        assert messages[2]['content'] == 'Weather: Sunny, 20°C'
-        assert 'tool_call_id' in messages[2]
-        assert messages[2]['tool_call_id'] == 'call_123'
+        assert messages[2]["role"] == "tool"
+        assert messages[2]["content"] == "Weather: Sunny, 20°C"
+        assert "tool_call_id" in messages[2]
+        assert messages[2]["tool_call_id"] == "call_123"
 
 
 @pytest.mark.asyncio
@@ -353,8 +355,8 @@ async def test_streaming_with_tool_calls(provider):
             "function": {
                 "name": "get_weather",
                 "description": "Get weather",
-                "parameters": {"type": "object", "properties": {}}
-            }
+                "parameters": {"type": "object", "properties": {}},
+            },
         }
     ]
 
@@ -372,10 +374,10 @@ async def test_streaming_with_tool_calls(provider):
     mock_chunks = [
         'data: {"choices":[{"delta":{"role":"assistant"}}]}\n',
         'data: {"choices":[{"delta":{"content":"Let"}}]}\n',
-        'data: [DONE]\n',
+        "data: [DONE]\n",
     ]
 
-    with patch.object(provider, '_get_session') as mock_get_session:
+    with patch.object(provider, "_get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -383,7 +385,7 @@ async def test_streaming_with_tool_calls(provider):
         # Create async generator for content
         async def mock_content():
             for chunk in mock_chunks:
-                yield chunk.encode('utf-8')
+                yield chunk.encode("utf-8")
 
         mock_response.content = mock_content()
 
@@ -402,13 +404,13 @@ async def test_streaming_with_tool_calls(provider):
 
         # Verify tools were sent in payload
         call_args = mock_session.post.call_args
-        payload = call_args.kwargs['json']
+        payload = call_args.kwargs["json"]
 
-        assert 'tools' in payload
-        assert payload['tools'] == tools
-        assert 'tool_choice' in payload
-        assert payload['tool_choice'] == "auto"
-        assert payload['stream'] is True
+        assert "tools" in payload
+        assert payload["tools"] == tools
+        assert "tool_choice" in payload
+        assert payload["tool_choice"] == "auto"
+        assert payload["stream"] is True
 
 
 @pytest.mark.asyncio
@@ -436,12 +438,9 @@ async def test_finish_reason_tool_calls(provider):
                         {
                             "id": "call_456",
                             "type": "function",
-                            "function": {
-                                "name": "test_func",
-                                "arguments": "{}"
-                            }
+                            "function": {"name": "test_func", "arguments": "{}"},
                         }
-                    ]
+                    ],
                 },
                 "finish_reason": "tool_calls",
             }
@@ -453,7 +452,7 @@ async def test_finish_reason_tool_calls(provider):
         },
     }
 
-    with patch.object(provider, '_get_session') as mock_get_session:
+    with patch.object(provider, "_get_session") as mock_get_session:
         mock_session = AsyncMock()
         mock_response = AsyncMock()
         mock_response.status = 200

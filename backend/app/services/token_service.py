@@ -11,14 +11,14 @@ Provides:
 - Token family tracking to detect token reuse attacks
 """
 
-import logging
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
-from app.core.config import settings
 from app.core.cache import core_cache
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,9 @@ class TokenService:
         }
         await core_cache.set(family_key, family_data, ttl=self.token_ttl, prefix="auth")
 
-        logger.debug(f"Created refresh token entry for user {user_id}, family {family_id}")
+        logger.debug(
+            f"Created refresh token entry for user {user_id}, family {family_id}"
+        )
         return family_id
 
     async def validate_refresh_token(
@@ -142,7 +144,10 @@ class TokenService:
             )
             # Revoke entire token family
             await self.revoke_token_family(family_id)
-            return {"valid": False, "error": "Token reuse detected. All sessions revoked."}
+            return {
+                "valid": False,
+                "error": "Token reuse detected. All sessions revoked.",
+            }
 
         return {"valid": True, "family_id": family_id}
 

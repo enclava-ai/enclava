@@ -3,6 +3,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from app.core.config import settings
 from app.core.logging import log_module_event
 from app.db.database import async_session_factory
 from app.services.base_module import BaseModule, Permission
@@ -37,8 +38,10 @@ class ExtractModule(BaseModule):
         """
         log_module_event("extract", "initializing", {"version": self.version})
 
-        # Initialize the LLM service (same as agent and chatbot modules)
-        await llm_service.initialize()
+        if settings.TESTING or settings.LLM_TEST_MODE:
+            logger.info("Skipping external LLM provider initialization in test mode")
+        else:
+            await llm_service.initialize()
 
         # Seed default templates
         async with async_session_factory() as db:
@@ -47,6 +50,8 @@ class ExtractModule(BaseModule):
         logger.info("Extract initialized")
         logger.info(f"LLM service available: {llm_service._initialized}")
         log_module_event("extract", "initialized", {"success": True})
+        self.initialized = True
+        return True
 
     async def cleanup(self):
         """Cleanup module resources on application shutdown."""
@@ -73,7 +78,7 @@ class ExtractModule(BaseModule):
         }
 
 
-# ModuleManager discovery hook (pattern used by agent/chatbot)
+# ModuleManager discovery hook
 extract_module = ExtractModule()
 
 

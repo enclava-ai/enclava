@@ -25,18 +25,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.connector_source import (
     ConnectorSource,
+    ConnectorStatus,
     ConnectorSyncJob,
     ConnectorSyncStatus,
-    ConnectorStatus,
 )
-from app.models.rag_document import RagDocument
 from app.models.rag_collection import RagCollection
+from app.models.rag_document import RagDocument
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Credential encryption helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_fernet() -> Fernet:
     """
@@ -58,9 +59,7 @@ def _get_fernet() -> Fernet:
         except Exception:
             # Treat it as a passphrase and derive the key
             pass
-        derived = base64.urlsafe_b64encode(
-            hashlib.sha256(raw_key.encode()).digest()
-        )
+        derived = base64.urlsafe_b64encode(hashlib.sha256(raw_key.encode()).digest())
         return Fernet(derived)
 
     jwt_secret = os.environ.get("JWT_SECRET", "")
@@ -73,15 +72,14 @@ def _get_fernet() -> Fernet:
         "CONNECTOR_CREDENTIALS_KEY not set — deriving encryption key from "
         "JWT_SECRET.  Set CONNECTOR_CREDENTIALS_KEY in production."
     )
-    derived = base64.urlsafe_b64encode(
-        hashlib.sha256(jwt_secret.encode()).digest()
-    )
+    derived = base64.urlsafe_b64encode(hashlib.sha256(jwt_secret.encode()).digest())
     return Fernet(derived)
 
 
 def encrypt_credentials(credentials: dict) -> str:
     """Encrypt a credentials dict to a base64 string for DB storage."""
     import json
+
     fernet = _get_fernet()
     plaintext = json.dumps(credentials).encode()
     return fernet.encrypt(plaintext).decode()
@@ -90,17 +88,21 @@ def encrypt_credentials(credentials: dict) -> str:
 def decrypt_credentials(encrypted: str) -> dict:
     """Decrypt credentials from the stored base64 string."""
     import json
+
     fernet = _get_fernet()
     try:
         plaintext = fernet.decrypt(encrypted.encode())
         return json.loads(plaintext)
     except InvalidToken as exc:
-        raise ValueError("Failed to decrypt connector credentials — key mismatch?") from exc
+        raise ValueError(
+            "Failed to decrypt connector credentials — key mismatch?"
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
 # Sync execution
 # ---------------------------------------------------------------------------
+
 
 class ConnectorSyncService:
     """
@@ -192,8 +194,7 @@ class ConnectorSyncService:
 
         # Decide full vs incremental
         is_incremental = (
-            connector.last_synced_at is not None
-            and connector.checkpoint is not None
+            connector.last_synced_at is not None and connector.checkpoint is not None
         )
 
         if is_incremental and connector.checkpoint:
@@ -279,8 +280,8 @@ class ConnectorSyncService:
 
         # Process document into chunks / embeddings, then store in the target
         # Qdrant collection.
-        from app.modules.rag.main import process_document as rag_process_document
         from app.modules.rag.main import index_processed_document as rag_index_document
+        from app.modules.rag.main import process_document as rag_process_document
 
         doc_metadata = {
             "title": doc.title,
@@ -332,6 +333,7 @@ class ConnectorSyncService:
 # Utility: index a connector document from the Qdrant collection directly
 # (used by the RAG module integration in _upsert_document above)
 # ---------------------------------------------------------------------------
+
 
 async def index_connector_document(
     content: str,

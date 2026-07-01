@@ -2,13 +2,15 @@
 Plugin Manifest Schema and Validation
 Defines the structure and validation for plugin manifest files
 """
-from typing import List, Dict, Any, Optional, Union
-from pydantic import BaseModel, Field, validator, HttpUrl
-from enum import Enum
-import yaml
+
 import hashlib
 import os
+from enum import Enum
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import yaml
+from pydantic import BaseModel, Field, HttpUrl, validator
 
 
 class PluginRuntimeSpec(BaseModel):
@@ -45,9 +47,9 @@ class PluginPermissions(BaseModel):
     @validator("platform_apis")
     def validate_platform_apis(cls, v):
         allowed_apis = [
-            "chatbot:invoke",
-            "chatbot:manage",
-            "chatbot:read",
+            "agent:invoke",
+            "agent:manage",
+            "agent:read",
             "rag:query",
             "rag:manage",
             "rag:read",
@@ -376,9 +378,9 @@ class PluginManifestValidator:
     def _is_platform_api_supported(cls, api: str) -> bool:
         """Check if platform API is supported"""
         supported_apis = [
-            "chatbot:invoke",
-            "chatbot:manage",
-            "chatbot:read",
+            "agent:invoke",
+            "agent:manage",
+            "agent:read",
             "rag:query",
             "rag:manage",
             "rag:read",
@@ -456,7 +458,7 @@ class PluginManifestValidator:
                     dependencies=["aiohttp>=3.8.0", "pydantic>=2.0.0"],
                 ),
                 permissions=PluginPermissions(
-                    platform_apis=["chatbot:invoke", "rag:query"],
+                    platform_apis=["agent:invoke", "rag:query"],
                     plugin_scopes=["read", "write"],
                 ),
                 database=PluginDatabaseSpec(

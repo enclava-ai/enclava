@@ -57,8 +57,8 @@ interface RecentActivity {
   type: 'info' | 'success' | 'warning' | 'error'
 }
 
-interface Chatbot {
-  id: string
+interface AgentSummary {
+  id: number
   name: string
   is_active: boolean
 }
@@ -78,12 +78,7 @@ function DashboardContent() {
   const [modules, setModules] = useState<ModuleInfo[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
-  const [chatbots, setChatbots] = useState<Chatbot[]>([])
-
-  // Get the public API URL from centralized config
-  const getPublicApiUrl = () => {
-    return config.getPublicApiUrl()
-  }
+  const [agents, setAgents] = useState<AgentSummary[]>([])
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -103,9 +98,9 @@ function DashboardContent() {
       
       // Fetch real dashboard stats through API proxy
       
-      const [modulesRes, chatbotsRes] = await Promise.all([
+      const [modulesRes, agentsRes] = await Promise.all([
         apiClient.get('/api-internal/v1/modules/').catch(() => null),
-        apiClient.get('/api-internal/v1/chatbot/instances').catch(() => null)
+        apiClient.get('/agent/configs').catch(() => null)
       ])
 
       // Set default stats since analytics endpoints removed
@@ -135,11 +130,10 @@ function DashboardContent() {
         setModules([])
       }
 
-      // Parse chatbots response
-      if (chatbotsRes && chatbotsRes.chatbots) {
-        setChatbots(chatbotsRes.chatbots.filter((bot: any) => bot.is_active))
+      if (agentsRes && agentsRes.configs) {
+        setAgents(agentsRes.configs.filter((agent: AgentSummary) => agent.is_active))
       } else {
-        setChatbots([])
+        setAgents([])
       }
 
       // No activity data since audit endpoint removed
@@ -320,54 +314,54 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        {/* Chatbot Endpoints */}
+        {/* Agent Endpoints */}
         <Card className="bg-empire-darker/50 border-empire-gold/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-empire-gold">
               <Bot className="h-5 w-5" />
-              Chatbot Endpoints
+              Agent Endpoints
             </CardTitle>
             <CardDescription className="text-empire-gold/60">
-              Active chatbot instances
+              Active agent configurations
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {chatbots.length === 0 ? (
+            {agents.length === 0 ? (
               <div className="space-y-3">
-                <p className="text-sm text-empire-gold/40">No active chatbots configured</p>
+                <p className="text-sm text-empire-gold/40">No active agents configured</p>
                 <Button
-                  onClick={() => window.open('/chatbot', '_blank')}
+                  onClick={() => window.open('/agents', '_blank')}
                   variant="outline"
                   size="sm"
                   className="w-full border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
                 >
                   <Plus className="h-3 w-3 mr-2" />
-                  Create Chatbot
+                  Create Agent
                 </Button>
               </div>
             ) : (
               <div className="space-y-3">
                 <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {chatbots.slice(0, 3).map(bot => (
-                    <div key={bot.id} className="flex items-center justify-between p-2 bg-empire-dark/30 rounded">
-                      <span className="text-xs text-empire-gold/70">{bot.name}</span>
+                  {agents.slice(0, 3).map(agent => (
+                    <div key={agent.id} className="flex items-center justify-between p-2 bg-empire-dark/30 rounded">
+                      <span className="text-xs text-empire-gold/70">{agent.name}</span>
                       <Badge variant="outline" className="border-green-500/20 text-green-400 text-xs">
                         Active
                       </Badge>
                     </div>
                   ))}
-                  {chatbots.length > 3 && (
-                    <p className="text-xs text-empire-gold/40">+{chatbots.length - 3} more</p>
+                  {agents.length > 3 && (
+                    <p className="text-xs text-empire-gold/40">+{agents.length - 3} more</p>
                   )}
                 </div>
                 <Button
-                  onClick={() => window.open('/chatbot', '_blank')}
+                  onClick={() => window.open('/agents', '_blank')}
                   variant="outline"
                   size="sm"
                   className="w-full border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
                 >
                   <Settings className="h-3 w-3 mr-2" />
-                  Manage Chatbots
+                  Manage Agents
                 </Button>
               </div>
             )}

@@ -2,14 +2,15 @@
 RAG Debug API endpoints for testing and debugging
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Dict, Any, Optional
 import logging
+from typing import Any, Dict, Optional
 
-from app.core.security import get_current_user
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from app.core.config import settings
-from app.modules.rag.main import RAGModule
+from app.core.security import get_current_user
 from app.models.user import User
+from app.modules.rag.main import RAGModule
 
 logger = logging.getLogger(__name__)
 

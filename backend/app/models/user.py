@@ -1,24 +1,35 @@
 """
 User model
 """
+
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List
-from enum import Enum
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    DateTime,
-    Boolean,
-    Text,
-    JSON,
-    ForeignKey,
-    Numeric,
-)
-from sqlalchemy.orm import relationship
-from sqlalchemy import inspect as sa_inspect
-from app.db.database import Base, utc_now
 from decimal import Decimal
+from enum import Enum
+from typing import List, Optional
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.orm import relationship, validates
+
+from app.db.database import Base, utc_now
+
+
+class UserRole(str, Enum):
+    """Legacy role enum retained for older tests/imports."""
+
+    USER = "user"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
 
 
 class User(Base):
@@ -66,8 +77,10 @@ class User(Base):
     # Relationships
     role = relationship("Role", back_populates="users")
     api_keys = relationship(
-        "APIKey", back_populates="user", cascade="all, delete-orphan",
-        foreign_keys="[APIKey.user_id]"
+        "APIKey",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="[APIKey.user_id]",
     )
     usage_tracking = relationship(
         "UsageTracking", back_populates="user", cascade="all, delete-orphan"
@@ -83,10 +96,16 @@ class User(Base):
         "Tool", back_populates="created_by", cascade="all, delete-orphan"
     )
     created_agent_configs = relationship(
-        "AgentConfig", back_populates="created_by", cascade="all, delete-orphan", foreign_keys="AgentConfig.created_by_user_id"
+        "AgentConfig",
+        back_populates="created_by",
+        cascade="all, delete-orphan",
+        foreign_keys="AgentConfig.created_by_user_id",
     )
     created_mcp_servers = relationship(
-        "MCPServer", back_populates="created_by", cascade="all, delete-orphan", foreign_keys="MCPServer.created_by_user_id"
+        "MCPServer",
+        back_populates="created_by",
+        cascade="all, delete-orphan",
+        foreign_keys="MCPServer.created_by_user_id",
     )
     tool_executions = relationship(
         "ToolExecution", back_populates="executed_by", cascade="all, delete-orphan"
@@ -107,8 +126,57 @@ class User(Base):
         "ExtractJob", back_populates="user", cascade="all, delete-orphan"
     )
 
+    def __init__(self, **kwargs):
+        password_hash = kwargs.pop("password_hash", None)
+        legacy_role = kwargs.get("role")
+        legacy_role_name = None
+        if isinstance(legacy_role, UserRole):
+            legacy_role_name = legacy_role.value
+        elif isinstance(legacy_role, str):
+            legacy_role_name = str(legacy_role)
+
+        if legacy_role_name is not None:
+            kwargs.pop("role")
+            if legacy_role_name in {"admin", "super_admin"}:
+                kwargs.setdefault("is_superuser", True)
+
+        super().__init__(**kwargs)
+
+        if password_hash is not None:
+            self.hashed_password = password_hash
+        if legacy_role_name is not None:
+            self._legacy_role_name = legacy_role_name
+        if isinstance(legacy_role, UserRole):
+            from app.models.role import Role
+
+            self.role = Role(
+                name=legacy_role_name,
+                display_name=legacy_role_name.replace("_", " ").title(),
+                level=legacy_role_name,
+                permissions={"granted": ["*"]} if self.is_superuser else {},
+                is_system_role=True,
+            )
+
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', username='{self.username}')>"
+
+    @validates("role")
+    def _validate_role_assignment(self, key, value):
+        if isinstance(value, (UserRole, str)):
+            from app.models.role import Role
+
+            role_name = getattr(value, "value", value)
+            self._legacy_role_name = role_name
+            if role_name in {"admin", "super_admin"}:
+                self.is_superuser = True
+            return Role(
+                name=role_name,
+                display_name=role_name.replace("_", " ").title(),
+                level=role_name,
+                permissions={"granted": ["*"]} if self.is_superuser else {},
+                is_system_role=True,
+            )
+        return value
 
     def to_dict(self):
         """Convert user to dictionary for API responses"""
@@ -128,13 +196,15 @@ class User(Base):
             "role": self.role.to_dict() if role_loaded and self.role else None,
             "custom_permissions": self.custom_permissions,
             "account_locked": self.account_locked,
-            "account_locked_until": self.account_locked_until.isoformat()
-            if self.account_locked_until
-            else None,
+            "account_locked_until": (
+                self.account_locked_until.isoformat()
+                if self.account_locked_until
+                else None
+            ),
             "failed_login_attempts": self.failed_login_attempts,
-            "last_failed_login": self.last_failed_login.isoformat()
-            if self.last_failed_login
-            else None,
+            "last_failed_login": (
+                self.last_failed_login.isoformat() if self.last_failed_login else None
+            ),
             "force_password_change": self.force_password_change,
             "avatar_url": self.avatar_url,
             "bio": self.bio,
@@ -184,7 +254,7 @@ class User(Base):
                 return True  # Basic users can access all modules
             # For read-only users, limit access
             elif self.role.level == "read_only":
-                return module_name in ["chatbot", "analytics"]  # Only certain modules
+                return module_name in ["agent", "analytics"]
 
         return False
 

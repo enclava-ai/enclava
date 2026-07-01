@@ -4,10 +4,11 @@ Provides direct, live statistics from Qdrant vector database
 This is the single source of truth for all RAG collection statistics
 """
 
-import httpx
 import logging
-from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+import httpx
 
 from app.core.config import settings
 

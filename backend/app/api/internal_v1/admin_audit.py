@@ -5,22 +5,22 @@ Internal API endpoints for querying billing audit logs.
 These endpoints require admin privileges.
 """
 
-from typing import List, Optional
 from datetime import datetime, timezone
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.core.security import RequiresRole
 from app.db.database import get_db
+from app.models.billing_audit_log import EntityType
 from app.schemas.audit import (
     AuditLogResponse,
     AuditLogSummary,
     AuditTrailResponse,
 )
 from app.services.billing_audit import BillingAuditService
-from app.models.billing_audit_log import EntityType
 
 logger = get_logger(__name__)
 
@@ -67,7 +67,9 @@ async def get_api_key_audit(
 
     Requires admin role.
     """
-    logger.info(f"Admin {current_user.get('id')} fetching audit for API key {api_key_id}")
+    logger.info(
+        f"Admin {current_user.get('id')} fetching audit for API key {api_key_id}"
+    )
 
     service = BillingAuditService(db)
     entries = await service.get_api_key_audit_trail(api_key_id, limit=limit)
@@ -154,7 +156,9 @@ async def get_pricing_audit(
 
     Requires admin role.
     """
-    logger.info(f"Admin {current_user.get('id')} fetching pricing audit for {provider}/{model}")
+    logger.info(
+        f"Admin {current_user.get('id')} fetching pricing audit for {provider}/{model}"
+    )
 
     service = BillingAuditService(db)
     entries = await service.get_pricing_audit_trail(provider, model, limit=limit)
@@ -171,27 +175,20 @@ async def get_pricing_audit(
 async def search_audit(
     entity_type: Optional[str] = Query(
         default=None,
-        description="Filter by entity type: api_key, budget, pricing, usage_record"
+        description="Filter by entity type: api_key, budget, pricing, usage_record",
     ),
-    action: Optional[str] = Query(
-        default=None,
-        description="Filter by action type"
-    ),
+    action: Optional[str] = Query(default=None, description="Filter by action type"),
     actor_user_id: Optional[int] = Query(
-        default=None,
-        description="Filter by actor user ID"
+        default=None, description="Filter by actor user ID"
     ),
     actor_type: Optional[str] = Query(
-        default=None,
-        description="Filter by actor type: user, system, api_sync"
+        default=None, description="Filter by actor type: user, system, api_sync"
     ),
     start_date: Optional[datetime] = Query(
-        default=None,
-        description="Filter by start date (inclusive)"
+        default=None, description="Filter by start date (inclusive)"
     ),
     end_date: Optional[datetime] = Query(
-        default=None,
-        description="Filter by end date (inclusive)"
+        default=None, description="Filter by end date (inclusive)"
     ),
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
@@ -223,7 +220,7 @@ async def search_audit(
         if entity_type not in valid_types:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid entity_type. Must be one of: {valid_types}"
+                detail=f"Invalid entity_type. Must be one of: {valid_types}",
             )
 
     service = BillingAuditService(db)
@@ -265,12 +262,10 @@ async def get_recent_audit(
 @router.get("/billing-audit/summary")
 async def get_audit_summary(
     start_date: Optional[datetime] = Query(
-        default=None,
-        description="Start of summary period"
+        default=None, description="Start of summary period"
     ),
     end_date: Optional[datetime] = Query(
-        default=None,
-        description="End of summary period"
+        default=None, description="End of summary period"
     ),
     current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -282,7 +277,8 @@ async def get_audit_summary(
 
     Requires admin role.
     """
-    from sqlalchemy import select, func, and_
+    from sqlalchemy import and_, func, select
+
     from app.models.billing_audit_log import BillingAuditLog
 
     logger.info(f"Admin {current_user.get('id')} fetching audit summary")
@@ -302,8 +298,7 @@ async def get_audit_summary(
 
     # Entries by entity type
     entity_query = select(
-        BillingAuditLog.entity_type,
-        func.count(BillingAuditLog.id)
+        BillingAuditLog.entity_type, func.count(BillingAuditLog.id)
     ).group_by(BillingAuditLog.entity_type)
     if conditions:
         entity_query = entity_query.where(and_(*conditions))
@@ -312,8 +307,7 @@ async def get_audit_summary(
 
     # Entries by action
     action_query = select(
-        BillingAuditLog.action,
-        func.count(BillingAuditLog.id)
+        BillingAuditLog.action, func.count(BillingAuditLog.id)
     ).group_by(BillingAuditLog.action)
     if conditions:
         action_query = action_query.where(and_(*conditions))
@@ -322,8 +316,7 @@ async def get_audit_summary(
 
     # Entries by actor type
     actor_query = select(
-        BillingAuditLog.actor_type,
-        func.count(BillingAuditLog.id)
+        BillingAuditLog.actor_type, func.count(BillingAuditLog.id)
     ).group_by(BillingAuditLog.actor_type)
     if conditions:
         actor_query = actor_query.where(and_(*conditions))

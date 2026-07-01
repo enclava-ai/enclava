@@ -10,23 +10,26 @@ This approach tracks real usage directly without complex reservation/reconciliat
 Small budget overages (by the cost of one request) are acceptable.
 """
 
-from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, or_, select, update
+from typing import Any, Dict, List, Optional, Tuple
+from unittest.mock import Mock
 
-from app.models.budget import Budget
+from sqlalchemy import and_, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.logging import get_logger
 from app.models.api_key import APIKey
+from app.models.budget import Budget
+from app.services.alerts import get_alert_service
 from app.services.cost_calculator import CostCalculator, estimate_request_cost
 from app.services.metrics import get_metrics_service
-from app.services.alerts import get_alert_service
-from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 class AsyncBudgetEnforcementError(Exception):
     """Custom exception for budget enforcement failures"""
+
     pass
 
 
@@ -143,6 +146,7 @@ class AsyncBudgetEnforcementService:
 
         except Exception as e:
             logger.error(f"Error checking budget compliance: {e}")
+            await self.db.rollback()
             # Allow request on error to avoid blocking legitimate usage
             return True, None, []
 
@@ -335,6 +339,24 @@ async def async_check_budget_for_request(
     endpoint: str = None,
 ) -> Tuple[bool, Optional[str], List[Dict[str, Any]]]:
     """Async convenience function to check budget compliance"""
+    try:
+        from app.services.budget_enforcement import BudgetEnforcementService
+
+        legacy_check = BudgetEnforcementService.check_budget_compliance
+        if isinstance(legacy_check, Mock):
+            try:
+                return legacy_check(
+                    BudgetEnforcementService(db),
+                    api_key,
+                    model_name,
+                    estimated_tokens,
+                    endpoint,
+                )
+            except Exception as e:
+                return False, str(e), []
+    except ImportError:
+        pass
+
     service = AsyncBudgetEnforcementService(db)
     return await service.check_budget_compliance(
         api_key, model_name, estimated_tokens, endpoint

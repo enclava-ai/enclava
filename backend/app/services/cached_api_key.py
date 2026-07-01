@@ -7,10 +7,11 @@ from ~60ms to ~5ms by avoiding expensive bcrypt operations
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, Tuple
+from typing import Any, Dict, Optional, Tuple
+
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.core.cache import core_cache
 from app.core.config import settings
@@ -109,7 +110,12 @@ class CachedAPIKeyService:
             # Cache for future requests
             await self._cache_api_key_data(key_prefix, api_key, user)
 
-            return {"api_key": api_key, "user": user, "api_key_id": api_key.id, "user_id": user.id}
+            return {
+                "api_key": api_key,
+                "user": user,
+                "api_key_id": api_key.id,
+                "user_id": user.id,
+            }
 
         except Exception as e:
             logger.error(f"Error retrieving API key for prefix {key_prefix}: {e}")
@@ -137,31 +143,32 @@ class CachedAPIKeyService:
                     "allowed_ips": api_key.allowed_ips,
                     "description": api_key.description,
                     "tags": api_key.tags,
-                    "created_at": api_key.created_at.isoformat()
-                    if api_key.created_at
-                    else None,
-                    "updated_at": api_key.updated_at.isoformat()
-                    if api_key.updated_at
-                    else None,
-                    "last_used_at": api_key.last_used_at.isoformat()
-                    if api_key.last_used_at
-                    else None,
-                    "expires_at": api_key.expires_at.isoformat()
-                    if api_key.expires_at
-                    else None,
+                    "created_at": (
+                        api_key.created_at.isoformat() if api_key.created_at else None
+                    ),
+                    "updated_at": (
+                        api_key.updated_at.isoformat() if api_key.updated_at else None
+                    ),
+                    "last_used_at": (
+                        api_key.last_used_at.isoformat()
+                        if api_key.last_used_at
+                        else None
+                    ),
+                    "expires_at": (
+                        api_key.expires_at.isoformat() if api_key.expires_at else None
+                    ),
                     "total_requests": api_key.total_requests,
                     "total_tokens": api_key.total_tokens,
                     "total_cost": api_key.total_cost,
                     "is_unlimited": api_key.is_unlimited,
                     "budget_limit_cents": api_key.budget_limit_cents,
                     "budget_type": api_key.budget_type,
-                    "allowed_chatbots": api_key.allowed_chatbots,
                     "allowed_agents": api_key.allowed_agents,
                     "allowed_extract_templates": api_key.allowed_extract_templates,
                     # Soft delete fields (should always be None for cached keys)
-                    "deleted_at": api_key.deleted_at.isoformat()
-                    if api_key.deleted_at
-                    else None,
+                    "deleted_at": (
+                        api_key.deleted_at.isoformat() if api_key.deleted_at else None
+                    ),
                     "deleted_by_user_id": api_key.deleted_by_user_id,
                     "deletion_reason": api_key.deletion_reason,
                 },
@@ -172,15 +179,15 @@ class CachedAPIKeyService:
                     "is_active": user.is_active,
                     "is_superuser": user.is_superuser,
                     "role_id": user.role_id,  # Use column instead of relationship to avoid lazy loading
-                    "created_at": user.created_at.isoformat()
-                    if user.created_at
-                    else None,
-                    "updated_at": user.updated_at.isoformat()
-                    if user.updated_at
-                    else None,
-                    "last_login": user.last_login.isoformat()
-                    if user.last_login
-                    else None,
+                    "created_at": (
+                        user.created_at.isoformat() if user.created_at else None
+                    ),
+                    "updated_at": (
+                        user.updated_at.isoformat() if user.updated_at else None
+                    ),
+                    "last_login": (
+                        user.last_login.isoformat() if user.last_login else None
+                    ),
                 },
                 "cached_at": datetime.now(timezone.utc).isoformat(),
             }
@@ -295,9 +302,7 @@ class CachedAPIKeyService:
                 await db.commit()
 
                 # Mark that we've updated DB recently (5 min throttle for DB writes only)
-                await core_cache.set(
-                    db_update_key, now_iso, ttl=300, prefix="perf"
-                )
+                await core_cache.set(db_update_key, now_iso, ttl=300, prefix="perf")
 
                 logger.debug(f"Persisted last_used_at to DB for API key {api_key_id}")
 

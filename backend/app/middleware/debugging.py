@@ -1,14 +1,16 @@
 """
 Debugging middleware for detailed request/response logging
 """
+
 import json
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from uuid import uuid4
+
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from uuid import uuid4
 
 from app.core.logging import get_logger
 
@@ -49,9 +51,11 @@ class DebuggingMiddleware(BaseHTTPMiddleware):
 
         # Extract headers we care about
         headers_to_log = {
-            "authorization": request.headers.get("Authorization", "")[:50] + "..."
-            if request.headers.get("Authorization")
-            else None,
+            "authorization": (
+                request.headers.get("Authorization", "")[:50] + "..."
+                if request.headers.get("Authorization")
+                else None
+            ),
             "content-type": request.headers.get("Content-Type"),
             "user-agent": request.headers.get("User-Agent"),
             "x-forwarded-for": request.headers.get("X-Forwarded-For"),

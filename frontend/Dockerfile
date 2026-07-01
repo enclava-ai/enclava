@@ -1,5 +1,5 @@
 # Use the official Node.js runtime as the base image
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -9,7 +9,6 @@ WORKDIR /app
 
 # Install dependencies with npm only
 COPY package.json package-lock.json ./
-RUN npm install
 RUN npm ci
 
 # Rebuild the source code only when needed
@@ -20,10 +19,11 @@ COPY . .
 
 # Environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
+ARG BASE_URL
+ARG NEXT_PUBLIC_BASE_URL
+ENV BASE_URL=${BASE_URL}
+ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
 
-# Ensure all dependencies are installed for build
-RUN npm install
 RUN npm run build
 
 # Production image, copy all the files and run next
@@ -32,21 +32,19 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG BASE_URL
+ARG NEXT_PUBLIC_BASE_URL
+ENV BASE_URL=${BASE_URL}
+ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
 
 # Create nextjs user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy node_modules from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
 # Copy built application (standalone output)
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
-# Set the correct permission for prerender cache
-RUN chown -R nextjs:nodejs .next
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 

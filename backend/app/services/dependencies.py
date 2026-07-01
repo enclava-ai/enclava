@@ -20,13 +20,14 @@ Usage in tests:
     app.dependency_overrides[get_llm_service] = lambda: mock_llm_service
 """
 
-from typing import Annotated, TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
+
 from fastapi import Depends, Request
 
 if TYPE_CHECKING:
-    from app.services.module_manager import ModuleManager
     from app.services.llm.service import LLMService
-    from app.services.plugin_registry import PluginInstaller, PluginDiscoveryService
+    from app.services.module_manager import ModuleManager
+    from app.services.plugin_registry import PluginDiscoveryService, PluginInstaller
 
 
 def get_module_manager(request: Request) -> "ModuleManager":

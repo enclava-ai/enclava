@@ -5,7 +5,7 @@ Internal API endpoints for monitoring inference provider health and attestation.
 These endpoints require admin privileges.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,14 +51,13 @@ async def get_providers_health(
         logger.error(f"Error fetching provider health: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch provider health: {str(e)}"
+            detail=f"Failed to fetch provider health: {str(e)}",
         )
 
 
 @router.post("/{provider_id}/verify")
 async def verify_provider(
-    provider_id: str,
-    current_user: dict = Depends(require_admin)
+    provider_id: str, current_user: dict = Depends(require_admin)
 ) -> Dict[str, Any]:
     """
     Force immediate attestation verification for a provider.
@@ -99,13 +98,10 @@ async def verify_provider(
     except ValueError as e:
         # Unknown provider
         logger.warning(f"Unknown provider requested: {provider_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Verification failed for provider {provider_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Verification failed: {str(e)}"
+            detail=f"Verification failed: {str(e)}",
         )

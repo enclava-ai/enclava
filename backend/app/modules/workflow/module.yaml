@@ -1,0 +1,34 @@
+name: workflow
+version: 1.0.0
+description: "Workflow orchestration for module-based automations"
+author: "Enclava Team"
+category: "automation"
+
+enabled: true
+auto_start: true
+dependencies:
+  - agent
+optional_dependencies: []
+
+provides:
+  - "workflow_execution"
+  - "workflow_status"
+
+consumes:
+  - "agent_chat"
+
+endpoints:
+  - path: "/workflow/status"
+    method: "GET"
+    description: "Get workflow module status"
+  - path: "/workflow/execute"
+    method: "POST"
+    description: "Execute a workflow definition"
+
+permissions:
+  - name: "workflow.execute"
+    description: "Execute workflows"
+  - name: "workflow.read"
+    description: "Read workflow definitions"
+  - name: "workflow.manage"
+    description: "Manage workflow definitions"

@@ -4,9 +4,9 @@ Audit Schemas for Billing Audit Log API
 Pydantic models for billing audit log endpoints.
 """
 
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -64,16 +64,21 @@ class AuditLogResponse(BaseModel):
     """Response schema for a single audit log entry"""
 
     id: int = Field(..., description="Unique audit log entry ID")
-    entity_type: str = Field(..., description="Type of entity (api_key, budget, pricing, usage_record)")
+    entity_type: str = Field(
+        ..., description="Type of entity (api_key, budget, pricing, usage_record)"
+    )
     entity_id: str = Field(..., description="ID of the entity that was modified")
     action: str = Field(..., description="Action performed on the entity")
     changes: Dict[str, Any] = Field(
-        ...,
-        description="Changes made: {field: {old: value, new: value}}"
+        ..., description="Changes made: {field: {old: value, new: value}}"
     )
     actor_type: str = Field(..., description="Type of actor (user, system, api_sync)")
-    actor_user_id: Optional[int] = Field(None, description="User ID of the actor (if applicable)")
-    actor_description: Optional[str] = Field(None, description="Description of the actor")
+    actor_user_id: Optional[int] = Field(
+        None, description="User ID of the actor (if applicable)"
+    )
+    actor_description: Optional[str] = Field(
+        None, description="Description of the actor"
+    )
     reason: Optional[str] = Field(None, description="Reason for the change")
     ip_address: Optional[str] = Field(None, description="IP address of the request")
     user_agent: Optional[str] = Field(None, description="User agent of the request")
@@ -93,7 +98,7 @@ class AuditLogResponse(BaseModel):
                 "action": "create",
                 "changes": {
                     "name": {"old": None, "new": "My API Key"},
-                    "is_active": {"old": None, "new": True}
+                    "is_active": {"old": None, "new": True},
                 },
                 "actor_type": "user",
                 "actor_user_id": 1,
@@ -105,7 +110,7 @@ class AuditLogResponse(BaseModel):
                 "related_api_key_id": 42,
                 "related_budget_id": None,
                 "related_user_id": 1,
-                "created_at": "2025-01-15T10:30:00Z"
+                "created_at": "2025-01-15T10:30:00Z",
             }
         }
 
@@ -115,39 +120,21 @@ class AuditLogSearchParams(BaseModel):
 
     entity_type: Optional[str] = Field(
         None,
-        description="Filter by entity type (api_key, budget, pricing, usage_record)"
+        description="Filter by entity type (api_key, budget, pricing, usage_record)",
     )
-    action: Optional[str] = Field(
-        None,
-        description="Filter by action type"
-    )
-    actor_user_id: Optional[int] = Field(
-        None,
-        description="Filter by actor user ID"
-    )
+    action: Optional[str] = Field(None, description="Filter by action type")
+    actor_user_id: Optional[int] = Field(None, description="Filter by actor user ID")
     actor_type: Optional[str] = Field(
-        None,
-        description="Filter by actor type (user, system, api_sync)"
+        None, description="Filter by actor type (user, system, api_sync)"
     )
     start_date: Optional[datetime] = Field(
-        None,
-        description="Filter by start date (inclusive)"
+        None, description="Filter by start date (inclusive)"
     )
     end_date: Optional[datetime] = Field(
-        None,
-        description="Filter by end date (inclusive)"
+        None, description="Filter by end date (inclusive)"
     )
-    limit: int = Field(
-        100,
-        ge=1,
-        le=500,
-        description="Maximum number of results"
-    )
-    offset: int = Field(
-        0,
-        ge=0,
-        description="Number of results to skip"
-    )
+    limit: int = Field(100, ge=1, le=500, description="Maximum number of results")
+    offset: int = Field(0, ge=0, description="Number of results to skip")
 
     class Config:
         json_schema_extra = {
@@ -158,7 +145,7 @@ class AuditLogSearchParams(BaseModel):
                 "start_date": "2025-01-01T00:00:00Z",
                 "end_date": "2025-01-31T23:59:59Z",
                 "limit": 100,
-                "offset": 0
+                "offset": 0,
             }
         }
 
@@ -168,24 +155,19 @@ class AuditLogSummary(BaseModel):
 
     total_entries: int = Field(..., description="Total number of audit entries")
     entries_by_entity_type: Dict[str, int] = Field(
-        ...,
-        description="Count of entries by entity type"
+        ..., description="Count of entries by entity type"
     )
     entries_by_action: Dict[str, int] = Field(
-        ...,
-        description="Count of entries by action type"
+        ..., description="Count of entries by action type"
     )
     entries_by_actor_type: Dict[str, int] = Field(
-        ...,
-        description="Count of entries by actor type"
+        ..., description="Count of entries by actor type"
     )
     period_start: Optional[datetime] = Field(
-        None,
-        description="Start of the summary period"
+        None, description="Start of the summary period"
     )
     period_end: Optional[datetime] = Field(
-        None,
-        description="End of the summary period"
+        None, description="End of the summary period"
     )
 
     class Config:
@@ -196,21 +178,17 @@ class AuditLogSummary(BaseModel):
                     "api_key": 500,
                     "budget": 300,
                     "pricing": 600,
-                    "usage_record": 100
+                    "usage_record": 100,
                 },
                 "entries_by_action": {
                     "create": 400,
                     "update": 600,
                     "sync_update": 400,
-                    "exceeded": 100
+                    "exceeded": 100,
                 },
-                "entries_by_actor_type": {
-                    "user": 700,
-                    "system": 200,
-                    "api_sync": 600
-                },
+                "entries_by_actor_type": {"user": 700, "system": 200, "api_sync": 600},
                 "period_start": "2025-01-01T00:00:00Z",
-                "period_end": "2025-01-31T23:59:59Z"
+                "period_end": "2025-01-31T23:59:59Z",
             }
         }
 
@@ -220,7 +198,9 @@ class AuditTrailResponse(BaseModel):
 
     entries: List[AuditLogResponse] = Field(..., description="List of audit entries")
     total: int = Field(..., description="Total number of entries matching the query")
-    entity_type: Optional[str] = Field(None, description="Entity type of the audit trail")
+    entity_type: Optional[str] = Field(
+        None, description="Entity type of the audit trail"
+    )
     entity_id: Optional[str] = Field(None, description="Entity ID of the audit trail")
 
     class Config:
@@ -235,11 +215,11 @@ class AuditTrailResponse(BaseModel):
                         "changes": {"name": {"old": None, "new": "My API Key"}},
                         "actor_type": "user",
                         "actor_user_id": 1,
-                        "created_at": "2025-01-15T10:30:00Z"
+                        "created_at": "2025-01-15T10:30:00Z",
                     }
                 ],
                 "total": 1,
                 "entity_type": "api_key",
-                "entity_id": "42"
+                "entity_id": "42",
             }
         }

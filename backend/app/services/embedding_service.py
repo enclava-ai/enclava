@@ -7,7 +7,8 @@ Falls back to deterministic random vectors when the local model is unavailable.
 import asyncio
 import logging
 import time
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
 from app.core.config import settings

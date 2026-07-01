@@ -2,32 +2,34 @@
 Notification Service
 Multi-channel notification system with email, webhooks, and other providers
 """
+
 import asyncio
 import json
 import logging
 import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
-from jinja2 import Template, Environment, DictLoader
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Any, Dict, List, Optional
+
 import aiohttp
+from fastapi import HTTPException, status
+from jinja2 import DictLoader, Environment, Template
+from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import and_, or_, desc, func
-from fastapi import HTTPException, status
 
-from app.models.notification import (
-    Notification,
-    NotificationTemplate,
-    NotificationChannel,
-    NotificationType,
-    NotificationStatus,
-    NotificationPriority,
-)
-from app.models.user import User
 from app.core.config import settings
 from app.db.database import utc_now
+from app.models.notification import (
+    Notification,
+    NotificationChannel,
+    NotificationPriority,
+    NotificationStatus,
+    NotificationTemplate,
+    NotificationType,
+)
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -564,9 +566,9 @@ class NotificationService:
                 "name": name,
                 "success_count": success,
                 "failure_count": failure,
-                "success_rate": success / (success + failure)
-                if (success + failure) > 0
-                else 0,
+                "success_rate": (
+                    success / (success + failure) if (success + failure) > 0 else 0
+                ),
             }
             for name, success, failure in channel_stats.all()
         ]

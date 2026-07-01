@@ -42,9 +42,6 @@ const getIconForPage = (pageName: string, pluginId: string) => {
   }
   
   // Try to match by plugin type
-  if (pluginId.includes('zammad') || pluginId.includes('helpdesk')) {
-    return Ticket;
-  }
   if (pluginId.includes('discord') || pluginId.includes('slack')) {
     return Bell;
   }

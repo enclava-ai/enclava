@@ -9,24 +9,23 @@ Business logic for managing MCP server configurations, including:
 """
 
 import time
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, or_, and_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.logging import get_logger
 from app.core.cache import CoreCacheService
+from app.core.logging import get_logger
 from app.models.mcp_server import MCPServer
-from app.services.mcp_client import MCPClient
 from app.schemas.mcp_server import (
     MCPServerCreate,
-    MCPServerUpdate,
+    MCPServerRefreshResponse,
     MCPServerTestRequest,
     MCPServerTestResponse,
+    MCPServerUpdate,
     MCPToolInfo,
-    MCPServerRefreshResponse,
 )
-
+from app.services.mcp_client import MCPClient
 
 logger = get_logger("mcp_server_service")
 
@@ -51,10 +50,7 @@ class MCPServerService:
     # =========================================================================
 
     async def create_server(
-        self,
-        data: MCPServerCreate,
-        user_id: int,
-        is_admin: bool = False
+        self, data: MCPServerCreate, user_id: int, is_admin: bool = False
     ) -> MCPServer:
         """
         Create a new MCP server configuration.
@@ -106,10 +102,7 @@ class MCPServerService:
     # =========================================================================
 
     async def get_server(
-        self,
-        server_id: int,
-        user_id: int,
-        is_admin: bool = False
+        self, server_id: int, user_id: int, is_admin: bool = False
     ) -> Optional[MCPServer]:
         """
         Get an MCP server by ID.
@@ -132,7 +125,7 @@ class MCPServerService:
             query = query.where(
                 or_(
                     MCPServer.created_by_user_id == user_id,
-                    and_(MCPServer.is_global == True, MCPServer.is_active == True)
+                    and_(MCPServer.is_global == True, MCPServer.is_active == True),
                 )
             )
 
@@ -140,10 +133,7 @@ class MCPServerService:
         return result.scalar_one_or_none()
 
     async def get_server_by_name(
-        self,
-        name: str,
-        user_id: int,
-        is_admin: bool = False
+        self, name: str, user_id: int, is_admin: bool = False
     ) -> Optional[MCPServer]:
         """
         Get an MCP server by name.
@@ -172,10 +162,7 @@ class MCPServerService:
         return server
 
     async def _get_server_by_name(
-        self,
-        name: str,
-        user_id: int,
-        is_admin: bool = False
+        self, name: str, user_id: int, is_admin: bool = False
     ) -> Optional[MCPServer]:
         """Internal method to get server by name."""
         query = select(MCPServer).where(MCPServer.name == name)
@@ -184,7 +171,7 @@ class MCPServerService:
             query = query.where(
                 or_(
                     MCPServer.created_by_user_id == user_id,
-                    and_(MCPServer.is_global == True, MCPServer.is_active == True)
+                    and_(MCPServer.is_global == True, MCPServer.is_active == True),
                 )
             )
 
@@ -192,10 +179,7 @@ class MCPServerService:
         return result.scalar_one_or_none()
 
     async def list_servers(
-        self,
-        user_id: int,
-        is_admin: bool = False,
-        include_inactive: bool = False
+        self, user_id: int, is_admin: bool = False, include_inactive: bool = False
     ) -> Tuple[List[MCPServer], int, int]:
         """
         List MCP servers visible to the user.
@@ -220,7 +204,7 @@ class MCPServerService:
             query = select(MCPServer).where(
                 or_(
                     MCPServer.created_by_user_id == user_id,
-                    and_(MCPServer.is_global == True, MCPServer.is_active == True)
+                    and_(MCPServer.is_global == True, MCPServer.is_active == True),
                 )
             )
             if not include_inactive:
@@ -245,7 +229,7 @@ class MCPServerService:
         server_id: int,
         data: MCPServerUpdate,
         user_id: int,
-        is_admin: bool = False
+        is_admin: bool = False,
     ) -> Optional[MCPServer]:
         """
         Update an MCP server configuration.
@@ -315,10 +299,7 @@ class MCPServerService:
     # =========================================================================
 
     async def delete_server(
-        self,
-        server_id: int,
-        user_id: int,
-        is_admin: bool = False
+        self, server_id: int, user_id: int, is_admin: bool = False
     ) -> bool:
         """
         Delete an MCP server configuration.
@@ -357,8 +338,7 @@ class MCPServerService:
     # =========================================================================
 
     async def test_connection(
-        self,
-        data: MCPServerTestRequest
+        self, data: MCPServerTestRequest
     ) -> MCPServerTestResponse:
         """
         Test connection to an MCP server and discover tools.
@@ -378,7 +358,7 @@ class MCPServerService:
                 server_url=data.server_url,
                 api_key=data.api_key,
                 api_key_header_name=data.api_key_header_name,
-                timeout_seconds=data.timeout_seconds
+                timeout_seconds=data.timeout_seconds,
             )
 
             # Fetch tools from server
@@ -390,18 +370,20 @@ class MCPServerService:
             tool_infos = []
             for tool in tools:
                 func = tool.get("function", {})
-                tool_infos.append(MCPToolInfo(
-                    name=func.get("name", ""),
-                    description=func.get("description"),
-                    parameters_schema=func.get("parameters")
-                ))
+                tool_infos.append(
+                    MCPToolInfo(
+                        name=func.get("name", ""),
+                        description=func.get("description"),
+                        parameters_schema=func.get("parameters"),
+                    )
+                )
 
             return MCPServerTestResponse(
                 success=True,
                 message=f"Successfully connected and discovered {len(tools)} tools",
                 tools=tool_infos,
                 tool_count=len(tools),
-                response_time_ms=response_time_ms
+                response_time_ms=response_time_ms,
             )
 
         except Exception as e:
@@ -414,14 +396,11 @@ class MCPServerService:
                 tools=[],
                 tool_count=0,
                 response_time_ms=response_time_ms,
-                error=str(e)
+                error=str(e),
             )
 
     async def refresh_server_tools(
-        self,
-        server_id: int,
-        user_id: int,
-        is_admin: bool = False
+        self, server_id: int, user_id: int, is_admin: bool = False
     ) -> MCPServerRefreshResponse:
         """
         Refresh the cached tools for an MCP server.
@@ -439,7 +418,7 @@ class MCPServerService:
             return MCPServerRefreshResponse(
                 success=False,
                 message="Server not found",
-                error="Server not found or not accessible"
+                error="Server not found or not accessible",
             )
 
         try:
@@ -447,7 +426,7 @@ class MCPServerService:
                 server_url=server.server_url,
                 api_key=server.api_key,
                 api_key_header_name=server.api_key_header_name,
-                timeout_seconds=server.timeout_seconds
+                timeout_seconds=server.timeout_seconds,
             )
 
             tools = await client.list_tools()
@@ -463,11 +442,13 @@ class MCPServerService:
             tool_infos = []
             for tool in tools:
                 func = tool.get("function", {})
-                tool_infos.append(MCPToolInfo(
-                    name=func.get("name", ""),
-                    description=func.get("description"),
-                    parameters_schema=func.get("parameters")
-                ))
+                tool_infos.append(
+                    MCPToolInfo(
+                        name=func.get("name", ""),
+                        description=func.get("description"),
+                        parameters_schema=func.get("parameters"),
+                    )
+                )
 
             # Invalidate cache
             await self._invalidate_server_cache(server.name, user_id)
@@ -476,7 +457,7 @@ class MCPServerService:
                 success=True,
                 tools=tool_infos,
                 tool_count=len(tools),
-                message=f"Successfully refreshed {len(tools)} tools"
+                message=f"Successfully refreshed {len(tools)} tools",
             )
 
         except Exception as e:
@@ -491,7 +472,7 @@ class MCPServerService:
                 tools=[],
                 tool_count=0,
                 message="Failed to refresh tools",
-                error=str(e)
+                error=str(e),
             )
 
     # =========================================================================
@@ -499,9 +480,7 @@ class MCPServerService:
     # =========================================================================
 
     async def get_server_config_for_tool_calling(
-        self,
-        server_name: str,
-        user_id: int
+        self, server_name: str, user_id: int
     ) -> Optional[Dict[str, Any]]:
         """
         Get server configuration for use with tool calling.
@@ -529,13 +508,10 @@ class MCPServerService:
             "api_key": server.api_key,
             "api_key_header_name": server.api_key_header_name,
             "timeout": server.timeout_seconds,
-            "max_retries": server.max_retries
+            "max_retries": server.max_retries,
         }
 
-    async def get_available_mcp_servers(
-        self,
-        user_id: int
-    ) -> List[Dict[str, Any]]:
+    async def get_available_mcp_servers(self, user_id: int) -> List[Dict[str, Any]]:
         """
         Get list of available MCP servers for agent configuration.
 
@@ -555,7 +531,7 @@ class MCPServerService:
                 "display_name": s.display_name,
                 "description": s.description,
                 "tool_count": len(s.cached_tools) if s.cached_tools else 0,
-                "is_global": s.is_global
+                "is_global": s.is_global,
             }
             for s in servers
         ]

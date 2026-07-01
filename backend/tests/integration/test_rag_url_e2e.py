@@ -8,16 +8,17 @@ Tests cover:
 - Mixed documents (with and without URLs)
 """
 
+import io
+import json
+from datetime import datetime
+
 import pytest
 import pytest_asyncio
-import json
-import io
-from datetime import datetime
 from httpx import AsyncClient
 from qdrant_client import QdrantClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.rag.main import RAGModule, ProcessedDocument
+from app.modules.rag.main import ProcessedDocument, RAGModule
 
 
 @pytest.fixture
@@ -66,16 +67,16 @@ class TestJSONLUploadWithURLs:
     """Test uploading JSONL files with URL metadata"""
 
     @pytest.mark.asyncio
-    async def test_upload_jsonl_with_urls(self, rag_module: RAGModule, sample_jsonl_with_urls: str):
+    async def test_upload_jsonl_with_urls(
+        self, rag_module: RAGModule, sample_jsonl_with_urls: str
+    ):
         """Test processing and indexing JSONL file with URLs"""
         filename = "faq_with_urls.jsonl"
         file_content = sample_jsonl_with_urls.encode("utf-8")
 
         # Process document
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename=filename,
-            metadata={"source": "test"}
+            file_data=file_content, filename=filename, metadata={"source": "test"}
         )
 
         # Verify processing
@@ -88,28 +89,27 @@ class TestJSONLUploadWithURLs:
         assert doc_id is not None
 
     @pytest.mark.asyncio
-    async def test_search_returns_urls(self, rag_module: RAGModule, sample_jsonl_with_urls: str):
+    async def test_search_returns_urls(
+        self, rag_module: RAGModule, sample_jsonl_with_urls: str
+    ):
         """Test that search results include source URLs"""
         # Upload and index document
         file_content = sample_jsonl_with_urls.encode("utf-8")
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename="faq.jsonl"
+            file_data=file_content, filename="faq.jsonl"
         )
         await rag_module.index_processed_document(processed_doc)
 
         # Search for password reset
         results = await rag_module.search_documents(
-            query="how to reset my password",
-            max_results=5
+            query="how to reset my password", max_results=5
         )
 
         # Verify results contain URLs
         assert len(results) > 0
         # Check that at least one result has metadata with source_url
         has_url = any(
-            result.document.metadata.get("source_url") is not None
-            for result in results
+            result.document.metadata.get("source_url") is not None for result in results
         )
         assert has_url, "Expected at least one result to have source_url"
 
@@ -118,15 +118,16 @@ class TestBackwardCompatibility:
     """Test backward compatibility with documents without URLs"""
 
     @pytest.mark.asyncio
-    async def test_upload_legacy_jsonl(self, rag_module: RAGModule, sample_jsonl_without_urls: str):
+    async def test_upload_legacy_jsonl(
+        self, rag_module: RAGModule, sample_jsonl_without_urls: str
+    ):
         """Test processing legacy JSONL without URLs"""
         filename = "legacy_faq.jsonl"
         file_content = sample_jsonl_without_urls.encode("utf-8")
 
         # Process document
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename=filename
+            file_data=file_content, filename=filename
         )
 
         assert processed_doc is not None
@@ -136,20 +137,20 @@ class TestBackwardCompatibility:
         assert doc_id is not None
 
     @pytest.mark.asyncio
-    async def test_search_legacy_documents(self, rag_module: RAGModule, sample_jsonl_without_urls: str):
+    async def test_search_legacy_documents(
+        self, rag_module: RAGModule, sample_jsonl_without_urls: str
+    ):
         """Test searching documents without URLs"""
         # Upload and index legacy document
         file_content = sample_jsonl_without_urls.encode("utf-8")
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename="legacy.jsonl"
+            file_data=file_content, filename="legacy.jsonl"
         )
         await rag_module.index_processed_document(processed_doc)
 
         # Search
         results = await rag_module.search_documents(
-            query="what is artificial intelligence",
-            max_results=5
+            query="what is artificial intelligence", max_results=5
         )
 
         # Verify results work without URLs
@@ -164,15 +165,16 @@ class TestMixedDocuments:
     """Test handling mixed documents with and without URLs"""
 
     @pytest.mark.asyncio
-    async def test_upload_mixed_jsonl(self, rag_module: RAGModule, sample_jsonl_mixed: str):
+    async def test_upload_mixed_jsonl(
+        self, rag_module: RAGModule, sample_jsonl_mixed: str
+    ):
         """Test processing JSONL with mixed URL presence"""
         filename = "mixed_faq.jsonl"
         file_content = sample_jsonl_mixed.encode("utf-8")
 
         # Process document
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename=filename
+            file_data=file_content, filename=filename
         )
 
         assert processed_doc is not None
@@ -182,13 +184,14 @@ class TestMixedDocuments:
         assert doc_id is not None
 
     @pytest.mark.asyncio
-    async def test_search_mixed_documents(self, rag_module: RAGModule, sample_jsonl_mixed: str):
+    async def test_search_mixed_documents(
+        self, rag_module: RAGModule, sample_jsonl_mixed: str
+    ):
         """Test searching returns mix of documents with and without URLs"""
         # Upload and index mixed document
         file_content = sample_jsonl_mixed.encode("utf-8")
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename="mixed.jsonl"
+            file_data=file_content, filename="mixed.jsonl"
         )
         await rag_module.index_processed_document(processed_doc)
 
@@ -196,7 +199,7 @@ class TestMixedDocuments:
         results = await rag_module.search_documents(
             query="security and authentication",
             max_results=10,
-            score_threshold=0.01  # Very low threshold to get all results
+            score_threshold=0.01,  # Very low threshold to get all results
         )
 
         # Verify we get both types of documents
@@ -223,19 +226,21 @@ class TestURLDeduplication:
 
         file_content = jsonl_content.encode("utf-8")
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename="duplicate_urls.jsonl"
+            file_data=file_content, filename="duplicate_urls.jsonl"
         )
         await rag_module.index_processed_document(processed_doc)
 
         # Search for password reset
         results = await rag_module.search_documents(
-            query="how to reset password step by step",
-            max_results=10
+            query="how to reset password step by step", max_results=10
         )
 
         # Count unique URLs
-        urls = [r.document.metadata.get("source_url") for r in results if r.document.metadata.get("source_url")]
+        urls = [
+            r.document.metadata.get("source_url")
+            for r in results
+            if r.document.metadata.get("source_url")
+        ]
         unique_urls = set(urls)
 
         # After deduplication, should have only 1 unique URL
@@ -251,21 +256,21 @@ class TestURLDeduplication:
 
         file_content = jsonl_content.encode("utf-8")
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename="scores.jsonl"
+            file_data=file_content, filename="scores.jsonl"
         )
         await rag_module.index_processed_document(processed_doc)
 
         # Search
         results = await rag_module.search_documents(
-            query="detailed guide how to reset password",
-            max_results=10
+            query="detailed guide how to reset password", max_results=10
         )
 
         # Results with the URL should exist
         url_results = [
-            r for r in results
-            if r.document.metadata.get("source_url") == "https://support.example.com/faq/password"
+            r
+            for r in results
+            if r.document.metadata.get("source_url")
+            == "https://support.example.com/faq/password"
         ]
 
         # Should have deduplicated results
@@ -276,14 +281,16 @@ class TestEndToEndFlow:
     """Test complete end-to-end flow: upload → index → search → response"""
 
     @pytest.mark.asyncio
-    async def test_complete_flow_with_urls(self, rag_module: RAGModule, sample_jsonl_with_urls: str):
+    async def test_complete_flow_with_urls(
+        self, rag_module: RAGModule, sample_jsonl_with_urls: str
+    ):
         """Test complete workflow from upload to search"""
         # Step 1: Upload and process JSONL
         file_content = sample_jsonl_with_urls.encode("utf-8")
         processed_doc = await rag_module.process_document(
             file_data=file_content,
             filename="complete_test.jsonl",
-            metadata={"test": "e2e"}
+            metadata={"test": "e2e"},
         )
 
         assert processed_doc is not None
@@ -295,8 +302,7 @@ class TestEndToEndFlow:
 
         # Step 3: Search for content
         search_results = await rag_module.search_documents(
-            query="business hours and opening times",
-            max_results=5
+            query="business hours and opening times", max_results=5
         )
 
         assert len(search_results) > 0
@@ -314,13 +320,14 @@ class TestEndToEndFlow:
         # assert found_business_hours or len(search_results) > 0
 
     @pytest.mark.asyncio
-    async def test_complete_flow_without_urls(self, rag_module: RAGModule, sample_jsonl_without_urls: str):
+    async def test_complete_flow_without_urls(
+        self, rag_module: RAGModule, sample_jsonl_without_urls: str
+    ):
         """Test complete workflow with legacy documents"""
         # Upload and process
         file_content = sample_jsonl_without_urls.encode("utf-8")
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename="legacy_test.jsonl"
+            file_data=file_content, filename="legacy_test.jsonl"
         )
 
         # Index
@@ -329,36 +336,36 @@ class TestEndToEndFlow:
 
         # Search
         results = await rag_module.search_documents(
-            query="machine learning and artificial intelligence",
-            max_results=5
+            query="machine learning and artificial intelligence", max_results=5
         )
 
         # Verify results work without URLs
         assert len(results) >= 0  # May have 0 results based on embeddings
         for result in results:
             # Should handle missing URLs gracefully
-            assert result.document.metadata.get("source_url") is None or result.document.metadata.get("source_url") == ""
+            assert (
+                result.document.metadata.get("source_url") is None
+                or result.document.metadata.get("source_url") == ""
+            )
 
 
 class TestSearchResultFormat:
     """Test search result format and structure"""
 
     @pytest.mark.asyncio
-    async def test_search_result_structure(self, rag_module: RAGModule, sample_jsonl_with_urls: str):
+    async def test_search_result_structure(
+        self, rag_module: RAGModule, sample_jsonl_with_urls: str
+    ):
         """Test that search results have correct structure"""
         # Upload and index
         file_content = sample_jsonl_with_urls.encode("utf-8")
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename="structure_test.jsonl"
+            file_data=file_content, filename="structure_test.jsonl"
         )
         await rag_module.index_processed_document(processed_doc)
 
         # Search
-        results = await rag_module.search_documents(
-            query="password",
-            max_results=5
-        )
+        results = await rag_module.search_documents(query="password", max_results=5)
 
         if len(results) > 0:
             result = results[0]
@@ -378,26 +385,28 @@ class TestSearchResultFormat:
             assert isinstance(metadata, dict)
 
     @pytest.mark.asyncio
-    async def test_results_sorted_by_relevance(self, rag_module: RAGModule, sample_jsonl_with_urls: str):
+    async def test_results_sorted_by_relevance(
+        self, rag_module: RAGModule, sample_jsonl_with_urls: str
+    ):
         """Test that search results are sorted by relevance score"""
         # Upload and index
         file_content = sample_jsonl_with_urls.encode("utf-8")
         processed_doc = await rag_module.process_document(
-            file_data=file_content,
-            filename="sorted_test.jsonl"
+            file_data=file_content, filename="sorted_test.jsonl"
         )
         await rag_module.index_processed_document(processed_doc)
 
         # Search
         results = await rag_module.search_documents(
-            query="subscription and account management",
-            max_results=10
+            query="subscription and account management", max_results=10
         )
 
         if len(results) > 1:
             # Verify results are sorted by score (descending)
             scores = [r.score for r in results]
-            assert scores == sorted(scores, reverse=True), "Results should be sorted by score in descending order"
+            assert scores == sorted(
+                scores, reverse=True
+            ), "Results should be sorted by score in descending order"
 
 
 if __name__ == "__main__":

@@ -1,20 +1,22 @@
 """
 Base module interface and interceptor pattern implementation
 """
-from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass
-from fastapi import Request, Response
+
+import copy
+import hashlib
 import json
 import re
-import copy
 import time
-import hashlib
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from fastapi import Request, Response
+
 from app.core.logging import get_logger
-from app.utils.exceptions import ValidationError, AuthenticationError, RateLimitExceeded
 from app.services.permission_manager import permission_registry
+from app.utils.exceptions import AuthenticationError, RateLimitExceeded, ValidationError
 
 logger = get_logger(__name__)
 
@@ -415,9 +417,11 @@ class SecurityInterceptor(ModuleInterceptor):
         def clean_dict(obj):
             if isinstance(obj, dict):
                 return {
-                    k: "***REDACTED***"
-                    if any(sk in k.lower() for sk in sensitive_keys)
-                    else clean_dict(v)
+                    k: (
+                        "***REDACTED***"
+                        if any(sk in k.lower() for sk in sensitive_keys)
+                        else clean_dict(v)
+                    )
                     for k, v in obj.items()
                 }
             elif isinstance(obj, list):

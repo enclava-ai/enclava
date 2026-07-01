@@ -1,25 +1,24 @@
 """
-Database models for agent module conversations
+Database models for configured agent conversations.
 
-Agent conversations are separate from chatbot conversations to:
-1. Maintain clean separation between chatbot and agent systems
-2. Allow agent-specific conversation metadata
-3. Enable independent scaling and optimization
+Agent conversations keep request/response history and metadata for reusable
+agent configurations.
 """
 
+import uuid
+from datetime import datetime, timezone
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    ForeignKey,
     Integer,
     String,
     Text,
-    Boolean,
-    DateTime,
-    JSON,
-    ForeignKey,
 )
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
-import uuid
 
 from app.db.database import Base, utc_now
 

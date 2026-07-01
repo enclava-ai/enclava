@@ -6,8 +6,8 @@ and verifies template-level access control.
 """
 
 import pytest
-from app.models.api_key import APIKey
 
+from app.models.api_key import APIKey
 
 # --- Unit Tests ---
 
@@ -30,9 +30,7 @@ def test_can_access_template_restricted():
 
 def test_can_access_template_multiple():
     """API key with multiple templates can access all of them"""
-    api_key = APIKey(
-        allowed_extract_templates=["detailed_invoice", "expense_report"]
-    )
+    api_key = APIKey(allowed_extract_templates=["detailed_invoice", "expense_report"])
     assert api_key.can_access_template("detailed_invoice")
     assert not api_key.can_access_template("simple_receipt")
     assert api_key.can_access_template("expense_report")
@@ -86,9 +84,7 @@ def test_add_allowed_template_duplicate():
 
 def test_remove_allowed_template():
     """Remove template from allowed list"""
-    api_key = APIKey(
-        allowed_extract_templates=["detailed_invoice", "simple_receipt"]
-    )
+    api_key = APIKey(allowed_extract_templates=["detailed_invoice", "simple_receipt"])
     api_key.remove_allowed_template("simple_receipt")
     assert "detailed_invoice" in api_key.allowed_extract_templates
     assert "simple_receipt" not in api_key.allowed_extract_templates

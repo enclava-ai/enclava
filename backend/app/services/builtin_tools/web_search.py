@@ -4,9 +4,12 @@ Web Search Built-in Tool
 Searches the internet for current information using Brave Search API.
 """
 
+import inspect
 import os
+from typing import Any, Dict
+
 import aiohttp
-from typing import Dict, Any
+
 from .base import BuiltinTool, ToolExecutionContext, ToolResult
 
 
@@ -44,20 +47,22 @@ DO NOT USE THIS TOOL WHEN:
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The search query to find information on the web"
+                "description": "The search query to find information on the web",
             },
             "num_results": {
                 "type": "integer",
                 "description": "Number of search results to return (default: 5)",
                 "default": 5,
                 "minimum": 1,
-                "maximum": 20
-            }
+                "maximum": 20,
+            },
         },
-        "required": ["query"]
+        "required": ["query"],
     }
 
-    async def execute(self, params: Dict[str, Any], ctx: ToolExecutionContext) -> ToolResult:
+    async def execute(
+        self, params: Dict[str, Any], ctx: ToolExecutionContext
+    ) -> ToolResult:
         """Execute web search with the given query.
 
         Args:
@@ -75,16 +80,14 @@ DO NOT USE THIS TOOL WHEN:
             return ToolResult(
                 success=False,
                 output=None,
-                error="Brave Search API key not configured. Set BRAVE_SEARCH_API_KEY environment variable."
+                error="Brave Search API key not configured. Set BRAVE_SEARCH_API_KEY environment variable.",
             )
 
         # Extract parameters
         query = params.get("query")
         if not query:
             return ToolResult(
-                success=False,
-                output=None,
-                error="Query parameter is required"
+                success=False, output=None, error="Query parameter is required"
             )
 
         num_results = params.get("num_results", 5)
@@ -92,25 +95,26 @@ DO NOT USE THIS TOOL WHEN:
         try:
             # Make API request to Brave Search
             async with aiohttp.ClientSession() as session:
-                async with session.get(
+                response_context = session.get(
                     "https://api.search.brave.com/res/v1/web/search",
-                    params={
-                        "q": query,
-                        "count": num_results
-                    },
+                    params={"q": query, "count": num_results},
                     headers={
                         "Accept": "application/json",
                         "Accept-Encoding": "gzip",
-                        "X-Subscription-Token": api_key
+                        "X-Subscription-Token": api_key,
                     },
-                    timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
+                    timeout=aiohttp.ClientTimeout(total=10),
+                )
+                if inspect.isawaitable(response_context):
+                    response_context = await response_context
+
+                async with response_context as resp:
                     if resp.status != 200:
                         error_text = await resp.text()
                         return ToolResult(
                             success=False,
                             output=None,
-                            error=f"Brave Search API error (status {resp.status}): {error_text}"
+                            error=f"Brave Search API error (status {resp.status}): {error_text}",
                         )
 
                     data = await resp.json()
@@ -120,32 +124,32 @@ DO NOT USE THIS TOOL WHEN:
                     formatted_results = []
 
                     for result in web_results:
-                        formatted_results.append({
-                            "title": result.get("title", ""),
-                            "url": result.get("url", ""),
-                            "description": result.get("description", ""),
-                            "age": result.get("age"),  # How recent the result is
-                            "extra_snippets": result.get("extra_snippets", [])
-                        })
+                        formatted_results.append(
+                            {
+                                "title": result.get("title", ""),
+                                "url": result.get("url", ""),
+                                "description": result.get("description", ""),
+                                "age": result.get("age"),  # How recent the result is
+                                "extra_snippets": result.get("extra_snippets", []),
+                            }
+                        )
 
                     return ToolResult(
                         success=True,
                         output={
                             "results": formatted_results,
                             "count": len(formatted_results),
-                            "query": query
-                        }
+                            "query": query,
+                        },
                     )
 
         except aiohttp.ClientError as e:
             return ToolResult(
                 success=False,
                 output=None,
-                error=f"Network error during web search: {str(e)}"
+                error=f"Network error during web search: {str(e)}",
             )
         except Exception as e:
             return ToolResult(
-                success=False,
-                output=None,
-                error=f"Web search failed: {str(e)}"
+                success=False, output=None, error=f"Web search failed: {str(e)}"
             )

@@ -13,9 +13,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List
 
-from PIL import Image
 from fastapi import UploadFile
 from pdf2image import convert_from_bytes
+from PIL import Image
 
 from ..exceptions import FileTooLargeError, InvalidFileError
 
@@ -89,23 +89,17 @@ class DocumentProcessor:
 
         if ext == ".pdf" or file.content_type == "application/pdf":
             images = await loop.run_in_executor(
-                _executor,
-                self._convert_pdf_to_images,
-                content
+                _executor, self._convert_pdf_to_images, content
             )
             logger.debug("Converted PDF to %d images", len(images))
         else:
             images = await loop.run_in_executor(
-                _executor,
-                lambda: [Image.open(io.BytesIO(content))]
+                _executor, lambda: [Image.open(io.BytesIO(content))]
             )
 
         # Process images in executor (resize and encode)
         encoded_images = await loop.run_in_executor(
-            _executor,
-            self._process_images_sync,
-            images,
-            max_dimension
+            _executor, self._process_images_sync, images, max_dimension
         )
 
         return encoded_images
@@ -154,7 +148,9 @@ class DocumentProcessor:
                 ".pdf": "application/pdf",
             }
             content_type = mime_type_map.get(ext)
-            logger.info(f"Content-Type was None, inferred {content_type} from extension {ext}")
+            logger.info(
+                f"Content-Type was None, inferred {content_type} from extension {ext}"
+            )
 
         if content_type not in self.ALLOWED_MIME_TYPES:
             raise InvalidFileError(f"MIME type '{content_type}' not allowed")
@@ -188,15 +184,12 @@ class DocumentProcessor:
         try:
             # Limit pages to prevent memory exhaustion
             images = convert_from_bytes(
-                pdf_bytes,
-                dpi=dpi,
-                first_page=1,
-                last_page=self.MAX_PDF_PAGES
+                pdf_bytes, dpi=dpi, first_page=1, last_page=self.MAX_PDF_PAGES
             )
             if len(images) == self.MAX_PDF_PAGES:
                 logger.warning(
                     "PDF truncated to %d pages to prevent memory exhaustion",
-                    self.MAX_PDF_PAGES
+                    self.MAX_PDF_PAGES,
                 )
             return images
         except Exception as e:

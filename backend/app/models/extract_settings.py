@@ -19,7 +19,9 @@ class ExtractSettings(Base):
     __tablename__ = "extract_settings"
 
     id = Column(Integer, primary_key=True, default=1)
-    default_model = Column(String(100), nullable=True)  # Auto-selected from available vision models
+    default_model = Column(
+        String(100), nullable=True
+    )  # Auto-selected from available vision models
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

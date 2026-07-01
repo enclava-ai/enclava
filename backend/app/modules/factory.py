@@ -6,25 +6,21 @@ It ensures proper dependency injection while maintaining optimal performance
 through direct method calls and minimal indirection.
 """
 
-from typing import Dict, Optional, Any
 import logging
-
-# Import all modules
-from .rag.main import RAGModule
-from .chatbot.main import ChatbotModule, create_module as create_chatbot_module
-from .workflow.main import WorkflowModule
+from typing import Any, Dict, Optional
 
 # Import services that modules depend on
-from app.services.litellm_client import LiteLLMClient
-
 # Import protocols for type safety
 from .protocols import (
     RAGServiceProtocol,
-    ChatbotServiceProtocol,
-    LiteLLMClientProtocol,
-    WorkflowServiceProtocol,
     ServiceRegistry,
+    WorkflowServiceProtocol,
 )
+
+# Import all modules
+from .agent.main import AgentModule, create_module as create_agent_module
+from .rag.main import RAGModule
+from .workflow.main import WorkflowModule
 
 logger = logging.getLogger(__name__)
 
@@ -52,27 +48,19 @@ class ModuleFactory:
 
         logger.info("Creating modules with dependency injection...")
 
-        # Step 1: Create LiteLLM client (shared dependency)
-        litellm_client = LiteLLMClient()
-
-        # Step 2: Create RAG module (no dependencies on other modules)
+        # Step 1: Create RAG module (no dependencies on other modules)
         rag_module = RAGModule(config=config.get("rag", {}))
 
-        # Step 3: Create chatbot module with RAG dependency
-        chatbot_module = create_chatbot_module(
-            litellm_client=litellm_client,
-            rag_service=rag_module,  # RAG module implements RAGServiceProtocol
-        )
+        # Step 2: Create agent module with RAG dependency
+        agent_module = create_agent_module(rag_service=rag_module)
 
-        # Step 4: Create workflow module with chatbot dependency
-        workflow_module = WorkflowModule(
-            chatbot_service=chatbot_module  # Chatbot module implements ChatbotServiceProtocol
-        )
+        # Step 3: Create workflow module with agent dependency
+        workflow_module = WorkflowModule(agent_service=agent_module)
 
         # Store all modules
         modules = {
             "rag": rag_module,
-            "chatbot": chatbot_module,
+            "agent": agent_module,
             "workflow": workflow_module,
         }
 
@@ -94,8 +82,8 @@ class ModuleFactory:
         # Initialize in dependency order (modules with no deps first)
         initialization_order = [
             ("rag", modules["rag"]),
-            ("chatbot", modules["chatbot"]),  # Depends on RAG
-            ("workflow", modules["workflow"]),  # Depends on Chatbot
+            ("agent", modules["agent"]),  # Depends on RAG
+            ("workflow", modules["workflow"]),  # Depends on Agent
         ]
 
         for module_name, module in initialization_order:
@@ -124,7 +112,7 @@ class ModuleFactory:
             return
 
         # Cleanup in reverse order
-        cleanup_order = ["workflow", "chatbot", "rag"]
+        cleanup_order = ["workflow", "agent", "rag"]
 
         for module_name in cleanup_order:
             if module_name in self.modules:
@@ -180,18 +168,16 @@ def create_rag_module(config: Optional[Dict[str, Any]] = None) -> RAGModule:
     return RAGModule(config=config or {})
 
 
-def create_chatbot_with_rag(
-    rag_service: RAGServiceProtocol, litellm_client: LiteLLMClientProtocol
-) -> ChatbotModule:
-    """Create chatbot module with RAG dependency"""
-    return create_chatbot_module(litellm_client=litellm_client, rag_service=rag_service)
+def create_agent_with_rag(rag_service: RAGServiceProtocol) -> AgentModule:
+    """Create agent module with RAG dependency."""
+    return create_agent_module(rag_service=rag_service)
 
 
-def create_workflow_with_chatbot(
-    chatbot_service: ChatbotServiceProtocol,
+def create_workflow_with_agent(
+    agent_service: AgentModule,
 ) -> WorkflowModule:
-    """Create workflow module with chatbot dependency"""
-    return WorkflowModule(chatbot_service=chatbot_service)
+    """Create workflow module with agent dependency."""
+    return WorkflowModule(agent_service=agent_service)
 
 
 # Module registry for backward compatibility

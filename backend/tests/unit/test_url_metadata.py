@@ -8,9 +8,11 @@ Tests cover:
 - ProcessedDocument with source_url
 """
 
-import pytest
 import json
 from datetime import datetime, timezone
+
+import pytest
+
 from app.modules.rag.main import ProcessedDocument, RAGModule
 
 
@@ -182,7 +184,7 @@ class TestProcessedDocument:
             processed_at=datetime.now(timezone.utc),
             file_hash="abc123",
             file_size=100,
-            source_url="https://example.com/faq/article"
+            source_url="https://example.com/faq/article",
         )
 
         assert doc.source_url == "https://example.com/faq/article"
@@ -206,7 +208,7 @@ class TestProcessedDocument:
             processing_time=0.5,
             processed_at=datetime.now(timezone.utc),
             file_hash="def456",
-            file_size=100
+            file_size=100,
         )
 
         assert doc.source_url is None
@@ -231,7 +233,7 @@ class TestProcessedDocument:
             processed_at=datetime.now(timezone.utc),
             file_hash="ghi789",
             file_size=100,
-            source_url=source_url
+            source_url=source_url,
         )
 
         # URL should be in both source_url field and metadata
@@ -251,7 +253,7 @@ class TestURLMetadataStorage:
             "content": "This is chunk 0",
             "source_url": "https://example.com/faq/article",
             "article_id": "123",
-            "language": "EN"
+            "language": "EN",
         }
 
         assert "source_url" in chunk_metadata
@@ -264,7 +266,7 @@ class TestURLMetadataStorage:
             "chunk_index": 0,
             "chunk_count": 3,
             "content": "This is chunk 0",
-            "article_id": "456"
+            "article_id": "456",
         }
 
         assert chunk_metadata.get("source_url") is None
@@ -280,7 +282,7 @@ class TestURLMetadataStorage:
                 "chunk_index": i,
                 "chunk_count": 3,
                 "content": f"This is chunk {i}",
-                "source_url": source_url
+                "source_url": source_url,
             }
             chunks.append(chunk_metadata)
 
@@ -296,9 +298,21 @@ class TestURLDeduplication:
     def test_deduplicate_by_url(self):
         """Test deduplication of documents by source_url"""
         search_results = [
-            {"document_id": "doc1", "source_url": "https://example.com/faq/1", "score": 0.95},
-            {"document_id": "doc2", "source_url": "https://example.com/faq/1", "score": 0.85},  # Duplicate URL
-            {"document_id": "doc3", "source_url": "https://example.com/faq/2", "score": 0.80},
+            {
+                "document_id": "doc1",
+                "source_url": "https://example.com/faq/1",
+                "score": 0.95,
+            },
+            {
+                "document_id": "doc2",
+                "source_url": "https://example.com/faq/1",
+                "score": 0.85,
+            },  # Duplicate URL
+            {
+                "document_id": "doc3",
+                "source_url": "https://example.com/faq/2",
+                "score": 0.80,
+            },
         ]
 
         # Deduplication logic
@@ -318,9 +332,21 @@ class TestURLDeduplication:
     def test_keep_highest_score_for_duplicate_urls(self):
         """Test that highest scoring document is kept for duplicate URLs"""
         search_results = [
-            {"document_id": "doc1", "source_url": "https://example.com/faq/1", "score": 0.85},
-            {"document_id": "doc2", "source_url": "https://example.com/faq/1", "score": 0.95},  # Higher score
-            {"document_id": "doc3", "source_url": "https://example.com/faq/2", "score": 0.80},
+            {
+                "document_id": "doc1",
+                "source_url": "https://example.com/faq/1",
+                "score": 0.85,
+            },
+            {
+                "document_id": "doc2",
+                "source_url": "https://example.com/faq/1",
+                "score": 0.95,
+            },  # Higher score
+            {
+                "document_id": "doc3",
+                "source_url": "https://example.com/faq/2",
+                "score": 0.80,
+            },
         ]
 
         # Deduplication with score tracking
@@ -335,16 +361,26 @@ class TestURLDeduplication:
 
         assert len(deduplicated) == 2
         # Should keep doc2 (score 0.95) instead of doc1 (score 0.85)
-        url1_doc = [d for d in deduplicated if d["source_url"] == "https://example.com/faq/1"][0]
+        url1_doc = [
+            d for d in deduplicated if d["source_url"] == "https://example.com/faq/1"
+        ][0]
         assert url1_doc["document_id"] == "doc2"
         assert url1_doc["score"] == 0.95
 
     def test_deduplicate_mixed_urls_and_none(self):
         """Test deduplication with mix of URLs and None values"""
         search_results = [
-            {"document_id": "doc1", "source_url": "https://example.com/faq/1", "score": 0.95},
+            {
+                "document_id": "doc1",
+                "source_url": "https://example.com/faq/1",
+                "score": 0.95,
+            },
             {"document_id": "doc2", "source_url": None, "score": 0.90},
-            {"document_id": "doc3", "source_url": "https://example.com/faq/1", "score": 0.85},  # Duplicate
+            {
+                "document_id": "doc3",
+                "source_url": "https://example.com/faq/1",
+                "score": 0.85,
+            },  # Duplicate
             {"document_id": "doc4", "source_url": None, "score": 0.80},
         ]
 
@@ -375,11 +411,8 @@ class TestURLFieldCompatibility:
         result = {
             "document_id": "legacy_doc",
             "content": "Legacy content",
-            "metadata": {
-                "article_id": "123",
-                "language": "EN"
-            },
-            "score": 0.85
+            "metadata": {"article_id": "123", "language": "EN"},
+            "score": 0.85,
         }
 
         # Accessing source_url should not raise error
@@ -392,13 +425,13 @@ class TestURLFieldCompatibility:
             {
                 "document_id": "new_doc",
                 "metadata": {"source_url": "https://example.com/faq/1"},
-                "score": 0.95
+                "score": 0.95,
             },
             {
                 "document_id": "legacy_doc",
                 "metadata": {"article_id": "123"},
-                "score": 0.85
-            }
+                "score": 0.85,
+            },
         ]
 
         for result in results:

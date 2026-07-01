@@ -3,11 +3,12 @@ Ollama Embedding Service
 Provides text embedding functionality using Ollama locally
 """
 
-import logging
-from typing import List, Dict, Any, Optional
-import numpy as np
-import aiohttp
 import asyncio
+import logging
+from typing import Any, Dict, List, Optional
+
+import aiohttp
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,9 @@ class OllamaEmbeddingService:
     """Service for generating text embeddings using Ollama"""
 
     def __init__(
-        self, model_name: str = "bge-small-en", base_url: str = "http://172.17.0.1:11434"
+        self,
+        model_name: str = "bge-small-en",
+        base_url: str = "http://172.17.0.1:11434",
     ):
         self.model_name = model_name
         self.base_url = base_url

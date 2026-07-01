@@ -4,18 +4,19 @@ Represents documents within RAG collections
 """
 
 from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
     Column,
+    DateTime,
+    ForeignKey,
     Integer,
     String,
     Text,
-    DateTime,
-    Boolean,
-    BigInteger,
-    ForeignKey,
-    JSON,
 )
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.db.database import Base
 
 
@@ -96,7 +97,96 @@ class RagDocument(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    connector_source = relationship("ConnectorSource", foreign_keys=[connector_source_id])
+    connector_source = relationship(
+        "ConnectorSource", foreign_keys=[connector_source_id]
+    )
+
+    def __init__(self, **kwargs):
+        if "size" in kwargs and "file_size" not in kwargs:
+            kwargs["file_size"] = kwargs.pop("size")
+        if "content" in kwargs and "converted_content" not in kwargs:
+            kwargs["converted_content"] = kwargs.pop("content")
+        if "metadata" in kwargs and "document_metadata" not in kwargs:
+            kwargs["document_metadata"] = kwargs.pop("metadata")
+        if "embedding_status" in kwargs:
+            embedding_status = kwargs.pop("embedding_status")
+            kwargs.setdefault(
+                "status",
+                {
+                    "completed": "indexed",
+                    "failed": "error",
+                }.get(embedding_status, embedding_status),
+            )
+            kwargs["_legacy_embedding_status"] = embedding_status
+        if "chunk_count" in kwargs and "vector_count" not in kwargs:
+            kwargs["vector_count"] = kwargs.pop("chunk_count")
+        if "error_message" in kwargs and "processing_error" not in kwargs:
+            kwargs["processing_error"] = kwargs.pop("error_message")
+        kwargs.setdefault("original_filename", kwargs.get("filename", ""))
+        kwargs.setdefault("file_path", kwargs.get("filename", ""))
+        kwargs.setdefault(
+            "file_type",
+            (
+                kwargs.get("filename", "").rsplit(".", 1)[-1]
+                if "." in kwargs.get("filename", "")
+                else "txt"
+            ),
+        )
+        kwargs.setdefault("file_size", len(kwargs.get("converted_content") or ""))
+        legacy_status = kwargs.pop("_legacy_embedding_status", None)
+        super().__init__(**kwargs)
+        if legacy_status is not None:
+            self._legacy_embedding_status = legacy_status
+
+    @property
+    def size(self):
+        return self.file_size
+
+    @size.setter
+    def size(self, value):
+        self.file_size = value
+
+    @property
+    def content(self):
+        return self.converted_content
+
+    @content.setter
+    def content(self, value):
+        self.converted_content = value
+
+    @property
+    def embedding_status(self):
+        if hasattr(self, "_legacy_embedding_status"):
+            return self._legacy_embedding_status
+        return {
+            "indexed": "completed",
+            "processed": "completed",
+            "error": "failed",
+        }.get(self.status, self.status)
+
+    @embedding_status.setter
+    def embedding_status(self, value):
+        self._legacy_embedding_status = value
+        self.status = {
+            "completed": "indexed",
+            "failed": "error",
+        }.get(value, value)
+
+    @property
+    def chunk_count(self):
+        return self.vector_count
+
+    @chunk_count.setter
+    def chunk_count(self, value):
+        self.vector_count = value
+
+    @property
+    def error_message(self):
+        return self.processing_error
+
+    @error_message.setter
+    def error_message(self, value):
+        self.processing_error = value
 
     def to_dict(self):
         """Convert model to dictionary for API responses"""
@@ -120,13 +210,15 @@ class RagDocument(Base):
             "metadata": self.document_metadata or {},
             "connector_source_id": self.connector_source_id,
             "external_id": self.external_id,
-            "external_updated_at": self.external_updated_at.isoformat()
-            if self.external_updated_at
-            else None,
+            "external_updated_at": (
+                self.external_updated_at.isoformat()
+                if self.external_updated_at
+                else None
+            ),
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "processed_at": self.processed_at.isoformat()
-            if self.processed_at
-            else None,
+            "processed_at": (
+                self.processed_at.isoformat() if self.processed_at else None
+            ),
             "indexed_at": self.indexed_at.isoformat() if self.indexed_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "is_deleted": self.is_deleted,

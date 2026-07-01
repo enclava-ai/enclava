@@ -23,12 +23,14 @@ class ProviderError(LLMError):
     def __init__(
         self,
         message: str,
-        provider: str,
+        provider: str = "unknown",
+        status_code: int = None,
         error_code: str = "PROVIDER_ERROR",
         details: dict = None,
     ):
         super().__init__(message, error_code, details)
         self.provider = provider
+        self.status_code = status_code
 
 
 class SecurityError(LLMError):
@@ -94,3 +96,6 @@ class ValidationError(LLMError):
     ):
         super().__init__(message, error_code, details)
         self.field = field
+
+
+LLMServiceError = LLMError

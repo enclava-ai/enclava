@@ -3,15 +3,15 @@ Optimized JSONL Processor for RAG Module
 Handles JSONL files efficiently to prevent resource exhaustion
 """
 
+import asyncio
 import json
 import logging
-import asyncio
-from typing import Dict, Any, List
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
-from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue
 from qdrant_client.http.models import Batch
+from qdrant_client.models import FieldCondition, Filter, MatchValue, PointStruct
 
 from app.modules.rag.main import ProcessedDocument
 
@@ -47,7 +47,9 @@ def validate_source_url(url: str) -> str | None:
 
     # Check protocol (basic validation)
     if not (url.startswith("http://") or url.startswith("https://")):
-        logger.debug(f"URL has invalid protocol (only http/https allowed): {url[:50]}...")
+        logger.debug(
+            f"URL has invalid protocol (only http/https allowed): {url[:50]}..."
+        )
         return None
 
     return url
@@ -190,7 +192,9 @@ class JSONLProcessor:
                             points.append(
                                 PointStruct(
                                     id=point_id,
-                                    vector=embeddings[0],
+                                    vector=self.rag_module._align_embedding_dimension(
+                                        embeddings[0], collection_name
+                                    ),
                                     payload={
                                         **doc_metadata,
                                         "document_id": f"{base_doc_id}_{article_id}",
@@ -221,7 +225,9 @@ class JSONLProcessor:
                                 points.append(
                                     PointStruct(
                                         id=point_id,
-                                        vector=embedding,
+                                        vector=self.rag_module._align_embedding_dimension(
+                                            embedding, collection_name
+                                        ),
                                         payload={
                                             **metadata,
                                             "filename": filename,
@@ -243,7 +249,9 @@ class JSONLProcessor:
                             points.append(
                                 PointStruct(
                                     id=point_id,
-                                    vector=embeddings[0],
+                                    vector=self.rag_module._align_embedding_dimension(
+                                        embeddings[0], collection_name
+                                    ),
                                     payload={
                                         **metadata,
                                         "filename": filename,

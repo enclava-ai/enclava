@@ -2,11 +2,11 @@
 
 **Confidential AI Platform for businesses**
 
-Enclava is a comprehensive AI platform that makes privacy practical. It provides easy to create openai compatible chatbots and API endpoints with knowledge base access (RAG). All in a completely confidential way through [privatemode.ai](https://privatemode.ai)
+Enclava is a comprehensive AI platform that makes privacy practical. It provides easy-to-create OpenAI-compatible agents and API endpoints with knowledge base access (RAG), all in a confidential way through [privatemode.ai](https://privatemode.ai).
 
 ## Key Features
 
-- **AI Chatbots** - Customizable chatbots with prompt templates and RAG integration (openai compatible)
+- **AI Agents** - Customizable agents with prompt templates, tools, and RAG integration (OpenAI compatible)
 - **RAG System** - Document upload, processing, and semantic search with Qdrant
 - **TEE Security** - Privacy-protected LLM inference via confidential computing
 - **OpenAI Compatible** - Standard API endpoints for seamless integration with existing tools 
@@ -89,4 +89,3 @@ See `.env.example` for all available configuration options.
 
 
 ---
-

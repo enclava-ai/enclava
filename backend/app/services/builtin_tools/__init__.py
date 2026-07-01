@@ -9,8 +9,8 @@ Tools are registered at application startup via register_builtin_tools().
 """
 
 from .base import BuiltinTool, ToolExecutionContext, ToolResult
-from .registry import BuiltinToolRegistry
 from .rag_search import RAGSearchTool
+from .registry import BuiltinToolRegistry
 from .web_search import WebSearchTool
 
 

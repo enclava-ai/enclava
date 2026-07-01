@@ -14,18 +14,19 @@ to prevent information disclosure about system internals.
 
 import asyncio
 import logging
-import psutil
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+import psutil
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.db.database import async_session_factory, get_pool_status
-from app.services.embedding_service import embedding_service
 from app.core.config import settings
 from app.core.security import get_current_user
+from app.db.database import async_session_factory, get_pool_status
+from app.services.embedding_service import embedding_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -117,12 +118,16 @@ class HealthChecker:
                 # Warning if using more than 70% of max connections
                 if async_checked_out > async_max * 0.7:
                     pool_health = "warning"
-                    issues.append(f"Async pool high utilization: {async_checked_out}/{async_max}")
+                    issues.append(
+                        f"Async pool high utilization: {async_checked_out}/{async_max}"
+                    )
 
                 # Critical if using more than 90%
                 if async_checked_out > async_max * 0.9:
                     pool_health = "critical"
-                    issues.append(f"Async pool near exhaustion: {async_checked_out}/{async_max}")
+                    issues.append(
+                        f"Async pool near exhaustion: {async_checked_out}/{async_max}"
+                    )
 
                 # Warning if overflow is being used
                 if async_overflow > 0:
@@ -141,12 +146,16 @@ class HealthChecker:
                 if sync_checked_out > sync_max * 0.7:
                     if pool_health == "healthy":
                         pool_health = "warning"
-                    issues.append(f"Sync pool high utilization: {sync_checked_out}/{sync_max}")
+                    issues.append(
+                        f"Sync pool high utilization: {sync_checked_out}/{sync_max}"
+                    )
 
                 # Critical if using more than 90%
                 if sync_checked_out > sync_max * 0.9:
                     pool_health = "critical"
-                    issues.append(f"Sync pool near exhaustion: {sync_checked_out}/{sync_max}")
+                    issues.append(
+                        f"Sync pool near exhaustion: {sync_checked_out}/{sync_max}"
+                    )
 
                 # Warning if overflow is being used
                 if sync_overflow > 0:

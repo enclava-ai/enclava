@@ -1,21 +1,23 @@
 """
 Module management service with dynamic discovery
 """
+
 import asyncio
 import importlib
 import os
 import sys
-from typing import Dict, List, Optional, Any
-from pathlib import Path
 from dataclasses import dataclass
-from watchdog.observers import Observer
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 from app.core.config import settings
-from app.core.logging import log_module_event, get_logger
-from app.utils.exceptions import ModuleLoadError, ModuleNotFoundError
+from app.core.logging import get_logger, log_module_event
+from app.services.module_config_manager import ModuleManifest, module_config_manager
 from app.services.permission_manager import permission_registry
-from app.services.module_config_manager import module_config_manager, ModuleManifest
+from app.utils.exceptions import ModuleLoadError, ModuleNotFoundError
 
 logger = get_logger(__name__)
 

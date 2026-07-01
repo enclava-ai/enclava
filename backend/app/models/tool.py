@@ -1,21 +1,24 @@
 """
 Tool model for custom tool execution
 """
+
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    Float,
+    ForeignKey,
     Integer,
     String,
-    DateTime,
-    Boolean,
     Text,
-    JSON,
-    ForeignKey,
-    Float,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
 
 
@@ -114,9 +117,9 @@ class Tool(Base):
             "category": self.category,
             "tags": self.tags,
             "usage_count": self.usage_count,
-            "last_used_at": self.last_used_at.isoformat()
-            if self.last_used_at
-            else None,
+            "last_used_at": (
+                self.last_used_at.isoformat() if self.last_used_at else None
+            ),
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -202,9 +205,9 @@ class ToolExecution(Base):
             "cpu_time_ms": self.cpu_time_ms,
             "container_id": self.container_id,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

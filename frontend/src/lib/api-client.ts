@@ -72,51 +72,6 @@ export const apiClient = {
   delete: <T = any>(url: string, init?: RequestInit) => request<T>('DELETE', url, undefined, init),
 }
 
-export const chatbotApi = {
-  async listChatbots() {
-    try {
-      return await apiClient.get('/api-internal/v1/chatbot/list')
-    } catch {
-      return await apiClient.get('/api-internal/v1/chatbot/instances')
-    }
-  },
-  createChatbot(config: any) {
-    return apiClient.post('/api-internal/v1/chatbot/create', config)
-  },
-  updateChatbot(id: string, config: any) {
-    return apiClient.put(`/api-internal/v1/chatbot/update/${encodeURIComponent(id)}`, config)
-  },
-  deleteChatbot(id: string) {
-    return apiClient.delete(`/api-internal/v1/chatbot/delete/${encodeURIComponent(id)}`)
-  },
-  // Legacy method with JWT auth (to be deprecated)
-  sendMessage(chatbotId: string, message: string, conversationId?: string, history?: Array<{role: string; content: string}>) {
-    const body: any = { message }
-    if (conversationId) body.conversation_id = conversationId
-    if (history) body.history = history
-    return apiClient.post(`/api-internal/v1/chatbot/chat/${encodeURIComponent(chatbotId)}`, body)
-  },
-  // OpenAI-compatible chatbot API with API key auth
-  sendOpenAIChatMessage(chatbotId: string, messages: Array<{role: string; content: string}>, apiKey: string, options?: {
-    temperature?: number
-    max_tokens?: number
-    stream?: boolean
-  }) {
-    const body: any = {
-      messages,
-      ...options
-    }
-    return fetch(`/api/v1/chatbot/external/${encodeURIComponent(chatbotId)}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(body)
-    }).then(res => res.json())
-  }
-}
-
 export const agentApi = {
   listAgents(params?: { category?: string; is_public?: boolean }) {
     const queryParams = new URLSearchParams()

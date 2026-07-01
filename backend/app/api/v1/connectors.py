@@ -26,8 +26,8 @@ from app.core.security import get_current_user
 from app.db.database import get_db
 from app.models.connector_source import (
     ConnectorSource,
-    ConnectorSyncJob,
     ConnectorStatus,
+    ConnectorSyncJob,
     ConnectorType,
 )
 from app.models.rag_collection import RagCollection
@@ -43,12 +43,13 @@ router = APIRouter(tags=["Connectors"])
 # Request / Response schemas
 # ---------------------------------------------------------------------------
 
+
 class ConnectorCreate(BaseModel):
     name: str
     connector_type: str
     collection_id: int
     config: dict[str, Any] = {}
-    credentials: dict[str, Any] = {}   # plaintext — encrypted before DB write
+    credentials: dict[str, Any] = {}  # plaintext — encrypted before DB write
     sync_frequency: str = "PT1H"
 
     @field_validator("connector_type")
@@ -63,6 +64,7 @@ class ConnectorCreate(BaseModel):
     @classmethod
     def validate_frequency(cls, v: str) -> str:
         from app.tasks.connector_sync import _parse_duration
+
         try:
             _parse_duration(v)
         except ValueError as exc:
@@ -83,6 +85,7 @@ class ConnectorUpdate(BaseModel):
         if v is None:
             return v
         from app.tasks.connector_sync import _parse_duration
+
         try:
             _parse_duration(v)
         except ValueError as exc:
@@ -91,7 +94,7 @@ class ConnectorUpdate(BaseModel):
 
 
 class OAuthAuthorizeRequest(BaseModel):
-    connector_type: str   # "notion" or "github"
+    connector_type: str  # "notion" or "github"
     collection_id: int
     connector_name: Optional[str] = None  # optional name override
 
@@ -100,10 +103,50 @@ class OAuthAuthorizeRequest(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _require_admin(user: User) -> None:
-    if user.is_superuser:
-        return
-    if user.role and user.role.level in ("admin", "super_admin"):
+
+def _auth_user(auth_context: Any) -> Optional[User]:
+    if isinstance(auth_context, User):
+        return auth_context
+    if isinstance(auth_context, dict):
+        user_obj = auth_context.get("user_obj")
+        if isinstance(user_obj, User):
+            return user_obj
+    return None
+
+
+def _auth_user_id(auth_context: Any) -> int:
+    user = _auth_user(auth_context)
+    if user:
+        return int(user.id)
+    if isinstance(auth_context, dict):
+        return int(auth_context["id"])
+    return int(auth_context.id)
+
+
+def _role_level(auth_context: Any) -> Optional[str]:
+    user = _auth_user(auth_context)
+    if user and user.role:
+        return user.role.level
+    if isinstance(auth_context, dict):
+        role = auth_context.get("role")
+        return role if isinstance(role, str) else None
+    role = getattr(auth_context, "role", None)
+    if isinstance(role, str) or role is None:
+        return role
+    return getattr(role, "level", None)
+
+
+def _is_admin(auth_context: Any) -> bool:
+    user = _auth_user(auth_context)
+    if user and user.is_superuser:
+        return True
+    if isinstance(auth_context, dict) and auth_context.get("is_superuser"):
+        return True
+    return _role_level(auth_context) in ("admin", "super_admin")
+
+
+def _require_admin(user: Any) -> None:
+    if _is_admin(user):
         return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -111,9 +154,7 @@ def _require_admin(user: User) -> None:
     )
 
 
-async def _get_connector_or_404(
-    connector_id: int, db: AsyncSession
-) -> ConnectorSource:
+async def _get_connector_or_404(connector_id: int, db: AsyncSession) -> ConnectorSource:
     connector = await db.get(ConnectorSource, connector_id)
     if connector is None or not connector.is_active:
         raise HTTPException(status_code=404, detail="Connector not found")
@@ -123,6 +164,7 @@ async def _get_connector_or_404(
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/connectors")
 async def list_connectors(
@@ -135,9 +177,8 @@ async def list_connectors(
     result = await db.execute(stmt)
     connectors = result.scalars().all()
 
-    is_admin = current_user.is_superuser or (
-        current_user.role and current_user.role.level in ("admin", "super_admin")
-    )
+    is_admin = _is_admin(current_user)
+    user_obj = _auth_user(current_user)
 
     visible = []
     for c in connectors:
@@ -145,10 +186,40 @@ async def list_connectors(
             visible.append(c)
         else:
             collection = await db.get(RagCollection, c.collection_id)
-            if collection and can_user_access_collection(collection, current_user):
+            if collection and can_user_access_collection(collection, user_obj):
                 visible.append(c)
 
     return {"success": True, "connectors": [c.to_dict() for c in visible]}
+
+
+@router.get("/connectors/collections")
+async def list_connector_collections(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """List database-backed RAG collections that can be connector targets."""
+    stmt = select(RagCollection).where(RagCollection.is_active.is_(True))
+    result = await db.execute(stmt)
+    collections = result.scalars().all()
+
+    user_obj = _auth_user(current_user)
+    visible = [
+        collection
+        for collection in collections
+        if _is_admin(current_user) or can_user_access_collection(collection, user_obj)
+    ]
+
+    return {
+        "success": True,
+        "collections": [
+            {
+                "id": collection.id,
+                "name": collection.name,
+                "description": collection.description,
+            }
+            for collection in visible
+        ],
+    }
 
 
 @router.post("/connectors", status_code=status.HTTP_201_CREATED)
@@ -169,6 +240,7 @@ async def create_connector(
     encrypted: Optional[str] = None
     if data.credentials:
         from app.services.connector_sync_service import encrypt_credentials
+
         encrypted = encrypt_credentials(data.credentials)
 
     connector = ConnectorSource(
@@ -179,7 +251,7 @@ async def create_connector(
         encrypted_credentials=encrypted,
         sync_frequency=data.sync_frequency,
         status=ConnectorStatus.PENDING,
-        created_by_user_id=current_user.id,
+        created_by_user_id=_auth_user_id(current_user),
     )
     db.add(connector)
     await db.commit()
@@ -201,12 +273,12 @@ async def get_connector(
     """Get a single connector.  Users may only see connectors for accessible collections."""
     connector = await _get_connector_or_404(connector_id, db)
 
-    is_admin = current_user.is_superuser or (
-        current_user.role and current_user.role.level in ("admin", "super_admin")
-    )
+    is_admin = _is_admin(current_user)
     if not is_admin:
         collection = await db.get(RagCollection, connector.collection_id)
-        if not collection or not can_user_access_collection(collection, current_user):
+        if not collection or not can_user_access_collection(
+            collection, _auth_user(current_user)
+        ):
             raise HTTPException(status_code=404, detail="Connector not found")
 
     return {"success": True, "connector": connector.to_dict()}
@@ -229,6 +301,7 @@ async def update_connector(
         connector.config = data.config
     if data.credentials is not None:
         from app.services.connector_sync_service import encrypt_credentials
+
         connector.encrypted_credentials = encrypt_credentials(data.credentials)
     if data.sync_frequency is not None:
         connector.sync_frequency = data.sync_frequency
@@ -275,6 +348,7 @@ async def trigger_sync(
 
     # Fire the sync in a background task so the HTTP response returns immediately
     import asyncio
+
     from app.tasks.connector_sync import sync_connector_now
 
     asyncio.create_task(sync_connector_now(connector.id))
@@ -298,9 +372,11 @@ async def validate_connector(
     credentials: dict[str, Any] = {}
     if connector.encrypted_credentials:
         from app.services.connector_sync_service import decrypt_credentials
+
         credentials = decrypt_credentials(connector.encrypted_credentials)
 
     from app.connectors.registry import build_connector
+
     try:
         impl = build_connector(
             ConnectorType(connector.connector_type),
@@ -383,15 +459,13 @@ async def oauth_authorize(
     state_data = {
         "connector_type": data.connector_type,
         "collection_id": data.collection_id,
-        "user_id": current_user.id,
+        "user_id": _auth_user_id(current_user),
         "connector_name": data.connector_name,
     }
     await core_cache.set(f"oauth_state:{state}", state_data, ttl=600)
 
     # Build provider-specific authorization URL
-    redirect_uri = (
-        f"{settings.BASE_URL}/api-internal/v1/connectors/oauth/callback"
-    )
+    redirect_uri = f"{settings.BASE_URL}/api-internal/v1/connectors/oauth/callback"
     if data.connector_type == "notion":
         params = {
             "client_id": settings.NOTION_CLIENT_ID,
@@ -459,9 +533,7 @@ async def oauth_callback(
     user_id = state_data.get("user_id")
     connector_name = state_data.get("connector_name")
 
-    redirect_uri = (
-        f"{settings.BASE_URL}/api-internal/v1/connectors/oauth/callback"
-    )
+    redirect_uri = f"{settings.BASE_URL}/api-internal/v1/connectors/oauth/callback"
 
     # Exchange the authorization code for an access token
     credentials: dict[str, Any] = {}
@@ -470,7 +542,9 @@ async def oauth_callback(
             if connector_type == "notion":
                 import base64 as _b64
 
-                creds_str = f"{settings.NOTION_CLIENT_ID}:{settings.NOTION_CLIENT_SECRET}"
+                creds_str = (
+                    f"{settings.NOTION_CLIENT_ID}:{settings.NOTION_CLIENT_SECRET}"
+                )
                 basic_token = _b64.b64encode(creds_str.encode()).decode()
                 resp = await client.post(
                     "https://api.notion.com/v1/oauth/token",
@@ -506,7 +580,9 @@ async def oauth_callback(
                 resp.raise_for_status()
                 token_data = resp.json()
                 if "error" in token_data:
-                    raise ValueError(token_data.get("error_description", token_data["error"]))
+                    raise ValueError(
+                        token_data.get("error_description", token_data["error"])
+                    )
                 credentials = {
                     "access_token": token_data.get("access_token"),
                     "token_type": token_data.get("token_type"),
@@ -563,6 +639,7 @@ async def available_connector_types(
 ) -> dict:
     """Return the list of connector types that are registered."""
     from app.connectors.registry import available_connector_types as _avail
+
     return {
         "success": True,
         "connector_types": [t.value for t in _avail()],

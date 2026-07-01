@@ -10,17 +10,19 @@ Provides comprehensive metrics collection for:
 Thread-safe singleton implementation using prometheus_client.
 """
 
+import os
 from typing import Optional
+
 from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
-    CollectorRegistry,
     generate_latest,
-    CONTENT_TYPE_LATEST,
 )
 from prometheus_client.multiprocess import MultiProcessCollector
-import os
+
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -220,9 +222,9 @@ class MetricsService:
 
             # Record cost
             if cost_cents > 0:
-                self.usage_cost_cents_total.labels(
-                    provider=provider, model=model
-                ).inc(cost_cents)
+                self.usage_cost_cents_total.labels(provider=provider, model=model).inc(
+                    cost_cents
+                )
 
             # Record latency
             if latency_ms is not None:
@@ -232,9 +234,9 @@ class MetricsService:
 
             # Record TTFT (streaming only)
             if ttft_ms is not None:
-                self.usage_ttft_seconds.labels(
-                    provider=provider, model=model
-                ).observe(ttft_ms / 1000.0)
+                self.usage_ttft_seconds.labels(provider=provider, model=model).observe(
+                    ttft_ms / 1000.0
+                )
 
             # Record errors
             if status == "error" and error_type:
@@ -279,9 +281,7 @@ class MetricsService:
         except Exception as e:
             logger.error(f"Error recording budget usage metrics: {e}")
 
-    def record_budget_exceeded(
-        self, budget_id: int, budget_name: str, user_id: int
-    ):
+    def record_budget_exceeded(self, budget_id: int, budget_name: str, user_id: int):
         """
         Record a budget exceeded event.
 
@@ -352,9 +352,10 @@ class MetricsService:
             # Update last success timestamp
             if success:
                 import time
-                self.pricing_sync_last_success_timestamp.labels(
-                    provider=provider
-                ).set(time.time())
+
+                self.pricing_sync_last_success_timestamp.labels(provider=provider).set(
+                    time.time()
+                )
             else:
                 self.pricing_sync_failures_total.labels(provider=provider).inc()
 
@@ -434,9 +435,6 @@ def setup_metrics(app):
     async def metrics_endpoint():
         """Prometheus metrics endpoint"""
         metrics_data = metrics_service.get_metrics()
-        return Response(
-            content=metrics_data,
-            media_type=CONTENT_TYPE_LATEST
-        )
+        return Response(content=metrics_data, media_type=CONTENT_TYPE_LATEST)
 
     logger.info("Prometheus metrics endpoint setup at /metrics")

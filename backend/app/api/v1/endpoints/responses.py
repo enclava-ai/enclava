@@ -5,15 +5,16 @@ OpenAI-compatible Responses API for agentic interactions with tool execution.
 """
 
 import logging
-from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.schemas.responses import ResponseCreateRequest, ResponseObject
-from app.services.responses.responses_service import ResponsesService
 from app.services.api_key_auth import require_api_key
+from app.services.responses.responses_service import ResponsesService
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +39,13 @@ router = APIRouter()
 
     Compatible with OpenAI's Responses API format.
     """,
-    tags=["Responses API"]
+    tags=["Responses API"],
 )
 async def create_response(
     request: ResponseCreateRequest,
     stream: bool = Query(default=False, description="Enable streaming response"),
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Create a response with automatic tool execution.
@@ -66,8 +67,11 @@ async def create_response(
 
         # Handle streaming request
         if stream:
+
             async def event_generator():
-                async for event in service.create_response_stream(request, api_key_context):
+                async for event in service.create_response_stream(
+                    request, api_key_context
+                ):
                     yield event
 
             return StreamingResponse(
@@ -76,8 +80,8 @@ async def create_response(
                 headers={
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
-                    "X-Accel-Buffering": "no"  # Disable nginx buffering
-                }
+                    "X-Accel-Buffering": "no",  # Disable nginx buffering
+                },
             )
 
         # Handle non-streaming request
@@ -91,12 +95,12 @@ async def create_response(
             if error_type == "budget_exceeded":
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=error.get("message", "Budget exceeded")
+                    detail=error.get("message", "Budget exceeded"),
                 )
             else:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=error.get("message", "Internal server error")
+                    detail=error.get("message", "Internal server error"),
                 )
 
         return response
@@ -107,7 +111,7 @@ async def create_response(
         logger.error(f"Error in create_response endpoint: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create response: {str(e)}"
+            detail=f"Failed to create response: {str(e)}",
         )
 
 
@@ -122,12 +126,12 @@ async def create_response(
     Only returns responses owned by the authenticated user.
     Responses with store=false cannot be retrieved.
     """,
-    tags=["Responses API"]
+    tags=["Responses API"],
 )
 async def get_response(
     response_id: str,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> ResponseObject:
     """
     Get a stored response by ID.
@@ -152,7 +156,7 @@ async def get_response(
         if not response:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Response {response_id} not found"
+                detail=f"Response {response_id} not found",
             )
 
         return response
@@ -163,5 +167,5 @@ async def get_response(
         logger.error(f"Error in get_response endpoint: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve response: {str(e)}"
+            detail=f"Failed to retrieve response: {str(e)}",
         )

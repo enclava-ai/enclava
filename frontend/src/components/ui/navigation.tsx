@@ -21,10 +21,8 @@ import { ChevronDown } from "lucide-react"
 
 // Module to navigation mapping
 const MODULE_NAV_MAP = {
-  chatbot: { href: "/chatbot", label: "Chatbot" },
   rag: { href: "/rag", label: "RAG" },
   extract: { href: "/extract", label: "Extract" },
-  // Add more mappings as needed
 }
 
 const Navigation = () => {
@@ -74,17 +72,17 @@ const Navigation = () => {
   // Build settings children based on permissions
   const settingsChildren = [
     { href: "/settings", label: "System Settings" },
+    { href: "/llm", label: "LLM" },
     { href: "/admin/users", label: "Users" },
     { href: "/admin/api-keys", label: "API Keys" },
     { href: "/admin/connectors", label: "Connectors" },
   ];
 
   // Core navigation items that are always visible
-  // Order: Dashboard, Agents, LLM, Chatbot (module), Rag (module), Settings
+  // Order: Dashboard, Agents, module items, Settings
   const coreNavItems = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/agents", label: "Agents" },
-    { href: "/llm", label: "LLM" },
   ]
 
   // Settings goes at the end
@@ -99,7 +97,7 @@ const Navigation = () => {
     .filter(([moduleName]) => isModuleEnabled(moduleName))
     .map(([, navItem]) => navItem)
 
-  // Combine: Dashboard, Agents, LLM, module items (Chatbot, RAG), plugins, then Settings at the end
+  // Combine: Dashboard, Agents, module items, plugins, then Settings at the end
   const navItems = [...coreNavItems, ...moduleNavItems, ...pluginNavItems, settingsItem]
 
   return (

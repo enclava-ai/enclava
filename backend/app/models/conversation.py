@@ -3,16 +3,18 @@ Conversation model for Responses API
 """
 
 from datetime import datetime, timezone
+
 from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    DateTime,
     JSON,
+    Column,
+    DateTime,
     ForeignKey,
     Index,
+    Integer,
+    String,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
 
 
@@ -50,8 +52,16 @@ class Conversation(Base):
     # Indexes
     __table_args__ = (
         Index("idx_conversations_id", "id"),
-        Index("idx_conversations_user_id", "user_id", postgresql_where=(user_id.isnot(None))),
-        Index("idx_conversations_api_key_id", "api_key_id", postgresql_where=(api_key_id.isnot(None))),
+        Index(
+            "idx_conversations_user_id",
+            "user_id",
+            postgresql_where=(user_id.isnot(None)),
+        ),
+        Index(
+            "idx_conversations_api_key_id",
+            "api_key_id",
+            postgresql_where=(api_key_id.isnot(None)),
+        ),
         Index("idx_conversations_created_at", "created_at"),
         Index("idx_conversations_updated_at", "updated_at"),
     )

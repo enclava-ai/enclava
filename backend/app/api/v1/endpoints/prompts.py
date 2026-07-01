@@ -6,11 +6,12 @@ This provides a programmatic way to manage agent configurations.
 """
 
 import logging
-from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.models.agent_config import AgentConfig
@@ -25,8 +26,10 @@ router = APIRouter()
 # Schemas
 # ============================================================================
 
+
 class PromptCreateRequest(BaseModel):
     """Request to create a prompt (agent config)"""
+
     name: str = Field(..., min_length=1, max_length=200)
     display_name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
@@ -44,6 +47,7 @@ class PromptCreateRequest(BaseModel):
 
 class PromptUpdateRequest(BaseModel):
     """Request to update a prompt"""
+
     display_name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
     instructions: Optional[str] = Field(None, min_length=1)
@@ -60,6 +64,7 @@ class PromptUpdateRequest(BaseModel):
 
 class PromptResponse(BaseModel):
     """Prompt (agent config) response"""
+
     id: int
     name: str
     display_name: str
@@ -83,6 +88,7 @@ class PromptResponse(BaseModel):
 
 class PromptListResponse(BaseModel):
     """List of prompts"""
+
     object: str = "list"
     data: List[PromptResponse]
     has_more: bool = False
@@ -92,18 +98,19 @@ class PromptListResponse(BaseModel):
 # Endpoints
 # ============================================================================
 
+
 @router.post(
     "/prompts",
     response_model=PromptResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create Prompt",
     description="Create a new prompt (agent configuration).",
-    tags=["Prompts API"]
+    tags=["Prompts API"],
 )
 async def create_prompt(
     request: PromptCreateRequest,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> PromptResponse:
     """Create a new prompt.
 
@@ -123,8 +130,7 @@ async def create_prompt(
 
         # Check if name already exists for this user
         stmt = select(AgentConfig).where(
-            AgentConfig.name == request.name,
-            AgentConfig.created_by_user_id == user.id
+            AgentConfig.name == request.name, AgentConfig.created_by_user_id == user.id
         )
         result = await db.execute(stmt)
         existing = result.scalar_one_or_none()
@@ -132,7 +138,7 @@ async def create_prompt(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Prompt with name '{request.name}' already exists"
+                detail=f"Prompt with name '{request.name}' already exists",
             )
 
         # Convert tools to tools_config format
@@ -157,23 +163,25 @@ async def create_prompt(
             if mcp_servers:
                 tools_config["mcp_servers"] = mcp_servers
 
+        tools_config = tools_config or {}
+        tools_config[AgentConfig._DISPLAY_NAME_CONFIG_KEY] = request.display_name
+
         # Create agent config
         agent_config = AgentConfig(
             name=request.name,
-            display_name=request.display_name,
             description=request.description,
             system_prompt=request.instructions,
             model=request.model,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
-            tools_config=tools_config or {},
+            tools_config=tools_config,
             tool_resources=request.tool_resources,
             category=request.category,
             tags=request.tags or [],
             is_public=request.is_public,
             is_template=False,
             created_by_user_id=user.id,
-            is_active=True
+            is_active=True,
         )
 
         db.add(agent_config)
@@ -200,9 +208,17 @@ async def create_prompt(
             is_template=agent_config.is_template,
             is_active=agent_config.is_active,
             usage_count=agent_config.usage_count,
-            created_at=agent_config.created_at.isoformat() if agent_config.created_at else None,
-            updated_at=agent_config.updated_at.isoformat() if agent_config.updated_at else None,
-            last_used_at=agent_config.last_used_at.isoformat() if agent_config.last_used_at else None
+            created_at=(
+                agent_config.created_at.isoformat() if agent_config.created_at else None
+            ),
+            updated_at=(
+                agent_config.updated_at.isoformat() if agent_config.updated_at else None
+            ),
+            last_used_at=(
+                agent_config.last_used_at.isoformat()
+                if agent_config.last_used_at
+                else None
+            ),
         )
 
     except HTTPException:
@@ -212,7 +228,7 @@ async def create_prompt(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create prompt: {str(e)}"
+            detail=f"Failed to create prompt: {str(e)}",
         )
 
 
@@ -222,13 +238,13 @@ async def create_prompt(
     status_code=status.HTTP_200_OK,
     summary="List Prompts",
     description="List all prompts accessible to the user.",
-    tags=["Prompts API"]
+    tags=["Prompts API"],
 )
 async def list_prompts(
     limit: int = Query(default=20, ge=1, le=100),
     category: Optional[str] = Query(default=None),
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> PromptListResponse:
     """List prompts.
 
@@ -245,13 +261,18 @@ async def list_prompts(
         user = api_key_context.get("user")
 
         # Build query - user's own prompts + public prompts
-        stmt = select(AgentConfig).where(
-            AgentConfig.is_active == True,
-            (
-                (AgentConfig.created_by_user_id == user.id) |
-                (AgentConfig.is_public == True)
+        stmt = (
+            select(AgentConfig)
+            .where(
+                AgentConfig.is_active == True,
+                (
+                    (AgentConfig.created_by_user_id == user.id)
+                    | (AgentConfig.is_public == True)
+                ),
             )
-        ).order_by(AgentConfig.created_at.desc()).limit(limit)
+            .order_by(AgentConfig.created_at.desc())
+            .limit(limit)
+        )
 
         # Apply category filter
         if category:
@@ -281,22 +302,20 @@ async def list_prompts(
                 usage_count=ac.usage_count,
                 created_at=ac.created_at.isoformat() if ac.created_at else None,
                 updated_at=ac.updated_at.isoformat() if ac.updated_at else None,
-                last_used_at=ac.last_used_at.isoformat() if ac.last_used_at else None
+                last_used_at=ac.last_used_at.isoformat() if ac.last_used_at else None,
             )
             for ac in agent_configs
         ]
 
         return PromptListResponse(
-            object="list",
-            data=data,
-            has_more=len(agent_configs) == limit
+            object="list", data=data, has_more=len(agent_configs) == limit
         )
 
     except Exception as e:
         logger.error(f"Error listing prompts: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list prompts: {str(e)}"
+            detail=f"Failed to list prompts: {str(e)}",
         )
 
 
@@ -306,12 +325,12 @@ async def list_prompts(
     status_code=status.HTTP_200_OK,
     summary="Get Prompt",
     description="Get a prompt by ID or name.",
-    tags=["Prompts API"]
+    tags=["Prompts API"],
 )
 async def get_prompt(
     prompt_id: str,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> PromptResponse:
     """Get a prompt by ID or name.
 
@@ -336,9 +355,9 @@ async def get_prompt(
                 AgentConfig.id == id_int,
                 AgentConfig.is_active == True,
                 (
-                    (AgentConfig.created_by_user_id == user.id) |
-                    (AgentConfig.is_public == True)
-                )
+                    (AgentConfig.created_by_user_id == user.id)
+                    | (AgentConfig.is_public == True)
+                ),
             )
         except ValueError:
             # Not a number, search by name
@@ -346,9 +365,9 @@ async def get_prompt(
                 AgentConfig.name == prompt_id,
                 AgentConfig.is_active == True,
                 (
-                    (AgentConfig.created_by_user_id == user.id) |
-                    (AgentConfig.is_public == True)
-                )
+                    (AgentConfig.created_by_user_id == user.id)
+                    | (AgentConfig.is_public == True)
+                ),
             )
 
         result = await db.execute(stmt)
@@ -357,7 +376,7 @@ async def get_prompt(
         if not agent_config:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Prompt '{prompt_id}' not found"
+                detail=f"Prompt '{prompt_id}' not found",
             )
 
         return PromptResponse(
@@ -377,9 +396,17 @@ async def get_prompt(
             is_template=agent_config.is_template,
             is_active=agent_config.is_active,
             usage_count=agent_config.usage_count,
-            created_at=agent_config.created_at.isoformat() if agent_config.created_at else None,
-            updated_at=agent_config.updated_at.isoformat() if agent_config.updated_at else None,
-            last_used_at=agent_config.last_used_at.isoformat() if agent_config.last_used_at else None
+            created_at=(
+                agent_config.created_at.isoformat() if agent_config.created_at else None
+            ),
+            updated_at=(
+                agent_config.updated_at.isoformat() if agent_config.updated_at else None
+            ),
+            last_used_at=(
+                agent_config.last_used_at.isoformat()
+                if agent_config.last_used_at
+                else None
+            ),
         )
 
     except HTTPException:
@@ -388,7 +415,7 @@ async def get_prompt(
         logger.error(f"Error getting prompt: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get prompt: {str(e)}"
+            detail=f"Failed to get prompt: {str(e)}",
         )
 
 
@@ -398,13 +425,13 @@ async def get_prompt(
     status_code=status.HTTP_200_OK,
     summary="Update Prompt",
     description="Update a prompt by ID.",
-    tags=["Prompts API"]
+    tags=["Prompts API"],
 )
 async def update_prompt(
     prompt_id: int,
     request: PromptUpdateRequest,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> PromptResponse:
     """Update a prompt.
 
@@ -424,8 +451,7 @@ async def update_prompt(
         user = api_key_context.get("user")
 
         stmt = select(AgentConfig).where(
-            AgentConfig.id == prompt_id,
-            AgentConfig.created_by_user_id == user.id
+            AgentConfig.id == prompt_id, AgentConfig.created_by_user_id == user.id
         )
         result = await db.execute(stmt)
         agent_config = result.scalar_one_or_none()
@@ -433,7 +459,7 @@ async def update_prompt(
         if not agent_config:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Prompt {prompt_id} not found or not owned by user"
+                detail=f"Prompt {prompt_id} not found or not owned by user",
             )
 
         # Update fields
@@ -507,9 +533,17 @@ async def update_prompt(
             is_template=agent_config.is_template,
             is_active=agent_config.is_active,
             usage_count=agent_config.usage_count,
-            created_at=agent_config.created_at.isoformat() if agent_config.created_at else None,
-            updated_at=agent_config.updated_at.isoformat() if agent_config.updated_at else None,
-            last_used_at=agent_config.last_used_at.isoformat() if agent_config.last_used_at else None
+            created_at=(
+                agent_config.created_at.isoformat() if agent_config.created_at else None
+            ),
+            updated_at=(
+                agent_config.updated_at.isoformat() if agent_config.updated_at else None
+            ),
+            last_used_at=(
+                agent_config.last_used_at.isoformat()
+                if agent_config.last_used_at
+                else None
+            ),
         )
 
     except HTTPException:
@@ -519,7 +553,7 @@ async def update_prompt(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update prompt: {str(e)}"
+            detail=f"Failed to update prompt: {str(e)}",
         )
 
 
@@ -528,12 +562,12 @@ async def update_prompt(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Prompt",
     description="Delete a prompt by ID.",
-    tags=["Prompts API"]
+    tags=["Prompts API"],
 )
 async def delete_prompt(
     prompt_id: int,
     api_key_context: Dict[str, Any] = Depends(require_api_key),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete a prompt.
 
@@ -549,8 +583,7 @@ async def delete_prompt(
         user = api_key_context.get("user")
 
         stmt = delete(AgentConfig).where(
-            AgentConfig.id == prompt_id,
-            AgentConfig.created_by_user_id == user.id
+            AgentConfig.id == prompt_id, AgentConfig.created_by_user_id == user.id
         )
         result = await db.execute(stmt)
         await db.commit()
@@ -558,7 +591,7 @@ async def delete_prompt(
         if result.rowcount == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Prompt {prompt_id} not found or not owned by user"
+                detail=f"Prompt {prompt_id} not found or not owned by user",
             )
 
         logger.info(f"Deleted prompt {prompt_id}")
@@ -570,5 +603,5 @@ async def delete_prompt(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete prompt: {str(e)}"
+            detail=f"Failed to delete prompt: {str(e)}",
         )

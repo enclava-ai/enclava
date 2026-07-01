@@ -79,5 +79,7 @@ class ReprocessingService:
         enhancement_text = "\n\n".join(enhancements)
         enhanced_prompt = f"{original_prompt}\n\n{enhancement_text}"
 
-        logger.debug("Generated enhanced prompt with %d enhancements", len(enhancements))
+        logger.debug(
+            "Generated enhanced prompt with %d enhancements", len(enhancements)
+        )
         return enhanced_prompt

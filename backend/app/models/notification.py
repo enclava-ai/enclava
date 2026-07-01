@@ -1,20 +1,23 @@
 """
 Notification models for multi-channel communication
 """
+
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
 from enum import Enum
+from typing import Any, Dict, Optional
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    ForeignKey,
     Integer,
     String,
-    DateTime,
-    Boolean,
     Text,
-    JSON,
-    ForeignKey,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
 
 
@@ -152,9 +155,9 @@ class NotificationChannel(Base):
             "rate_limit": self.rate_limit,
             "retry_count": self.retry_count,
             "retry_delay_minutes": self.retry_delay_minutes,
-            "last_used_at": self.last_used_at.isoformat()
-            if self.last_used_at
-            else None,
+            "last_used_at": (
+                self.last_used_at.isoformat() if self.last_used_at else None
+            ),
             "success_count": self.success_count,
             "failure_count": self.failure_count,
             "last_error": self.last_error,
@@ -244,9 +247,9 @@ class Notification(Base):
             "cc_recipients": self.cc_recipients,
             "bcc_recipients": self.bcc_recipients,
             "priority": self.priority,
-            "scheduled_at": self.scheduled_at.isoformat()
-            if self.scheduled_at
-            else None,
+            "scheduled_at": (
+                self.scheduled_at.isoformat() if self.scheduled_at else None
+            ),
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
             "template_id": self.template_id,
             "channel_id": self.channel_id,
@@ -255,9 +258,9 @@ class Notification(Base):
             "attempts": self.attempts,
             "max_attempts": self.max_attempts,
             "sent_at": self.sent_at.isoformat() if self.sent_at else None,
-            "delivered_at": self.delivered_at.isoformat()
-            if self.delivered_at
-            else None,
+            "delivered_at": (
+                self.delivered_at.isoformat() if self.delivered_at else None
+            ),
             "failed_at": self.failed_at.isoformat() if self.failed_at else None,
             "error_message": self.error_message,
             "external_id": self.external_id,

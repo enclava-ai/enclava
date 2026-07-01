@@ -5,6 +5,7 @@ Abstract base class for provider-specific attestation verification.
 """
 
 from abc import ABC, abstractmethod
+
 from .models import AttestationResult
 
 

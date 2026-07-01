@@ -159,7 +159,6 @@ interface ApiKey {
   budget_type?: "total" | "monthly";
   is_unlimited: boolean;
   allowed_models: string[];
-  allowed_chatbots: string[];
   allowed_agents: string[];
 }
 
@@ -172,7 +171,6 @@ interface NewApiKeyData {
   budget_limit_cents?: number;
   budget_type?: "total" | "monthly";
   allowed_models: string[];
-  allowed_chatbots: string[];
   allowed_agents: string[];
 }
 
@@ -252,7 +250,6 @@ export default function UserManagement() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editKeyData, setEditKeyData] = useState<Partial<ApiKey>>({});
   const [availableModels, setAvailableModels] = useState<any[]>([]);
-  const [availableChatbots, setAvailableChatbots] = useState<any[]>([]);
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
 
   const [newApiKeyData, setNewApiKeyData] = useState<NewApiKeyData>({
@@ -264,7 +261,6 @@ export default function UserManagement() {
     budget_limit_cents: 1000,
     budget_type: "monthly",
     allowed_models: [],
-    allowed_chatbots: [],
     allowed_agents: [],
   });
 
@@ -312,7 +308,6 @@ export default function UserManagement() {
     if (activeTab === "apikeys") {
       fetchApiKeys();
       fetchAvailableModels();
-      fetchAvailableChatbots();
       fetchAvailableAgents();
     }
   }, [activeTab]);
@@ -372,15 +367,6 @@ export default function UserManagement() {
     }
   };
 
-  const fetchAvailableChatbots = async () => {
-    try {
-      const result = await apiClient.get("/api-internal/v1/chatbot/list") as any;
-      setAvailableChatbots(result || []);
-    } catch {
-      setAvailableChatbots([]);
-    }
-  };
-
   const fetchAvailableAgents = async () => {
     try {
       const result = await apiClient.get("/api-internal/v1/tool-calling/agent/configs") as any;
@@ -407,7 +393,6 @@ export default function UserManagement() {
         budget_limit_cents: 1000,
         budget_type: "monthly",
         allowed_models: [],
-        allowed_chatbots: [],
         allowed_agents: [],
       });
       await fetchApiKeys();

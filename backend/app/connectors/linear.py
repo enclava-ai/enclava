@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any, Iterator, Optional
 
 import httpx
+import requests
 
 from app.connectors.base import BaseConnector, ConnectorDocument
 
@@ -42,9 +43,18 @@ def _build_issue_content(issue: dict[str, Any]) -> str:
     state_name = state.get("name", "Unknown")
     team = issue.get("team", {})
     team_name = team.get("name", "Unknown")
-    labels = issue.get("labels", {}).get("nodes", [])
+    raw_labels = issue.get("labels", {})
+    labels = raw_labels.get("nodes", []) if isinstance(raw_labels, dict) else raw_labels
     label_names = [label.get("name", "") for label in labels]
-    comments = issue.get("comments", {}).get("nodes", [])
+    raw_comments = issue.get("comments", {})
+    comments = (
+        raw_comments.get("nodes", [])
+        if isinstance(raw_comments, dict)
+        else raw_comments or []
+    )
+
+    if not description and not comments:
+        return title
 
     # Build content
     lines: list[str] = []
@@ -70,7 +80,12 @@ def _build_issue_content(issue: dict[str, Any]) -> str:
         lines.append("## Comments")
         for i, comment in enumerate(comments, 1):
             comment_body = comment.get("body", "")
-            lines.append(f"### Comment {i}")
+            user = comment.get("user") or {}
+            user_name = user.get("name")
+            heading = f"### Comment {i}"
+            if user_name:
+                heading += f" by {user_name}"
+            lines.append(heading)
             lines.append(comment_body)
             lines.append("")
 
@@ -100,10 +115,12 @@ def _make_graphql_request(
 
             if response.status_code == 429:
                 # Rate limited
-                sleep_time = _RETRY_DELAY * (2 ** attempt)
+                sleep_time = _RETRY_DELAY * (2**attempt)
                 logger.warning(
                     "Rate limited (attempt %d/%d), sleeping %.1fs",
-                    attempt + 1, _MAX_RETRIES, sleep_time
+                    attempt + 1,
+                    _MAX_RETRIES,
+                    sleep_time,
                 )
                 time.sleep(sleep_time)
                 continue
@@ -120,10 +137,12 @@ def _make_graphql_request(
         except httpx.HTTPStatusError as exc:
             last_exception = exc
             if exc.response.status_code == 429:
-                sleep_time = _RETRY_DELAY * (2 ** attempt)
+                sleep_time = _RETRY_DELAY * (2**attempt)
                 logger.warning(
                     "HTTP 429 rate limited (attempt %d/%d), sleeping %.1fs",
-                    attempt + 1, _MAX_RETRIES, sleep_time
+                    attempt + 1,
+                    _MAX_RETRIES,
+                    sleep_time,
                 )
                 time.sleep(sleep_time)
                 continue
@@ -132,10 +151,12 @@ def _make_graphql_request(
         except Exception as exc:
             last_exception = exc
             if attempt < _MAX_RETRIES - 1:
-                sleep_time = _RETRY_DELAY * (2 ** attempt)
+                sleep_time = _RETRY_DELAY * (2**attempt)
                 logger.warning(
                     "Request failed (attempt %d/%d): %s, retrying...",
-                    attempt + 1, _MAX_RETRIES, exc
+                    attempt + 1,
+                    _MAX_RETRIES,
+                    exc,
                 )
                 time.sleep(sleep_time)
                 continue
@@ -244,6 +265,8 @@ class LinearConnector(BaseConnector):
         self._client: Optional[httpx.Client] = None
         self._api_key: Optional[str] = None
         self._checkpoint: dict[str, Any] = {}
+        self._last_issue_id: Optional[str] = None
+        self._cursor: Optional[str] = None
 
     def _get_client(self) -> httpx.Client:
         """Get or create HTTP client."""
@@ -263,12 +286,14 @@ class LinearConnector(BaseConnector):
         if not self._api_key:
             raise RuntimeError("Credentials not loaded. Call load_credentials() first.")
 
-        client = self._get_client()
         try:
-            data = _make_graphql_request(
-                client, self._VALIDATE_QUERY, {}, self._api_key
-            )
+            payload = self._make_graphql_request(self._VALIDATE_QUERY, {})
+            if "errors" in payload:
+                raise RuntimeError(payload["errors"])
+            data = payload.get("data", payload)
             viewer = data.get("viewer", {})
+            if not viewer:
+                raise RuntimeError("viewer missing from Linear response")
             viewer_name = viewer.get("name", "unknown")
             logger.info("Linear connector validated for user: %s", viewer_name)
         except Exception as exc:
@@ -278,6 +303,33 @@ class LinearConnector(BaseConnector):
             if self._client:
                 self._client.close()
                 self._client = None
+
+    def _make_graphql_request(
+        self,
+        query: str,
+        variables: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """Legacy instance wrapper for Linear GraphQL requests."""
+        if not self._api_key:
+            raise RuntimeError("Credentials not loaded. Call load_credentials() first.")
+
+        try:
+            response = requests.post(
+                _LINEAR_API_URL,
+                headers={
+                    "Authorization": self._api_key,
+                    "Content-Type": "application/json",
+                },
+                json={"query": query, "variables": variables or {}},
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if "errors" in payload:
+                raise RuntimeError(payload["errors"])
+            return payload
+        except Exception as exc:
+            raise RuntimeError(f"Linear GraphQL request failed: {exc}") from exc
 
     def _build_issue_filter(self) -> Optional[dict[str, Any]]:
         """Build the filter for issues based on config."""
@@ -319,8 +371,12 @@ class LinearConnector(BaseConnector):
         state_name = state.get("name", "")
         team = issue.get("team", {})
         team_name = team.get("name", "")
-        labels = issue.get("labels", {}).get("nodes", [])
+        raw_labels = issue.get("labels", {})
+        labels = (
+            raw_labels.get("nodes", []) if isinstance(raw_labels, dict) else raw_labels
+        )
         label_names = [label.get("name", "") for label in labels]
+        assignee = issue.get("assignee") or {}
 
         # Parse updated_at
         updated_at = datetime.utcnow()
@@ -342,6 +398,8 @@ class LinearConnector(BaseConnector):
             "state": state_name,
             "team": team_name,
             "labels": label_names,
+            "assignee": assignee.get("name") if isinstance(assignee, dict) else None,
+            "priority": issue.get("priority"),
         }
 
         return ConnectorDocument(
@@ -354,14 +412,18 @@ class LinearConnector(BaseConnector):
             file_type="md",
         )
 
-    def _fetch_all_issues(self) -> Iterator[ConnectorDocument]:
-        """Fetch all issues with pagination."""
+    def _fetch_issues(
+        self, since: Optional[datetime] = None
+    ) -> Iterator[dict[str, Any]]:
+        """Fetch raw Linear issues with pagination."""
         if not self._api_key:
             raise RuntimeError("Credentials not loaded. Call load_credentials() first.")
 
-        client = self._get_client()
         cursor: Optional[str] = None
         issue_filter = self._build_issue_filter()
+        if since is not None:
+            issue_filter = issue_filter or {}
+            issue_filter["updatedAt"] = {"gte": since.isoformat()}
 
         while True:
             variables: dict[str, Any] = {
@@ -372,9 +434,8 @@ class LinearConnector(BaseConnector):
                 variables["filter"] = issue_filter
 
             try:
-                data = _make_graphql_request(
-                    client, self._ISSUES_QUERY, variables, self._api_key
-                )
+                payload = self._make_graphql_request(self._ISSUES_QUERY, variables)
+                data = payload.get("data", payload)
             except Exception as exc:
                 logger.error("Failed to fetch issues: %s", exc)
                 break
@@ -384,7 +445,8 @@ class LinearConnector(BaseConnector):
             page_info = issues_data.get("pageInfo", {})
 
             for issue in issues:
-                yield self._issue_to_document(issue)
+                self._last_issue_id = issue.get("id")
+                yield issue
 
             # Rate limiting
             time.sleep(_RATE_LIMIT_SLEEP)
@@ -394,57 +456,28 @@ class LinearConnector(BaseConnector):
                 break
 
             cursor = page_info.get("endCursor")
+            self._cursor = cursor
             if not cursor:
                 break
+
+    def _fetch_all_issues(self) -> Iterator[ConnectorDocument]:
+        """Fetch all issues with pagination."""
+        for issue in self._fetch_issues():
+            yield self._issue_to_document(issue)
 
     def _fetch_updated_issues(self, since: datetime) -> Iterator[ConnectorDocument]:
         """Fetch issues updated since the given timestamp."""
         if not self._api_key:
             raise RuntimeError("Credentials not loaded. Call load_credentials() first.")
 
-        client = self._get_client()
+        for issue in self._fetch_issues(since=since):
+            doc = self._issue_to_document(issue)
+            if doc.updated_at >= since:
+                yield doc
 
-        # Convert since to ISO format for Linear
-        since_iso = since.isoformat()
-        variables = {"since": {"gte": since_iso}}
-
-        cursor: Optional[str] = None
-
-        while True:
-            try:
-                data = _make_graphql_request(
-                    client, self._UPDATED_ISSUES_QUERY, variables, self._api_key
-                )
-            except Exception as exc:
-                logger.error("Failed to fetch updated issues: %s", exc)
-                break
-
-            issues_data = data.get("issues", {})
-            issues = issues_data.get("nodes", [])
-            page_info = issues_data.get("pageInfo", {})
-
-            for issue in issues:
-                doc = self._issue_to_document(issue)
-                # Double-check the updated time since the filter might be inclusive
-                if doc.updated_at >= since:
-                    yield doc
-
-            # Rate limiting
-            time.sleep(_RATE_LIMIT_SLEEP)
-
-            has_more = page_info.get("hasNextPage", False)
-            if not has_more:
-                break
-
-            cursor = page_info.get("endCursor")
-            if not cursor:
-                break
-
-            # Update variables for next page
-            # Note: Linear's updatedAt filter with pagination can be tricky
-            # We continue with the same filter, relying on cursor
-
-    def _yield_batches(self, documents: Iterator[ConnectorDocument]) -> Iterator[list[ConnectorDocument]]:
+    def _yield_batches(
+        self, documents: Iterator[ConnectorDocument]
+    ) -> Iterator[list[ConnectorDocument]]:
         """Batch documents into groups of _BATCH_SIZE."""
         batch: list[ConnectorDocument] = []
 
@@ -480,12 +513,16 @@ class LinearConnector(BaseConnector):
         """Return checkpoint data for resumable sync."""
         return {
             "last_cursor": self._checkpoint.get("last_cursor"),
+            "last_issue_id": self._last_issue_id,
+            "cursor": self._cursor,
             "last_sync_time": datetime.utcnow().isoformat(),
         }
 
     def restore_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         """Restore state from a saved checkpoint."""
         self._checkpoint = checkpoint.copy()
+        self._last_issue_id = checkpoint.get("last_issue_id")
+        self._cursor = checkpoint.get("cursor")
 
     def __del__(self):
         """Cleanup resources."""

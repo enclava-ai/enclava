@@ -3,23 +3,24 @@ Internal LLM API endpoints - for frontend use with JWT authentication
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
+from app.api.v1.llm import get_cached_models  # Reuse the caching logic
 from app.core.security import get_current_user
-from app.services.llm.service import llm_service
-from app.services.llm.models import ChatRequest, ChatMessage as LLMChatMessage
+from app.db.database import get_db
 from app.services.llm.exceptions import (
     LLMError,
     ProviderError,
     SecurityError,
     ValidationError,
 )
-from app.api.v1.llm import get_cached_models  # Reuse the caching logic
+from app.services.llm.models import ChatMessage as LLMChatMessage
+from app.services.llm.models import ChatRequest
+from app.services.llm.service import llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ router = APIRouter()
 
 @router.get("/models")
 async def list_models(
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     List available LLM models for authenticated users

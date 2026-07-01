@@ -10,21 +10,21 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
-from app.core.security import get_current_user, RequiresRole
-from app.models.user import User
-from app.models.api_key import APIKey
-from app.services.usage_stats import UsageStatsService
-from app.schemas.usage_stats import (
-    UsageStatsResponse,
-    UsageRecordsListResponse,
-    UsageOverviewResponse,
-    TopUsersResponse,
-    TopKeysResponse,
-    ProviderBreakdownResponse,
-    UsageRecordResponse,
-)
 from app.core.logging import get_logger
+from app.core.security import RequiresRole, get_current_user
+from app.db.database import get_db
+from app.models.api_key import APIKey
+from app.models.user import User
+from app.schemas.usage_stats import (
+    ProviderBreakdownResponse,
+    TopKeysResponse,
+    TopUsersResponse,
+    UsageOverviewResponse,
+    UsageRecordResponse,
+    UsageRecordsListResponse,
+    UsageStatsResponse,
+)
+from app.services.usage_stats import UsageStatsService
 
 logger = get_logger(__name__)
 
@@ -48,7 +48,7 @@ async def get_my_usage_stats(
     This includes ALL usage:
     - API Key usage (external API calls)
     - Playground usage (LLM testing)
-    - Chatbot testing
+    - Agent testing
 
     **Periods:**
     - `7d`: Last 7 days
@@ -58,7 +58,11 @@ async def get_my_usage_stats(
     """
     try:
         # Get user_id from current_user (handles both dict and User object)
-        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        user_id = (
+            current_user.get("id")
+            if isinstance(current_user, dict)
+            else current_user.id
+        )
 
         # Parse period
         period_days = 30
@@ -112,7 +116,7 @@ async def get_my_usage_records(
         None, alias="status", description="Filter by status (success/error)"
     ),
     source: Optional[str] = Query(
-        None, description="Filter by source (api_key/playground/chatbot)"
+        None, description="Filter by source (agent/api_key/playground)"
     ),
     start_date: Optional[datetime] = Query(None, description="Start date"),
     end_date: Optional[datetime] = Query(None, description="End date"),
@@ -126,7 +130,11 @@ async def get_my_usage_records(
     """
     try:
         # Get user_id from current_user
-        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        user_id = (
+            current_user.get("id")
+            if isinstance(current_user, dict)
+            else current_user.id
+        )
 
         # Get records
         stats_service = UsageStatsService(db)
@@ -165,7 +173,7 @@ async def get_my_usage_records(
                 status=r.status,
                 error_type=r.error_type,
                 error_message=r.error_message,
-                chatbot_id=r.chatbot_id,
+                agent_config_id=r.agent_config_id,
                 session_id=r.session_id,
             )
             for r in records
@@ -225,8 +233,16 @@ async def get_api_key_usage_stats(
             )
 
         # Check ownership (unless admin)
-        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-        is_superuser = current_user.get("is_superuser", False) if isinstance(current_user, dict) else current_user.is_superuser
+        user_id = (
+            current_user.get("id")
+            if isinstance(current_user, dict)
+            else current_user.id
+        )
+        is_superuser = (
+            current_user.get("is_superuser", False)
+            if isinstance(current_user, dict)
+            else current_user.is_superuser
+        )
         if api_key.user_id != user_id and not is_superuser:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -310,8 +326,16 @@ async def get_api_key_usage_records(
             )
 
         # Check ownership (unless admin)
-        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-        is_superuser = current_user.get("is_superuser", False) if isinstance(current_user, dict) else current_user.is_superuser
+        user_id = (
+            current_user.get("id")
+            if isinstance(current_user, dict)
+            else current_user.id
+        )
+        is_superuser = (
+            current_user.get("is_superuser", False)
+            if isinstance(current_user, dict)
+            else current_user.is_superuser
+        )
         if api_key.user_id != user_id and not is_superuser:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -631,67 +655,6 @@ async def get_provider_breakdown(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve provider breakdown",
-        )
-
-
-@router.get(
-    "/chatbots/{chatbot_id}/stats",
-    response_model=UsageStatsResponse,
-    dependencies=[Depends(RequiresRole("admin"))],
-)
-async def get_chatbot_usage_stats(
-    chatbot_id: str,
-    period: Optional[str] = Query(
-        "30d",
-        description="Time period: 7d, 30d, 90d",
-    ),
-    start_date: Optional[datetime] = Query(None, description="Custom start date"),
-    end_date: Optional[datetime] = Query(None, description="Custom end date"),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Get usage statistics for a specific chatbot (admin only).
-
-    **Periods:**
-    - `7d`: Last 7 days
-    - `30d`: Last 30 days (default)
-    - `90d`: Last 90 days
-    """
-    try:
-        # Parse period
-        period_days = 30
-        if period == "7d":
-            period_days = 7
-        elif period == "30d":
-            period_days = 30
-        elif period == "90d":
-            period_days = 90
-        elif period == "custom":
-            if not start_date or not end_date:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="start_date and end_date required for custom period",
-                )
-
-        # Get statistics
-        stats_service = UsageStatsService(db)
-        stats = await stats_service.get_chatbot_stats(
-            chatbot_id=chatbot_id,
-            period_days=period_days,
-            start_date=start_date,
-            end_date=end_date,
-        )
-
-        return stats
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-        logger.error(f"Error getting chatbot stats: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve chatbot statistics",
         )
 
 

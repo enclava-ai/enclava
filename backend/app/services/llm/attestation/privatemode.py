@@ -4,10 +4,11 @@ PrivateMode Attestation Verifier
 Simple verifier for PrivateMode proxy. The proxy handles attestation internally.
 """
 
-import aiohttp
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Any, Dict
+
+import aiohttp
 
 from .base import BaseAttestationVerifier
 from .models import AttestationResult
@@ -32,7 +33,7 @@ class PrivateModeAttestationVerifier(BaseAttestationVerifier):
             proxy_url: Base URL of the privatemode proxy
             api_key: API key for authentication
         """
-        self.proxy_url = proxy_url.rstrip('/')
+        self.proxy_url = proxy_url.rstrip("/")
         self.api_key = api_key
         logger.debug(f"Initialized PrivateMode verifier for {self.proxy_url}")
 
@@ -55,7 +56,7 @@ class PrivateModeAttestationVerifier(BaseAttestationVerifier):
                 async with session.get(
                     f"{self.proxy_url}/models",
                     headers={"Authorization": f"Bearer {self.api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=10)
+                    timeout=aiohttp.ClientTimeout(total=10),
                 ) as response:
                     if response.status == 200:
                         logger.info("PrivateMode attestation verified successfully")
@@ -67,7 +68,7 @@ class PrivateModeAttestationVerifier(BaseAttestationVerifier):
                             intel_tdx_verified=True,  # Proxy handles this
                             gpu_attestation_verified=True,  # Proxy handles this
                             nonce_binding_verified=True,  # Proxy handles this
-                            errors=[]
+                            errors=[],
                         )
                     else:
                         text = await response.text()
@@ -78,7 +79,7 @@ class PrivateModeAttestationVerifier(BaseAttestationVerifier):
                             provider_id="privatemode",
                             model=model or "all",
                             timestamp=datetime.now(timezone.utc),
-                            errors=[error_msg]
+                            errors=[error_msg],
                         )
 
         except aiohttp.ClientError as e:
@@ -89,15 +90,17 @@ class PrivateModeAttestationVerifier(BaseAttestationVerifier):
                 provider_id="privatemode",
                 model=model or "all",
                 timestamp=datetime.now(timezone.utc),
-                errors=[error_msg]
+                errors=[error_msg],
             )
         except Exception as e:
             error_msg = f"Verification error: {str(e)}"
-            logger.error(f"PrivateMode attestation unexpected error: {error_msg}", exc_info=True)
+            logger.error(
+                f"PrivateMode attestation unexpected error: {error_msg}", exc_info=True
+            )
             return AttestationResult(
                 verified=False,
                 provider_id="privatemode",
                 model=model or "all",
                 timestamp=datetime.now(timezone.utc),
-                errors=[error_msg]
+                errors=[error_msg],
             )

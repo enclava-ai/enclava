@@ -2,32 +2,34 @@
 Plugin Security and Authentication Service
 Handles plugin tokens, permissions, and security policies
 """
-from jose import jwt
+
 import hashlib
+import json
 import secrets
 import time
-import redis
-from typing import Dict, Any, List, Optional, Set, Tuple
-from datetime import datetime, timezone, timedelta
-from sqlalchemy.orm import Session
-from cryptography.fernet import Fernet
-import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import redis
+from cryptography.fernet import Fernet
+from jose import jwt
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.db.database import get_db, utc_now
+from app.models.api_key import APIKey
 from app.models.plugin import (
     Plugin,
-    PluginConfiguration,
     PluginAuditLog,
+    PluginConfiguration,
     PluginPermission,
 )
 from app.models.user import User
-from app.models.api_key import APIKey
-from app.db.database import get_db, utc_now
 from app.services.plugin_configuration_service import PluginConfigurationService
-from app.utils.exceptions import SecurityError, PluginError
-
+from app.utils.exceptions import PluginError, SecurityError
 
 logger = get_logger("plugin.security")
 
@@ -338,9 +340,9 @@ class PluginPermissionManager:
     """Manages plugin permissions and access control"""
 
     PLATFORM_API_PERMISSIONS = {
-        "chatbot:invoke": "Invoke chatbot conversations",
-        "chatbot:manage": "Manage chatbot instances",
-        "chatbot:read": "Read chatbot configurations",
+        "agent:invoke": "Invoke agent conversations",
+        "agent:manage": "Manage agent configurations",
+        "agent:read": "Read agent configurations",
         "rag:query": "Query RAG collections",
         "rag:manage": "Manage RAG collections and documents",
         "rag:read": "Read RAG collection metadata",
@@ -645,6 +647,7 @@ class PluginSecurityPolicyManager:
             try:
                 # Create an async session wrapper for the configuration service
                 from sqlalchemy.ext.asyncio import AsyncSession
+
                 from app.db.database import async_session_factory
 
                 # Use async session for configuration service
@@ -756,6 +759,7 @@ class PluginSecurityPolicyManager:
             # Store policy in database using configuration service
             try:
                 from sqlalchemy.ext.asyncio import AsyncSession
+
                 from app.db.database import async_session_factory
 
                 # Use async session for configuration service

@@ -12,11 +12,13 @@ Supports multiple notification channels:
 - PagerDuty
 """
 
-from typing import Optional, Dict, Any, List
-from enum import Enum
-import httpx
 import asyncio
 from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import httpx
+
 from app.core.config import settings
 from app.core.logging import get_logger
 
@@ -25,6 +27,7 @@ logger = get_logger(__name__)
 
 class AlertSeverity(str, Enum):
     """Alert severity levels"""
+
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
@@ -32,6 +35,7 @@ class AlertSeverity(str, Enum):
 
 class AlertType(str, Enum):
     """Alert types"""
+
     BUDGET_EXCEEDED = "budget_exceeded"
     BUDGET_WARNING = "budget_warning"
     PRICING_SYNC_FAILURE = "pricing_sync_failure"
@@ -42,7 +46,7 @@ class AlertType(str, Enum):
 class AlertService:
     """
     Service for sending alerts through multiple channels.
-    
+
     Alerts can be sent via:
     - Email (if SMTP is configured)
     - Slack (if webhook URL is configured)
@@ -58,12 +62,16 @@ class AlertService:
         self.smtp_port = getattr(settings, "ALERT_SMTP_PORT", 587)
         self.smtp_username = getattr(settings, "ALERT_SMTP_USERNAME", None)
         self.smtp_password = getattr(settings, "ALERT_SMTP_PASSWORD", None)
-        self.alert_from_email = getattr(settings, "ALERT_FROM_EMAIL", "alerts@enclava.com")
+        self.alert_from_email = getattr(
+            settings, "ALERT_FROM_EMAIL", "alerts@enclava.com"
+        )
         self.alert_to_emails = getattr(settings, "ALERT_TO_EMAILS", [])
-        
+
         # Parse comma-separated email list if provided as string
         if isinstance(self.alert_to_emails, str):
-            self.alert_to_emails = [e.strip() for e in self.alert_to_emails.split(",") if e.strip()]
+            self.alert_to_emails = [
+                e.strip() for e in self.alert_to_emails.split(",") if e.strip()
+            ]
 
     async def send_alert(
         self,
@@ -74,7 +82,7 @@ class AlertService:
     ):
         """
         Send alert through all configured channels.
-        
+
         Args:
             alert_type: Type of alert
             severity: Alert severity level
@@ -108,7 +116,7 @@ class AlertService:
         if tasks:
             # Execute all alert tasks concurrently
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # Log any failures
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
@@ -127,7 +135,7 @@ class AlertService:
     ):
         """
         Send alert when a budget is exceeded.
-        
+
         Args:
             budget_id: Budget identifier
             budget_name: Budget name
@@ -174,7 +182,7 @@ class AlertService:
     ):
         """
         Send warning when budget approaches limit.
-        
+
         Args:
             budget_id: Budget identifier
             budget_name: Budget name
@@ -220,17 +228,14 @@ class AlertService:
     ):
         """
         Send alert when pricing sync fails.
-        
+
         Args:
             provider: Provider identifier
             error: Error message
             duration_seconds: Sync duration before failure
         """
-        message = (
-            f"Pricing Sync Failed: {provider}\n"
-            f"Error: {error}\n"
-        )
-        
+        message = f"Pricing Sync Failed: {provider}\n" f"Error: {error}\n"
+
         if duration_seconds is not None:
             message += f"Duration: {duration_seconds:.2f}s\n"
 
@@ -258,7 +263,7 @@ class AlertService:
     ):
         """
         Send alert when error rate is high.
-        
+
         Args:
             provider: Provider identifier
             model: Model name
@@ -299,7 +304,7 @@ class AlertService:
     ):
         """
         Send alert via email.
-        
+
         Args:
             message: Alert message
             context: Alert context
@@ -311,14 +316,16 @@ class AlertService:
 
             # Import email libraries only when needed
             import smtplib
-            from email.mime.text import MIMEText
             from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
 
             # Create email message
             msg = MIMEMultipart()
             msg["From"] = self.alert_from_email
             msg["To"] = ", ".join(self.alert_to_emails)
-            msg["Subject"] = f"[{context.get('severity', 'ALERT').upper()}] {context.get('alert_type', 'Alert')}"
+            msg["Subject"] = (
+                f"[{context.get('severity', 'ALERT').upper()}] {context.get('alert_type', 'Alert')}"
+            )
 
             # Build email body
             body = f"{message}\n\n"
@@ -349,7 +356,7 @@ class AlertService:
     ):
         """
         Send alert via Slack webhook.
-        
+
         Args:
             message: Alert message
             severity: Alert severity
@@ -363,8 +370,8 @@ class AlertService:
             # Color code by severity
             color_map = {
                 AlertSeverity.CRITICAL: "#FF0000",  # Red
-                AlertSeverity.WARNING: "#FFA500",   # Orange
-                AlertSeverity.INFO: "#0000FF",      # Blue
+                AlertSeverity.WARNING: "#FFA500",  # Orange
+                AlertSeverity.INFO: "#0000FF",  # Blue
             }
             color = color_map.get(severity, "#808080")
 
@@ -376,11 +383,7 @@ class AlertService:
                         "title": f"[{severity.value.upper()}] {context.get('alert_type', 'Alert')}",
                         "text": message,
                         "fields": [
-                            {
-                                "title": key,
-                                "value": str(value),
-                                "short": True
-                            }
+                            {"title": key, "value": str(value), "short": True}
                             for key, value in context.items()
                             if key not in ["timestamp", "alert_type", "severity"]
                         ],
@@ -413,7 +416,7 @@ class AlertService:
     ):
         """
         Send alert via PagerDuty Events API v2.
-        
+
         Args:
             message: Alert message
             alert_type: Alert type
@@ -459,7 +462,7 @@ _alert_service: Optional[AlertService] = None
 def get_alert_service() -> AlertService:
     """
     Get or create the alert service singleton.
-    
+
     Returns:
         AlertService instance
     """

@@ -2,32 +2,34 @@
 Plugin API Gateway
 Handles authentication, routing, and security for plugin APIs
 """
+
 import asyncio
-import time
-from jose import jwt
-from typing import Dict, Any, List, Optional, Tuple
-from fastapi import FastAPI, Request, Response, HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.middleware.base import BaseHTTPMiddleware
-from fastapi.responses import JSONResponse
-import aiohttp
-from urllib.parse import urlparse
 import hashlib
 import hmac
+import time
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
+
+import aiohttp
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import jwt
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.logging import get_logger
-# SECURITY FIX #13: Fixed import error - verify_jwt_token doesn't exist, use verify_token
-from app.core.security import verify_token, get_current_user
-from app.models.plugin import Plugin, PluginConfiguration, PluginAuditLog
-from app.models.api_key import APIKey
-from app.models.user import User
-from app.db.database import get_db
-from app.services.plugin_sandbox import plugin_loader
-from app.services.plugin_context_manager import plugin_context_manager
-from app.utils.exceptions import SecurityError, PluginError
-from sqlalchemy.orm import Session
 
+# SECURITY FIX #13: Fixed import error - verify_jwt_token doesn't exist, use verify_token
+from app.core.security import get_current_user, verify_token
+from app.db.database import get_db
+from app.models.api_key import APIKey
+from app.models.plugin import Plugin, PluginAuditLog, PluginConfiguration
+from app.models.user import User
+from app.services.plugin_context_manager import plugin_context_manager
+from app.services.plugin_sandbox import plugin_loader
+from app.utils.exceptions import PluginError, SecurityError
 
 logger = get_logger("plugin.gateway")
 security = HTTPBearer()
@@ -345,9 +347,11 @@ class PluginGatewayMiddleware(BaseHTTPMiddleware):
             await self.audit_service.log_plugin_access(
                 plugin_id=plugin_id,
                 user_id=user_id,
-                api_key_id=auth_context.get("api_key", {}).get("id")
-                if "api_key" in auth_context
-                else None,
+                api_key_id=(
+                    auth_context.get("api_key", {}).get("id")
+                    if "api_key" in auth_context
+                    else None
+                ),
                 endpoint=plugin_endpoint,
                 method=request.method,
                 ip_address=request.client.host,

@@ -11,11 +11,12 @@ Pool monitoring is available via get_pool_status() function.
 
 import logging
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Dict, Any
-from sqlalchemy import create_engine, MetaData, event
+from typing import Any, AsyncGenerator, Dict
+
+from sqlalchemy import MetaData, create_engine, event
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import settings
@@ -63,7 +64,7 @@ async_session_factory = async_sessionmaker(
 
 # Create synchronous engine for legacy code paths and startup operations
 # IMPORTANT: This pool should be MINIMAL - prefer async operations for all new code
-# Most budget enforcement, chatbot, and API operations now use async sessions
+# Most budget enforcement, agent, and API operations now use async sessions
 # Pool sizing: 5 base + 10 overflow = 15 max connections
 sync_engine = create_engine(
     settings.DATABASE_URL,
@@ -108,6 +109,7 @@ def utc_now() -> datetime:
 # ============================================================================
 # Pool Monitoring
 # ============================================================================
+
 
 def _setup_pool_monitoring():
     """Set up event listeners for pool monitoring"""
@@ -161,7 +163,11 @@ def get_pool_status() -> Dict[str, Any]:
             "checked_in": async_pool.checkedin(),
             "checked_out": async_pool.checkedout(),
             "overflow": async_pool.overflow(),
-            "invalid": async_pool.invalidatedcount() if hasattr(async_pool, 'invalidatedcount') else 0,
+            "invalid": (
+                async_pool.invalidatedcount()
+                if hasattr(async_pool, "invalidatedcount")
+                else 0
+            ),
         }
     except Exception as e:
         async_status = {"error": str(e)}
@@ -174,7 +180,11 @@ def get_pool_status() -> Dict[str, Any]:
             "checked_in": sync_pool.checkedin(),
             "checked_out": sync_pool.checkedout(),
             "overflow": sync_pool.overflow(),
-            "invalid": sync_pool.invalidatedcount() if hasattr(sync_pool, 'invalidatedcount') else 0,
+            "invalid": (
+                sync_pool.invalidatedcount()
+                if hasattr(sync_pool, "invalidatedcount")
+                else 0
+            ),
         }
     except Exception as e:
         sync_status = {"error": str(e)}
@@ -191,7 +201,7 @@ def get_pool_status() -> Dict[str, Any]:
             "sync_max_overflow": 10,
             "sync_max_connections": 15,
             "total_max_connections": 95,
-        }
+        },
     }
 
 
@@ -238,10 +248,10 @@ async def init_db():
     try:
         async with engine.begin() as conn:
             # Import all models to ensure they're registered
-            from app.models.user import User
-            from app.models.role import Role
             from app.models.api_key import APIKey
+            from app.models.role import Role
             from app.models.usage_tracking import UsageTracking
+            from app.models.user import User
 
             # Import additional models - these are available
             try:
@@ -276,9 +286,10 @@ async def init_db():
 
 async def create_default_roles():
     """Create default roles if they don't exist"""
-    from app.models.role import Role, RoleLevel
     from sqlalchemy import select, text
-    from sqlalchemy.exc import SQLAlchemyError, ProgrammingError
+    from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
+
+    from app.models.role import Role, RoleLevel
 
     try:
         async with async_session_factory() as session:
@@ -290,7 +301,9 @@ async def create_default_roles():
             table_exists = result.scalar()
 
             if not table_exists:
-                logger.warning("Roles table does not exist yet - waiting for migrations")
+                logger.warning(
+                    "Roles table does not exist yet - waiting for migrations"
+                )
                 return
 
             # Check if any roles exist
@@ -325,12 +338,13 @@ async def create_default_roles():
 
 async def create_default_admin():
     """Create default admin user if user with ADMIN_EMAIL doesn't exist"""
-    from app.models.user import User
-    from app.models.role import Role
-    from app.core.security import get_password_hash
-    from app.core.config import settings
     from sqlalchemy import select, text
-    from sqlalchemy.exc import SQLAlchemyError, ProgrammingError
+    from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
+
+    from app.core.config import settings
+    from app.core.security import get_password_hash
+    from app.models.role import Role
+    from app.models.user import User
 
     try:
         admin_email = settings.ADMIN_EMAIL
@@ -350,7 +364,9 @@ async def create_default_admin():
             tables_exist = result.scalar()
 
             if not tables_exist:
-                logger.warning("Users/roles tables do not exist yet - waiting for migrations")
+                logger.warning(
+                    "Users/roles tables do not exist yet - waiting for migrations"
+                )
                 return
 
             # Check if user with ADMIN_EMAIL exists
@@ -402,9 +418,13 @@ async def create_default_admin():
 
     except ProgrammingError as e:
         if "does not exist" in str(e):
-            logger.warning("Users/roles tables do not exist yet - waiting for migrations")
+            logger.warning(
+                "Users/roles tables do not exist yet - waiting for migrations"
+            )
         else:
-            logger.error(f"Failed to create default admin user due to database error: {e}")
+            logger.error(
+                f"Failed to create default admin user due to database error: {e}"
+            )
     except SQLAlchemyError as e:
         logger.error(f"Failed to create default admin user due to database error: {e}")
     except AttributeError as e:

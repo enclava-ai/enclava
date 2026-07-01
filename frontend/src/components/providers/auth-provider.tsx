@@ -10,7 +10,8 @@ interface User {
   username: string
   email: string
   name?: string
-  role: string
+  role?: string | null
+  is_superuser?: boolean
   permissions: string[]
   created_at: string
   updated_at: string

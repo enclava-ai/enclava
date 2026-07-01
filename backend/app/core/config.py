@@ -5,6 +5,7 @@ Configuration settings for the application
 import os
 import sys
 from typing import List, Optional, Union
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
@@ -19,6 +20,8 @@ class Settings(BaseSettings):
     APP_LOG_LEVEL: str = os.getenv("APP_LOG_LEVEL", "INFO")
     APP_HOST: str = os.getenv("APP_HOST", "0.0.0.0")
     APP_PORT: int = int(os.getenv("APP_PORT", "8000"))
+    TESTING: bool = os.getenv("TESTING", "False").lower() == "true"
+    LLM_TEST_MODE: bool = os.getenv("LLM_TEST_MODE", "False").lower() == "true"
     BACKEND_INTERNAL_PORT: int = int(os.getenv("BACKEND_INTERNAL_PORT", "8000"))
     FRONTEND_INTERNAL_PORT: int = int(os.getenv("FRONTEND_INTERNAL_PORT", "3000"))
 
@@ -57,6 +60,21 @@ class Settings(BaseSettings):
     # Base URL for deriving CORS origins
     BASE_URL: str = os.getenv("BASE_URL", "localhost")
 
+    @property
+    def SECRET_KEY(self) -> str:
+        """Backward-compatible alias for older tests and integrations."""
+        return self.JWT_SECRET
+
+    @property
+    def ALGORITHM(self) -> str:
+        """Backward-compatible alias for older tests and integrations."""
+        return self.JWT_ALGORITHM
+
+    @property
+    def DEFAULT_MODEL(self) -> str:
+        """Backward-compatible default model alias."""
+        return self.REDPILL_TEST_MODEL
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def derive_cors_origins(cls, v, info):
@@ -66,11 +84,13 @@ class Settings(BaseSettings):
             origins = [f"http://{base_url}", f"https://{base_url}"]
             # Add development ports if base_url is localhost (without port)
             if base_url == "localhost" or base_url.startswith("localhost:"):
-                origins.extend([
-                    "http://localhost:1080",  # Main nginx proxy
-                    "http://localhost:3000",  # Next.js default
-                    "http://localhost:3002",  # Next.js dev server
-                ])
+                origins.extend(
+                    [
+                        "http://localhost:1080",  # Main nginx proxy
+                        "http://localhost:3000",  # Next.js default
+                        "http://localhost:3002",  # Next.js dev server
+                    ]
+                )
             return origins
         return v if isinstance(v, list) else [v]
 
@@ -92,8 +112,12 @@ class Settings(BaseSettings):
     NOTION_CLIENT_SECRET: Optional[str] = os.getenv("NOTION_CLIENT_SECRET")
     GITHUB_CLIENT_ID: Optional[str] = os.getenv("GITHUB_CLIENT_ID")
     GITHUB_CLIENT_SECRET: Optional[str] = os.getenv("GITHUB_CLIENT_SECRET")
-    SLACK_BOT_TOKEN: Optional[str] = os.getenv("SLACK_BOT_TOKEN")  # for bot-token auth (non-OAuth)
-    LINEAR_API_KEY: Optional[str] = os.getenv("LINEAR_API_KEY")    # for API key auth (non-OAuth)
+    SLACK_BOT_TOKEN: Optional[str] = os.getenv(
+        "SLACK_BOT_TOKEN"
+    )  # for bot-token auth (non-OAuth)
+    LINEAR_API_KEY: Optional[str] = os.getenv(
+        "LINEAR_API_KEY"
+    )  # for API key auth (non-OAuth)
     CONNECTOR_CREDENTIALS_KEY: Optional[str] = os.getenv("CONNECTOR_CREDENTIALS_KEY")
 
     # API Keys for LLM providers (only integrated providers: privatemode, redpill)
@@ -116,7 +140,8 @@ class Settings(BaseSettings):
         "NVIDIA_NRAS_API_URL", "https://nras.attestation.nvidia.com/v3/attest/gpu"
     )
     PHALA_TDX_VERIFIER_URL: str = os.getenv(
-        "PHALA_TDX_VERIFIER_URL", "https://cloud-api.phala.network/api/v1/attestations/verify"
+        "PHALA_TDX_VERIFIER_URL",
+        "https://cloud-api.phala.network/api/v1/attestations/verify",
     )
 
     # Attestation scheduler configuration
@@ -227,7 +252,9 @@ class Settings(BaseSettings):
     PROMETHEUS_PORT: int = int(os.getenv("PROMETHEUS_PORT", "9090"))
 
     # Alerting Configuration
-    ALERT_EMAIL_ENABLED: bool = os.getenv("ALERT_EMAIL_ENABLED", "False").lower() == "true"
+    ALERT_EMAIL_ENABLED: bool = (
+        os.getenv("ALERT_EMAIL_ENABLED", "False").lower() == "true"
+    )
     ALERT_SMTP_HOST: Optional[str] = os.getenv("ALERT_SMTP_HOST")
     ALERT_SMTP_PORT: int = int(os.getenv("ALERT_SMTP_PORT", "587"))
     ALERT_SMTP_USERNAME: Optional[str] = os.getenv("ALERT_SMTP_USERNAME")
@@ -264,7 +291,9 @@ class Settings(BaseSettings):
     RAG_WARN_ON_FALLBACK: bool = (
         os.getenv("RAG_WARN_ON_FALLBACK", "True").lower() == "true"
     )
-    RAG_EMBEDDING_MODEL: str = os.getenv("RAG_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
+    RAG_EMBEDDING_MODEL: str = os.getenv(
+        "RAG_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"
+    )
     RAG_DOCUMENT_PROCESSING_TIMEOUT: int = int(
         os.getenv("RAG_DOCUMENT_PROCESSING_TIMEOUT", "300")
     )
@@ -380,3 +409,8 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    """Return the global settings instance."""
+    return settings

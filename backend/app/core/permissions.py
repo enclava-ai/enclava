@@ -2,15 +2,16 @@
 Permissions Module
 Role-based access control decorators and utilities
 """
+
 from datetime import datetime, timezone
 from functools import wraps
-from typing import List, Optional, Union, Callable
-from fastapi import HTTPException, status, Depends
+from typing import Callable, List, Optional, Union
+
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
-from app.models.user import User
 from app.db.database import utc_now
-
+from app.models.user import User
 
 security = HTTPBearer()
 

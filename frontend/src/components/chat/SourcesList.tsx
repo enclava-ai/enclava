@@ -2,7 +2,16 @@
 
 import { ExternalLink, Globe } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { ChatMessageSource } from "@/types/chatbot"
+
+export interface ChatMessageSource {
+  title?: string
+  content?: string
+  url?: string | null
+  language?: string
+  article_id?: string
+  relevance_score?: number
+  content_preview?: string
+}
 
 interface SourcesListProps {
   sources: ChatMessageSource[]

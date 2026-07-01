@@ -19,12 +19,11 @@ from typing import Any, Dict, Optional
 
 from fastapi import UploadFile
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.database import utc_now
 from app.middleware.analytics import set_analytics_data
-from app.services.cost_calculator import CostCalculator
 from app.models.api_key import APIKey
 from app.models.extract_job import ExtractJob
 from app.models.extract_result import ExtractResult
@@ -32,6 +31,7 @@ from app.models.extract_settings import ExtractSettings
 from app.models.user import User
 from app.services.api_key_auth import APIKeyAuthService
 from app.services.async_budget_enforcement import async_check_budget_for_request
+from app.services.cost_calculator import CostCalculator
 from app.services.llm.models import ChatRequest
 from app.services.llm.service import llm_service
 
@@ -50,7 +50,7 @@ class ExtractService:
     Main Extract orchestration service.
 
     Handles the complete document processing pipeline with unified
-    token tracking that matches chatbots and agents.
+    token tracking that matches agent requests.
     """
 
     def __init__(self):
@@ -71,8 +71,8 @@ class ExtractService:
         """
         Process a document through the Extract pipeline.
 
-        This method follows the EXACT same token tracking pattern as
-        chatbots and agents to ensure unified reporting.
+        This method follows the same token tracking pattern as
+        agent requests to ensure unified reporting.
 
         Args:
             db: Database session
@@ -115,9 +115,7 @@ class ExtractService:
             template = await template_manager.get_template(template_id)
 
             # 4. Get model (priority: template.model > settings.default_model > config > fallback)
-            model_name = await self._get_model_for_processing(
-                db, template, config
-            )
+            model_name = await self._get_model_for_processing(db, template, config)
             job.model_used = model_name
 
             # 5. Estimate tokens for budget check
@@ -138,7 +136,9 @@ class ExtractService:
                 )
 
                 if not is_allowed:
-                    logger.warning("Budget check failed for job %s: %s", job.id, error_message)
+                    logger.warning(
+                        "Budget check failed for job %s: %s", job.id, error_message
+                    )
                     raise BudgetExceededError(error_message)
 
             # 7. Update job status
@@ -148,7 +148,7 @@ class ExtractService:
             # 8. Build messages with image(s)
             messages = self._build_messages(images, template, context)
 
-            # 9. Call LLM service directly (SAME AS CHATBOTS/AGENTS)
+            # 9. Call LLM service directly (same path used by agents)
             # This ensures the call goes through the same resilience patterns
             # and unified usage tracking via UsageRecordingService
             llm_request = ChatRequest(
@@ -325,9 +325,7 @@ class ExtractService:
             logger.info(f"Auto-selected first available vision model: {model}")
             return model
         except Exception as e:
-            raise ProcessingError(
-                f"Failed to get available vision models: {e}"
-            )
+            raise ProcessingError(f"Failed to get available vision models: {e}")
 
     async def _get_available_vision_models(self):
         """Get list of vision-capable models from LLM service."""
@@ -431,7 +429,9 @@ class ExtractService:
     ) -> ExtractResult:
         """Save extraction result and update job."""
         # Count existing results for attempt number using proper COUNT query
-        count_stmt = select(func.count(ExtractResult.id)).where(ExtractResult.job_id == job.id)
+        count_stmt = select(func.count(ExtractResult.id)).where(
+            ExtractResult.job_id == job.id
+        )
         count_result = await db.execute(count_stmt)
         attempt_number = count_result.scalar_one() + 1
 
@@ -473,7 +473,13 @@ class ExtractService:
         await db.commit()
 
     # Valid job status values
-    ALLOWED_STATUSES = ["pending", "processing", "completed", "failed", "completed_with_errors"]
+    ALLOWED_STATUSES = [
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "completed_with_errors",
+    ]
 
     async def list_jobs(
         self,
@@ -488,7 +494,9 @@ class ExtractService:
 
         if status:
             if status not in self.ALLOWED_STATUSES:
-                raise ValueError(f"Invalid status '{status}'. Allowed: {self.ALLOWED_STATUSES}")
+                raise ValueError(
+                    f"Invalid status '{status}'. Allowed: {self.ALLOWED_STATUSES}"
+                )
             stmt = stmt.where(ExtractJob.status == status)
 
         stmt = stmt.order_by(ExtractJob.created_at.desc()).limit(limit).offset(offset)
@@ -497,7 +505,9 @@ class ExtractService:
         jobs = result.scalars().all()
 
         # Count total using proper COUNT query (not loading all into memory)
-        count_stmt = select(func.count(ExtractJob.id)).where(ExtractJob.user_id == user_id)
+        count_stmt = select(func.count(ExtractJob.id)).where(
+            ExtractJob.user_id == user_id
+        )
         if status:
             count_stmt = count_stmt.where(ExtractJob.status == status)
         total_result = await db.execute(count_stmt)
@@ -508,9 +518,11 @@ class ExtractService:
     async def get_job(self, db: AsyncSession, job_id: str, user_id: int):
         """Get job details with result."""
         # Use eager loading to avoid N+1 query when accessing job.results
-        stmt = select(ExtractJob).where(
-            ExtractJob.id == job_id, ExtractJob.user_id == user_id
-        ).options(selectinload(ExtractJob.results))
+        stmt = (
+            select(ExtractJob)
+            .where(ExtractJob.id == job_id, ExtractJob.user_id == user_id)
+            .options(selectinload(ExtractJob.results))
+        )
         result = await db.execute(stmt)
         job = result.scalar_one_or_none()
 

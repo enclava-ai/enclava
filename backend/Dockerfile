@@ -40,8 +40,8 @@ RUN set -eux; \
     ; \
     rm -rf "$apt_lists" "$apt_cache"
 
-# Install CPU-only PyTorch and compatible numpy first (faster download)
-RUN pip install --no-cache-dir torch==2.5.1+cpu torchaudio==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu -f https://download.pytorch.org/whl/torch_stable.html
+# Install CPU-only PyTorch first so sentence-transformers does not pull CUDA wheels.
+RUN pip install --no-cache-dir torch==2.12.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .

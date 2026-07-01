@@ -3,19 +3,21 @@ User Management Service
 Handles business logic for user and role management operations
 """
 
-from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+import bcrypt
+from fastapi import HTTPException, status
+from pydantic import EmailStr
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import and_, or_, desc
-from fastapi import HTTPException, status
-from datetime import datetime, timedelta, timezone
-import bcrypt
-from app.models.user import User
-from app.models.role import Role, RoleLevel
-from app.models.audit_log import AuditLog, AuditAction, AuditSeverity
+
 from app.core.security import create_access_token, get_password_hash
 from app.db.database import utc_now
-from pydantic import EmailStr
+from app.models.audit_log import AuditAction, AuditLog, AuditSeverity
+from app.models.role import Role, RoleLevel
+from app.models.user import User
 
 
 class UserManagementService:
@@ -122,10 +124,7 @@ class UserManagementService:
 
         # Check if account is locked
         if user.account_locked:
-            if (
-                user.account_locked_until
-                and user.account_locked_until > utc_now()
-            ):
+            if user.account_locked_until and user.account_locked_until > utc_now():
                 return None  # Account is still locked
             else:
                 # Unlock account if lock period has expired
@@ -815,6 +814,7 @@ class UserManagementService:
         return result.scalars().all()
 
 
+from sqlalchemy import func
+
 # Import for selectinload and func
 from sqlalchemy.orm import selectinload
-from sqlalchemy import func

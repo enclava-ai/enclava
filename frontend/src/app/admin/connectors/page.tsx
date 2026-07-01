@@ -73,7 +73,7 @@ function ConnectorsPageContent() {
     try {
       const [connectorsData, collectionsData] = await Promise.all([
         apiClient.get<{ connectors: Connector[] }>("/api-internal/v1/connectors"),
-        apiClient.get<{ collections: Collection[] }>("/api-internal/v1/rag/collections"),
+        apiClient.get<{ collections: Collection[] }>("/api-internal/v1/connectors/collections"),
       ])
 
       setConnectors(connectorsData.connectors || [])

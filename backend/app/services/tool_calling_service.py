@@ -2,17 +2,20 @@
 Tool Calling Service
 Integrates LLM service with tool execution for function calling capabilities
 """
+
 import json
 import logging
+import os
 import uuid
-from typing import Dict, Any, List, Optional, AsyncGenerator, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.llm.service import llm_service
-from app.services.llm.models import ChatRequest, ChatResponse, ChatMessage, ToolCall
-from app.services.tool_management_service import ToolManagementService
-from app.services.tool_execution_service import ToolExecutionService
 from app.models.user import User
+from app.services.llm.models import ChatMessage, ChatRequest, ChatResponse, ToolCall
+from app.services.llm.service import llm_service
+from app.services.tool_execution_service import ToolExecutionService
+from app.services.tool_management_service import ToolManagementService
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +82,10 @@ class ToolCallingService:
         # Build tool summary
         summary_parts = []
         if mcp_tools:
-            summary_parts.append("**Specialized MCP Tools (use these first for their domains):**\n" + "\n".join(mcp_tools))
+            summary_parts.append(
+                "**Specialized MCP Tools (use these first for their domains):**\n"
+                + "\n".join(mcp_tools)
+            )
         if builtin_tools:
             summary_parts.append("**Built-in Tools:**\n" + "\n".join(builtin_tools))
 
@@ -315,9 +321,7 @@ class ToolCallingService:
         return openai_tools
 
     async def _get_mcp_config(
-        self,
-        server_name: str,
-        user_id: int
+        self, server_name: str, user_id: int
     ) -> Optional[Dict[str, Any]]:
         """Get MCP server configuration by name from database.
 
@@ -332,6 +336,20 @@ class ToolCallingService:
             Dict with url, api_key (decrypted), timeout, max_retries,
             or None if not configured
         """
+        env_prefix = f"MCP_{server_name.upper().replace('-', '_')}"
+        env_url = os.getenv(f"{env_prefix}_URL")
+        if env_url:
+            return {
+                "url": env_url,
+                "api_key": os.getenv(f"{env_prefix}_API_KEY")
+                or os.getenv(f"{env_prefix}_KEY"),
+                "api_key_header_name": os.getenv(
+                    f"{env_prefix}_API_KEY_HEADER", "Authorization"
+                ),
+                "timeout": int(os.getenv(f"{env_prefix}_TIMEOUT", "30")),
+                "max_retries": int(os.getenv(f"{env_prefix}_MAX_RETRIES", "3")),
+            }
+
         from app.services.mcp_server_service import MCPServerService
 
         service = MCPServerService(self.db)
@@ -354,8 +372,8 @@ class ToolCallingService:
         Returns:
             Dict with execution results (output, error_message, status)
         """
-        from app.services.builtin_tools.registry import BuiltinToolRegistry
         from app.services.builtin_tools.base import ToolExecutionContext
+        from app.services.builtin_tools.registry import BuiltinToolRegistry
 
         function_name = tool_call.function.get("name")
         if not function_name:
@@ -373,13 +391,13 @@ class ToolCallingService:
             ctx = ToolExecutionContext(
                 user_id=self._get_user_id(user),
                 db=self.db,
-                tool_resources=self._tool_resources
+                tool_resources=self._tool_resources,
             )
             result = await tool.execute(arguments, ctx)
             return {
                 "output": result.output,
                 "error_message": result.error,
-                "status": "completed" if result.success else "failed"
+                "status": "completed" if result.success else "failed",
             }
 
         # 2. Check MCP tools (format: "server_name.tool_name")
@@ -389,12 +407,15 @@ class ToolCallingService:
             mcp_config = await self._get_mcp_config(server_name, user_id)
             if mcp_config:
                 from app.services.mcp_client import MCPClient
+
                 client = MCPClient(
                     server_url=mcp_config["url"],
                     api_key=mcp_config.get("api_key"),
-                    api_key_header_name=mcp_config.get("api_key_header_name", "Authorization"),
+                    api_key_header_name=mcp_config.get(
+                        "api_key_header_name", "Authorization"
+                    ),
                     timeout_seconds=mcp_config.get("timeout", 30),
-                    max_retries=mcp_config.get("max_retries", 3)
+                    max_retries=mcp_config.get("max_retries", 3),
                 )
                 return await client.call_tool(tool_name, arguments)
 
@@ -425,12 +446,16 @@ class ToolCallingService:
                     "output": execution.output,
                     "error_message": execution.error_message,
                     "execution_time_ms": execution.execution_time_ms,
-                    "created_at": execution.created_at.isoformat()
-                    if execution.created_at
-                    else None,
-                    "completed_at": execution.completed_at.isoformat()
-                    if execution.completed_at
-                    else None,
+                    "created_at": (
+                        execution.created_at.isoformat()
+                        if execution.created_at
+                        else None
+                    ),
+                    "completed_at": (
+                        execution.completed_at.isoformat()
+                        if execution.completed_at
+                        else None
+                    ),
                 }
             )
 
@@ -476,7 +501,9 @@ class ToolCallingService:
                         continue
 
                 # 3. Check custom user tools (from database)
-                tool = await self.tool_mgmt.get_tool_by_name_and_user(tool_name, user_id)
+                tool = await self.tool_mgmt.get_tool_by_name_and_user(
+                    tool_name, user_id
+                )
                 if tool:
                     availability[tool_name] = tool.can_be_used_by(user)
                 else:

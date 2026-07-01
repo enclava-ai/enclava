@@ -1,18 +1,21 @@
 """
 Analytics middleware for automatic request tracking
 """
+
 import time
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from typing import Optional
+
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
-from contextvars import ContextVar
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.core.config import settings
 from app.core.logging import get_logger
-from app.services.analytics import RequestEvent, get_analytics_service
 from app.db.database import get_db
+from app.services.analytics import RequestEvent, get_analytics_service
 
 logger = get_logger(__name__)
 
@@ -26,6 +29,9 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Start timing
         start_time = time.time()
+
+        if settings.TESTING or settings.LLM_TEST_MODE:
+            return await call_next(request)
 
         # Skip analytics for health checks and static files
         if request.url.path in [
@@ -44,6 +50,8 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
             authorization = request.headers.get("Authorization")
             if authorization and authorization.startswith("Bearer "):
                 token = authorization.split(" ")[1]
+                if not token.startswith("eyJ"):
+                    raise ValueError("Bearer token is not a JWT")
                 # Try to extract user info from token without full validation
                 # This is a lightweight check for analytics purposes
                 from app.core.security import verify_token

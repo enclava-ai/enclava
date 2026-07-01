@@ -5,23 +5,25 @@ Tests PricingManagementService functionality including manual pricing,
 override management, querying, and search operations.
 Also tests Pydantic schema validation.
 """
-import pytest
+
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+
+import pytest
 from pydantic import ValidationError
 
-from app.services.pricing_management import PricingManagementService
-from app.models.provider_pricing import ProviderPricing, PricingAuditLog
+from app.models.provider_pricing import PricingAuditLog, ProviderPricing
 from app.schemas.pricing import (
-    SetPricingRequest,
-    PricingResponse,
-    PricingHistoryResponse,
-    PricingAuditLogResponse,
-    SyncResultResponse,
-    PricingSummary,
     BulkPricingRequest,
+    PricingAuditLogResponse,
+    PricingHistoryResponse,
+    PricingResponse,
+    PricingSummary,
     RemoveOverrideResponse,
+    SetPricingRequest,
+    SyncResultResponse,
 )
+from app.services.pricing_management import PricingManagementService
 
 
 @pytest.mark.unit
@@ -470,7 +472,9 @@ class TestPricingManagementService:
         assert existing.effective_until is not None
         mock_db.commit.assert_called_once()
 
-    async def test_remove_override_returns_false_when_not_override(self, service, mock_db):
+    async def test_remove_override_returns_false_when_not_override(
+        self, service, mock_db
+    ):
         """Test remove_override returns False for non-override pricing."""
         existing = ProviderPricing(
             id=1,
@@ -498,7 +502,9 @@ class TestPricingManagementService:
         # Should not expire non-override pricing
         assert existing.effective_until is None
 
-    async def test_remove_override_returns_false_when_no_pricing(self, service, mock_db):
+    async def test_remove_override_returns_false_when_no_pricing(
+        self, service, mock_db
+    ):
         """Test remove_override returns False when no pricing exists."""
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
@@ -702,6 +708,7 @@ class TestPricingManagementService:
 
     async def test_get_pricing_summary(self, service, mock_db):
         """Test get_pricing_summary returns correct statistics."""
+
         # Setup mock returns for various queries
         async def mock_execute(stmt):
             result = MagicMock()
@@ -715,7 +722,10 @@ class TestPricingManagementService:
                 result.scalar.return_value = 10
             elif call_num == 2:  # By provider
                 result.__iter__ = lambda self: iter(
-                    [MagicMock(provider_id="redpill", count=7), MagicMock(provider_id="privatemode", count=3)]
+                    [
+                        MagicMock(provider_id="redpill", count=7),
+                        MagicMock(provider_id="privatemode", count=3),
+                    ]
                 )
             elif call_num == 3:  # Override count
                 result.scalar.return_value = 3

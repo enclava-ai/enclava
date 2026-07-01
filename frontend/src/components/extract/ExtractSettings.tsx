@@ -151,7 +151,9 @@ export function ExtractSettings() {
           <div className="flex justify-end">
             <Button
               onClick={saveSettings}
-              disabled={saving || selectedModel === settings?.default_model}
+              disabled={
+                saving || !selectedModel || selectedModel === settings?.default_model
+              }
             >
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Settings

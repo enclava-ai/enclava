@@ -5,19 +5,29 @@ Represents document collections for the RAG system
 
 from enum import Enum
 
-from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime, Boolean, BigInteger
-from sqlalchemy.sql import func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.db.database import Base
 
 
 class CollectionVisibility(str, Enum):
     """Who can search/read documents in this collection."""
 
-    PRIVATE = "private"      # owner + admins only
-    TEAM = "team"            # all authenticated users (default, matches legacy behaviour)
+    PRIVATE = "private"  # owner + admins only
+    TEAM = "team"  # all authenticated users (default, matches legacy behaviour)
     ROLE_REQUIRED = "role_required"  # users whose role.level >= allowed_role_level
-    PUBLIC = "public"        # anyone, including unauthenticated API callers
+    PUBLIC = "public"  # anyone, including unauthenticated API callers
 
 
 class RagCollection(Base):
@@ -70,6 +80,51 @@ class RagCollection(Base):
     connector_sources = relationship(
         "ConnectorSource", back_populates="collection", cascade="all, delete-orphan"
     )
+
+    def __init__(self, **kwargs):
+        if "user_id" in kwargs and "owner_user_id" not in kwargs:
+            kwargs["owner_user_id"] = kwargs.pop("user_id")
+        legacy_fields = {
+            "embedding_model": kwargs.pop("embedding_model", None),
+            "chunk_size": kwargs.pop("chunk_size", None),
+            "chunk_overlap": kwargs.pop("chunk_overlap", None),
+        }
+        super().__init__(**kwargs)
+        for key, value in legacy_fields.items():
+            if value is not None:
+                setattr(self, f"_{key}", value)
+
+    @property
+    def user_id(self):
+        return self.owner_user_id
+
+    @user_id.setter
+    def user_id(self, value):
+        self.owner_user_id = value
+
+    @property
+    def embedding_model(self):
+        return getattr(self, "_embedding_model", None)
+
+    @embedding_model.setter
+    def embedding_model(self, value):
+        self._embedding_model = value
+
+    @property
+    def chunk_size(self):
+        return getattr(self, "_chunk_size", None)
+
+    @chunk_size.setter
+    def chunk_size(self, value):
+        self._chunk_size = value
+
+    @property
+    def chunk_overlap(self):
+        return getattr(self, "_chunk_overlap", None)
+
+    @chunk_overlap.setter
+    def chunk_overlap(self, value):
+        self._chunk_overlap = value
 
     def to_dict(self):
         """Convert model to dictionary for API responses"""

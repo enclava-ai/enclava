@@ -5,18 +5,17 @@ Service for aggregating and querying usage statistics from usage_records.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, func, and_, desc, case
+from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.usage_record import UsageRecord
-from app.models.api_key import APIKey
-from app.models.user import User
-from app.models.chatbot import ChatbotInstance
-from app.models.agent_config import AgentConfig
 from app.core.logging import get_logger
 from app.db.database import utc_now
+from app.models.agent_config import AgentConfig
+from app.models.api_key import APIKey
+from app.models.usage_record import UsageRecord
+from app.models.user import User
 
 logger = get_logger(__name__)
 
@@ -70,7 +69,7 @@ class UsageStatsService:
         end_date: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         """
-        Get usage statistics for a specific user (all usage including playground and chatbot testing).
+        Get usage statistics for a specific user.
 
         Args:
             user_id: User ID
@@ -103,7 +102,7 @@ class UsageStatsService:
         # Get daily trend
         daily_trend = await self._get_daily_trend(base_conditions, start_date, end_date)
 
-        # Get breakdown by source (API key vs Playground vs Chatbot)
+        # Get breakdown by source (agents, API keys, playground)
         by_source = await self._get_source_breakdown(base_conditions)
 
         return {
@@ -136,7 +135,7 @@ class UsageStatsService:
             provider_filter: Filter by provider
             model_filter: Filter by model
             status_filter: Filter by status (success/error)
-            source_filter: Filter by source (api_key/playground/chatbot)
+            source_filter: Filter by source (agent/api_key/playground)
             start_date: Start date for filtering
             end_date: End date for filtering
 
@@ -160,12 +159,12 @@ class UsageStatsService:
         # Source filter
         if source_filter == "api_key":
             conditions.append(UsageRecord.api_key_id.is_not(None))
+            conditions.append(UsageRecord.agent_config_id.is_(None))
+        elif source_filter == "agent":
+            conditions.append(UsageRecord.agent_config_id.is_not(None))
         elif source_filter == "playground":
             conditions.append(UsageRecord.api_key_id.is_(None))
-            conditions.append(UsageRecord.chatbot_id.is_(None))
-        elif source_filter == "chatbot":
-            conditions.append(UsageRecord.api_key_id.is_(None))
-            conditions.append(UsageRecord.chatbot_id.is_not(None))
+            conditions.append(UsageRecord.agent_config_id.is_(None))
 
         # Get total count
         count_stmt = select(func.count(UsageRecord.id)).where(and_(*conditions))
@@ -187,55 +186,60 @@ class UsageStatsService:
         return records, total_count
 
     async def _get_source_breakdown(self, conditions: List) -> List[Dict[str, Any]]:
-        """Get breakdown by usage source (API Key, Playground, Chatbot).
+        """Get breakdown by usage source (Agent, API Key, Playground).
 
         Source classification:
-        - API Keys: api_key_id IS NOT NULL (external API usage)
-        - Playground: api_key_id IS NULL AND chatbot_id IS NULL (internal LLM testing)
-        - Chatbot Testing: api_key_id IS NULL AND chatbot_id IS NOT NULL (internal chatbot testing)
+        - Agents: agent_config_id IS NOT NULL
+        - API Keys: api_key_id IS NOT NULL and agent_config_id IS NULL
+        - Playground: api_key_id IS NULL and agent_config_id IS NULL
         """
         sources = []
+
+        agent_conditions = conditions + [
+            UsageRecord.agent_config_id.is_not(None),
+        ]
+        agent_stats = await self._get_summary(agent_conditions)
+        sources.append(
+            {
+                "source": "agent",
+                "source_name": "Agents",
+                "total_requests": agent_stats["total_requests"],
+                "total_tokens": agent_stats["total_tokens"],
+                "total_cost_dollars": agent_stats["total_cost_dollars"],
+            }
+        )
 
         # API Key usage (api_key_id IS NOT NULL)
         api_key_conditions = conditions + [
             UsageRecord.api_key_id.is_not(None),
+            UsageRecord.agent_config_id.is_(None),
         ]
         api_key_stats = await self._get_summary(api_key_conditions)
-        sources.append({
-            "source": "api_key",
-            "source_name": "API Keys",
-            "total_requests": api_key_stats["total_requests"],
-            "total_tokens": api_key_stats["total_tokens"],
-            "total_cost_dollars": api_key_stats["total_cost_dollars"],
-        })
+        sources.append(
+            {
+                "source": "api_key",
+                "source_name": "API Keys",
+                "total_requests": api_key_stats["total_requests"],
+                "total_tokens": api_key_stats["total_tokens"],
+                "total_cost_dollars": api_key_stats["total_cost_dollars"],
+            }
+        )
 
-        # Playground usage (api_key_id IS NULL AND chatbot_id IS NULL)
+        # Playground usage (api_key_id IS NULL AND agent_config_id IS NULL)
         playground_conditions = conditions + [
             UsageRecord.api_key_id.is_(None),
-            UsageRecord.chatbot_id.is_(None),
+            UsageRecord.agent_config_id.is_(None),
         ]
         playground_stats = await self._get_summary(playground_conditions)
-        sources.append({
-            "source": "playground",
-            "source_name": "Playground",
-            "total_requests": playground_stats["total_requests"],
-            "total_tokens": playground_stats["total_tokens"],
-            "total_cost_dollars": playground_stats["total_cost_dollars"],
-        })
-
-        # Chatbot testing (api_key_id IS NULL AND chatbot_id IS NOT NULL)
-        chatbot_conditions = conditions + [
-            UsageRecord.api_key_id.is_(None),
-            UsageRecord.chatbot_id.is_not(None),
-        ]
-        chatbot_stats = await self._get_summary(chatbot_conditions)
-        sources.append({
-            "source": "chatbot",
-            "source_name": "Chatbot Testing",
-            "total_requests": chatbot_stats["total_requests"],
-            "total_tokens": chatbot_stats["total_tokens"],
-            "total_cost_dollars": chatbot_stats["total_cost_dollars"],
-        })
+        sources.append(
+            {
+                "source": "playground",
+                "source_name": "Playground",
+                "total_requests": playground_stats["total_requests"],
+                "total_tokens": playground_stats["total_tokens"],
+                "total_cost_dollars": playground_stats["total_cost_dollars"],
+            }
+        )
 
         return [s for s in sources if s["total_requests"] > 0]
 
@@ -562,12 +566,12 @@ class UsageStatsService:
             select(
                 UsageRecord.provider_id,
                 func.count(UsageRecord.id).label("total_requests"),
-                func.sum(
-                    case((UsageRecord.status == "success", 1), else_=0)
-                ).label("successful_requests"),
-                func.sum(
-                    case((UsageRecord.status != "success", 1), else_=0)
-                ).label("failed_requests"),
+                func.sum(case((UsageRecord.status == "success", 1), else_=0)).label(
+                    "successful_requests"
+                ),
+                func.sum(case((UsageRecord.status != "success", 1), else_=0)).label(
+                    "failed_requests"
+                ),
                 func.sum(UsageRecord.total_tokens).label("total_tokens"),
                 func.sum(UsageRecord.total_cost_cents).label("total_cost_cents"),
                 func.avg(UsageRecord.latency_ms).label("average_latency_ms"),
@@ -780,67 +784,6 @@ class UsageStatsService:
             for d in daily
         ]
 
-    async def get_chatbot_stats(
-        self,
-        chatbot_id: str,
-        period_days: int = 30,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
-        """
-        Get usage statistics for a specific chatbot.
-
-        Args:
-            chatbot_id: Chatbot identifier (used as api_key_id for filtering)
-            period_days: Number of days to query
-            start_date: Custom start date
-            end_date: Custom end date
-
-        Returns:
-            Dictionary with summary, by_provider, by_model, and daily_trend
-        """
-        from app.models.chatbot import ChatbotInstance
-
-        # Verify chatbot exists
-        result = await self.db.execute(
-            select(ChatbotInstance).where(ChatbotInstance.id == chatbot_id)
-        )
-        chatbot = result.scalar_one_or_none()
-
-        if not chatbot:
-            raise ValueError(f"Chatbot not found: {chatbot_id}")
-
-        # Determine date range (naive datetimes for DB compatibility)
-        start_date, end_date = self._get_date_range(period_days, start_date, end_date)
-
-        # Build base query conditions
-        base_conditions = [
-            UsageRecord.chatbot_id == chatbot_id,
-            UsageRecord.created_at >= start_date,
-            UsageRecord.created_at <= end_date,
-        ]
-
-        # Get summary
-        summary = await self._get_summary(base_conditions)
-
-        # Get provider breakdown
-        by_provider = await self._get_provider_breakdown(base_conditions)
-
-        # Get model breakdown
-        by_model = await self._get_model_breakdown(base_conditions)
-
-        # Get daily trend
-        daily_trend = await self._get_daily_trend(base_conditions, start_date, end_date)
-
-        return {
-            "summary": summary,
-            "by_provider": by_provider,
-            "by_model": by_model,
-            "daily_trend": daily_trend,
-            "chatbot_id": chatbot_id,
-            "chatbot_name": chatbot.name,
-        }
-
     async def get_agent_stats(
         self,
         agent_config_id: int,
@@ -860,11 +803,9 @@ class UsageStatsService:
         Returns:
             Dictionary with summary, by_provider, by_model, and daily_trend
         """
-        from app.models.chatbot import ChatbotConfig
-
         # Verify agent config exists
         result = await self.db.execute(
-            select(ChatbotConfig).where(ChatbotConfig.id == agent_config_id)
+            select(AgentConfig).where(AgentConfig.id == agent_config_id)
         )
         agent_config = result.scalar_one_or_none()
 

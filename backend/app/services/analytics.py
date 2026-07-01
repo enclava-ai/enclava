@@ -2,25 +2,26 @@
 Analytics service for request tracking, usage metrics, and performance monitoring
 Integrated with the core app for budget tracking and token usage analysis.
 """
+
 import asyncio
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta, timezone
-from dataclasses import dataclass, asdict
 from collections import defaultdict, deque
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func, desc
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.models.usage_tracking import UsageTracking
+from app.db.database import utc_now
 from app.models.api_key import APIKey
 from app.models.budget import Budget
+from app.models.usage_tracking import UsageTracking
 from app.models.user import User
-from app.db.database import utc_now
 
 logger = get_logger(__name__)
 
@@ -188,7 +189,9 @@ class AnalyticsService:
         # Check cache
         if cache_key in self.metrics_cache:
             cached_time, cached_data = self.metrics_cache[cache_key]
-            if datetime.now(timezone.utc) - cached_time < timedelta(seconds=self.cache_ttl):
+            if datetime.now(timezone.utc) - cached_time < timedelta(
+                seconds=self.cache_ttl
+            ):
                 return cached_data
 
         try:
@@ -500,15 +503,15 @@ class AnalyticsService:
             total_requests = len(usage_records)
 
             efficiency_metrics = {
-                "cost_per_token": (total_cost / total_tokens)
-                if total_tokens > 0
-                else 0,
-                "cost_per_request": (total_cost / total_requests)
-                if total_requests > 0
-                else 0,
-                "tokens_per_request": (total_tokens / total_requests)
-                if total_requests > 0
-                else 0,
+                "cost_per_token": (
+                    (total_cost / total_tokens) if total_tokens > 0 else 0
+                ),
+                "cost_per_request": (
+                    (total_cost / total_requests) if total_requests > 0 else 0
+                ),
+                "tokens_per_request": (
+                    (total_tokens / total_requests) if total_requests > 0 else 0
+                ),
             }
 
             return {
@@ -668,7 +671,9 @@ class InMemoryAnalyticsService:
         # Check cache
         if cache_key in self.metrics_cache:
             cached_time, cached_data = self.metrics_cache[cache_key]
-            if datetime.now(timezone.utc) - cached_time < timedelta(seconds=self.cache_ttl):
+            if datetime.now(timezone.utc) - cached_time < timedelta(
+                seconds=self.cache_ttl
+            ):
                 return cached_data
 
         try:
@@ -932,15 +937,15 @@ class InMemoryAnalyticsService:
             total_requests = len(events)
 
             efficiency_metrics = {
-                "cost_per_token": (total_cost / total_tokens)
-                if total_tokens > 0
-                else 0,
-                "cost_per_request": (total_cost / total_requests)
-                if total_requests > 0
-                else 0,
-                "tokens_per_request": (total_tokens / total_requests)
-                if total_requests > 0
-                else 0,
+                "cost_per_token": (
+                    (total_cost / total_tokens) if total_tokens > 0 else 0
+                ),
+                "cost_per_request": (
+                    (total_cost / total_requests) if total_requests > 0 else 0
+                ),
+                "tokens_per_request": (
+                    (total_tokens / total_requests) if total_requests > 0 else 0
+                ),
             }
 
             return {

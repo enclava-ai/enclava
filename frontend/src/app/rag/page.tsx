@@ -112,6 +112,12 @@ function ConnectorSummaryCard({ connector }: { connector: Connector }) {
 
 function RAGPageContent() {
   const { user } = useAuth()
+  const canManageConnectors =
+    user?.is_superuser ||
+    user?.role === 'admin' ||
+    user?.role === 'super_admin' ||
+    user?.permissions?.includes('platform:*') ||
+    user?.permissions?.includes('platform:connectors:manage')
   const [collections, setCollections] = useState<Collection[]>([])
   const [stats, setStats] = useState<CollectionStats | null>(null)
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null)
@@ -342,7 +348,7 @@ function RAGPageContent() {
                     Connect external data sources to automatically sync content into your knowledge base.
                   </CardDescription>
                 </div>
-                {user?.role === 'admin' && (
+                {canManageConnectors && (
                   <Button asChild variant="outline">
                     <a href="/admin/connectors">
                       <Settings className="h-4 w-4 mr-2" />
@@ -353,7 +359,7 @@ function RAGPageContent() {
               </div>
             </CardHeader>
             <CardContent>
-              {user?.role !== 'admin' ? (
+              {!canManageConnectors ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Plug className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Admin Access Required</h3>

@@ -59,7 +59,9 @@ class DataValidator:
 
         # Validate addresses
         if sp := data.get("service_provider"):
-            self._validate_address(sp.get("address"), "service_provider.address", result)
+            self._validate_address(
+                sp.get("address"), "service_provider.address", result
+            )
         if buyer := data.get("buyer"):
             self._validate_address(buyer.get("address"), "buyer.address", result)
 

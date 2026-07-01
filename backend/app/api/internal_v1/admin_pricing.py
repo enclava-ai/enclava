@@ -11,28 +11,28 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.core.security import get_current_user, RequiresRole
+from app.core.security import RequiresRole, get_current_user
 from app.db.database import get_db
 from app.models import User
 from app.schemas.pricing import (
-    SetPricingRequest,
-    PricingResponse,
-    PricingHistoryResponse,
     PricingAuditLogResponse,
-    SyncResultResponse,
-    SyncResultModel,
+    PricingHistoryResponse,
     PricingListResponse,
-    RemoveOverrideResponse,
+    PricingResponse,
     PricingSummary,
-    ProviderMetadataResponse,
     ProviderListResponse,
+    ProviderMetadataResponse,
+    RemoveOverrideResponse,
+    SetPricingRequest,
+    SyncResultModel,
+    SyncResultResponse,
 )
 from app.services.pricing_management import PricingManagementService
 from app.services.provider_pricing_sync import ProviderPricingSyncService
 from app.services.provider_registry import (
     get_all_providers,
-    get_provider_currency,
     get_currency_symbol,
+    get_provider_currency,
 )
 
 logger = get_logger(__name__)
@@ -47,7 +47,9 @@ require_admin = RequiresRole("admin")
 def _pricing_to_response(pricing) -> PricingResponse:
     """Convert ProviderPricing model to response schema"""
     # Get currency from pricing record, or fall back to provider default
-    currency = getattr(pricing, 'currency', None) or get_provider_currency(pricing.provider_id)
+    currency = getattr(pricing, "currency", None) or get_provider_currency(
+        pricing.provider_id
+    )
     return PricingResponse(
         id=pricing.id,
         provider_id=pricing.provider_id,
@@ -75,7 +77,9 @@ def _pricing_to_response(pricing) -> PricingResponse:
 
 def _history_to_response(pricing) -> PricingHistoryResponse:
     """Convert ProviderPricing model to history response schema"""
-    currency = getattr(pricing, 'currency', None) or get_provider_currency(pricing.provider_id)
+    currency = getattr(pricing, "currency", None) or get_provider_currency(
+        pricing.provider_id
+    )
     return PricingHistoryResponse(
         id=pricing.id,
         provider_id=pricing.provider_id,

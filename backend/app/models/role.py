@@ -1,11 +1,14 @@
 """
 Role model for hierarchical permission management
 """
+
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
 from enum import Enum
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, JSON
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
 
 
@@ -52,6 +55,16 @@ class Role(Base):
 
     def __repr__(self):
         return f"<Role(id={self.id}, name='{self.name}', level='{self.level}')>"
+
+    def __eq__(self, other):
+        other_value = getattr(other, "value", other)
+        if isinstance(other_value, str):
+            return self.name == other_value or self.level == other_value
+        return super().__eq__(other)
+
+    @property
+    def value(self) -> str:
+        return self.name
 
     def to_dict(self):
         """Convert role to dictionary"""

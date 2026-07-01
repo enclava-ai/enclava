@@ -2,28 +2,30 @@
 Tool calling API endpoints
 Integration between LLM and tool execution
 """
-from typing import List, Dict, Any, Optional
+
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
 from pydantic import BaseModel, Field
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
 from app.core.security import get_current_user
-from app.services.api_key_auth import get_api_key_context
-from app.services.tool_calling_service import ToolCallingService
-from app.services.llm.models import ChatRequest, ChatResponse, ChatMessage
+from app.db.database import get_db
+from app.models.agent_config import AgentConfig
 from app.schemas.tool_calling import (
     ToolCallRequest,
     ToolCallResponse,
     ToolExecutionRequest,
+    ToolHistoryResponse,
     ToolValidationRequest,
     ToolValidationResponse,
-    ToolHistoryResponse,
 )
-from app.models.agent_config import AgentConfig
+from app.services.api_key_auth import get_api_key_context
+from app.services.llm.models import ChatMessage, ChatRequest, ChatResponse
+from app.services.tool_calling_service import ToolCallingService
 
 router = APIRouter()
 
@@ -189,10 +191,7 @@ async def list_agent_configs(
 
     # Build query for agents accessible to the user
     stmt = select(AgentConfig).where(
-        or_(
-            AgentConfig.created_by_user_id == user_id,
-            AgentConfig.is_public == True
-        )
+        or_(AgentConfig.created_by_user_id == user_id, AgentConfig.is_public == True)
     )
 
     if category:
@@ -214,5 +213,5 @@ async def list_agent_configs(
             }
             for cfg in configs
         ],
-        "count": len(configs)
+        "count": len(configs),
     }

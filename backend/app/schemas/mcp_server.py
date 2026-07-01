@@ -5,11 +5,11 @@ These schemas handle validation for MCP server CRUD operations,
 connection testing, and tool discovery.
 """
 
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-from pydantic import BaseModel, Field, validator
 import re
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field, validator
 
 # =============================================================================
 # MCP Server Create/Update Schemas
@@ -23,49 +23,36 @@ class MCPServerCreate(BaseModel):
         ...,
         min_length=1,
         max_length=100,
-        description="Unique identifier for the server (e.g., 'order-api', 'weather')"
+        description="Unique identifier for the server (e.g., 'order-api', 'weather')",
     )
     display_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=200,
-        description="Human-readable display name"
+        ..., min_length=1, max_length=200, description="Human-readable display name"
     )
     description: Optional[str] = Field(
         None,
         max_length=1000,
-        description="Optional description of the server's purpose"
+        description="Optional description of the server's purpose",
     )
     server_url: str = Field(
-        ...,
-        min_length=1,
-        max_length=500,
-        description="Base URL for the MCP server"
+        ..., min_length=1, max_length=500, description="Base URL for the MCP server"
     )
     api_key: Optional[str] = Field(
-        None,
-        description="API key for authentication (will be encrypted)"
+        None, description="API key for authentication (will be encrypted)"
     )
     api_key_header_name: str = Field(
         default="Authorization",
         max_length=100,
-        description="HTTP header name for API key (e.g., 'Authorization', 'X-API-Key')"
+        description="HTTP header name for API key (e.g., 'Authorization', 'X-API-Key')",
     )
     timeout_seconds: int = Field(
-        default=30,
-        ge=5,
-        le=300,
-        description="Request timeout in seconds"
+        default=30, ge=5, le=300, description="Request timeout in seconds"
     )
     max_retries: int = Field(
-        default=3,
-        ge=0,
-        le=10,
-        description="Maximum retry attempts for failed requests"
+        default=3, ge=0, le=10, description="Maximum retry attempts for failed requests"
     )
     is_global: bool = Field(
         default=False,
-        description="Make this server available to all users (admin only)"
+        description="Make this server available to all users (admin only)",
     )
 
     @validator("name")
@@ -91,51 +78,30 @@ class MCPServerUpdate(BaseModel):
     """Schema for updating an MCP server configuration."""
 
     display_name: Optional[str] = Field(
-        None,
-        min_length=1,
-        max_length=200,
-        description="Human-readable display name"
+        None, min_length=1, max_length=200, description="Human-readable display name"
     )
     description: Optional[str] = Field(
-        None,
-        max_length=1000,
-        description="Optional description"
+        None, max_length=1000, description="Optional description"
     )
     server_url: Optional[str] = Field(
-        None,
-        min_length=1,
-        max_length=500,
-        description="Base URL for the MCP server"
+        None, min_length=1, max_length=500, description="Base URL for the MCP server"
     )
     api_key: Optional[str] = Field(
-        None,
-        description="New API key (set to empty string to remove)"
+        None, description="New API key (set to empty string to remove)"
     )
     api_key_header_name: Optional[str] = Field(
-        None,
-        max_length=100,
-        description="HTTP header name for API key"
+        None, max_length=100, description="HTTP header name for API key"
     )
     timeout_seconds: Optional[int] = Field(
-        None,
-        ge=5,
-        le=300,
-        description="Request timeout in seconds"
+        None, ge=5, le=300, description="Request timeout in seconds"
     )
     max_retries: Optional[int] = Field(
-        None,
-        ge=0,
-        le=10,
-        description="Maximum retry attempts"
+        None, ge=0, le=10, description="Maximum retry attempts"
     )
     is_global: Optional[bool] = Field(
-        None,
-        description="Global availability (admin only)"
+        None, description="Global availability (admin only)"
     )
-    is_active: Optional[bool] = Field(
-        None,
-        description="Whether the server is active"
-    )
+    is_active: Optional[bool] = Field(None, description="Whether the server is active")
 
     @validator("server_url")
     def validate_url(cls, v):
@@ -156,25 +122,16 @@ class MCPServerTestRequest(BaseModel):
     """Schema for testing an MCP server connection without saving."""
 
     server_url: str = Field(
-        ...,
-        min_length=1,
-        max_length=500,
-        description="Base URL for the MCP server"
+        ..., min_length=1, max_length=500, description="Base URL for the MCP server"
     )
-    api_key: Optional[str] = Field(
-        None,
-        description="API key for authentication"
-    )
+    api_key: Optional[str] = Field(None, description="API key for authentication")
     api_key_header_name: str = Field(
         default="Authorization",
         max_length=100,
-        description="HTTP header name for API key (e.g., 'Authorization', 'X-API-Key')"
+        description="HTTP header name for API key (e.g., 'Authorization', 'X-API-Key')",
     )
     timeout_seconds: int = Field(
-        default=30,
-        ge=5,
-        le=60,
-        description="Request timeout for test"
+        default=30, ge=5, le=60, description="Request timeout for test"
     )
 
     @validator("server_url")
@@ -191,8 +148,7 @@ class MCPToolInfo(BaseModel):
     name: str = Field(..., description="Tool name/identifier")
     description: Optional[str] = Field(None, description="Tool description")
     parameters_schema: Optional[Dict[str, Any]] = Field(
-        None,
-        description="JSON schema for tool parameters"
+        None, description="JSON schema for tool parameters"
     )
 
 
@@ -202,13 +158,11 @@ class MCPServerTestResponse(BaseModel):
     success: bool = Field(..., description="Whether the connection test succeeded")
     message: str = Field(..., description="Status message")
     tools: List[MCPToolInfo] = Field(
-        default_factory=list,
-        description="List of discovered tools"
+        default_factory=list, description="List of discovered tools"
     )
     tool_count: int = Field(default=0, description="Number of tools discovered")
     response_time_ms: Optional[int] = Field(
-        None,
-        description="Response time in milliseconds"
+        None, description="Response time in milliseconds"
     )
     error: Optional[str] = Field(None, description="Error details if failed")
 
@@ -253,13 +207,9 @@ class MCPServerListResponse(BaseModel):
     servers: List[MCPServerResponse]
     total: int
     user_servers: int = Field(
-        ...,
-        description="Number of servers created by the current user"
+        ..., description="Number of servers created by the current user"
     )
-    global_servers: int = Field(
-        ...,
-        description="Number of global servers"
-    )
+    global_servers: int = Field(..., description="Number of global servers")
 
 
 class MCPServerRefreshResponse(BaseModel):

@@ -57,7 +57,6 @@ interface ApiKey {
   budget_type?: "total" | "monthly";
   is_unlimited: boolean;
   allowed_models: string[];
-  allowed_chatbots: string[];
   allowed_agents: string[];
   allowed_extract_templates: string[];
 }
@@ -88,7 +87,6 @@ interface NewApiKeyData {
   budget_limit_cents?: number;
   budget_type?: "total" | "monthly";
   allowed_models: string[];
-  allowed_chatbots: string[];
   allowed_agents: string[];
   allowed_extract_templates: string[];
 }
@@ -125,7 +123,6 @@ function ApiKeysContent() {
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
   const [editKeyData, setEditKeyData] = useState<Partial<ApiKey>>({});
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
-  const [availableChatbots, setAvailableChatbots] = useState<any[]>([]);
   const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([]);
   const [availableTemplates, setAvailableTemplates] = useState<ExtractTemplate[]>([]);
 
@@ -138,7 +135,6 @@ function ApiKeysContent() {
     budget_limit_cents: 1000, // $10.00 default
     budget_type: "monthly",
     allowed_models: [],
-    allowed_chatbots: [],
     allowed_agents: [],
     allowed_extract_templates: [],
   });
@@ -146,33 +142,13 @@ function ApiKeysContent() {
   useEffect(() => {
     fetchApiKeys();
     fetchAvailableModels();
-    fetchAvailableChatbots();
     fetchAvailableAgents();
     fetchAvailableTemplates();
     
     // Check URL parameters for auto-opening create dialog
-    const chatbotId = searchParams.get('chatbot');
-    const chatbotName = searchParams.get('chatbot_name');
     const createParam = searchParams.get('create');
     
-    if (chatbotId && chatbotName) {
-      // Pre-populate the form with the chatbot selected and required permissions
-      setNewKeyData(prev => ({
-        ...prev,
-        name: `${decodeURIComponent(chatbotName)} API Key`,
-        allowed_chatbots: [chatbotId],
-        scopes: ["chat.completions"] // Chatbots need chat completion permission
-      }));
-      
-      // Automatically open the create dialog
-      setShowCreateDialog(true);
-      
-      toast({
-        title: "Chatbot Selected",
-        description: `Creating API key for ${decodeURIComponent(chatbotName)}`
-      });
-    } else if (createParam === 'true') {
-      // Automatically open the create dialog for general API key creation
+    if (createParam === 'true') {
       setShowCreateDialog(true);
     }
   }, [searchParams, toast]);
@@ -199,15 +175,6 @@ function ApiKeysContent() {
       setAvailableModels(result.data || []);
     } catch (error) {
       setAvailableModels([]);
-    }
-  };
-
-  const fetchAvailableChatbots = async () => {
-    try {
-      const result = await apiClient.get("/api-internal/v1/chatbot/list") as any;
-      setAvailableChatbots(result || []);
-    } catch (error) {
-      setAvailableChatbots([]);
     }
   };
 
@@ -250,7 +217,6 @@ function ApiKeysContent() {
         budget_limit_cents: 1000, // $10.00 default
         budget_type: "monthly",
         allowed_models: [],
-        allowed_chatbots: [],
         allowed_agents: [],
         allowed_extract_templates: [],
       });
@@ -352,7 +318,6 @@ function ApiKeysContent() {
         budget_type: !editKeyData.is_unlimited ? editKeyData.budget_type : null,
         expires_at: editKeyData.expires_at,
         allowed_models: editKeyData.allowed_models,
-        allowed_chatbots: editKeyData.allowed_chatbots,
         allowed_agents: editKeyData.allowed_agents,
         allowed_extract_templates: editKeyData.allowed_extract_templates,
       });
@@ -386,7 +351,6 @@ function ApiKeysContent() {
       budget_type: apiKey.budget_type || "monthly",
       expires_at: apiKey.expires_at,
       allowed_models: apiKey.allowed_models || [],
-      allowed_chatbots: apiKey.allowed_chatbots || [],
       allowed_agents: apiKey.allowed_agents || [],
       allowed_extract_templates: apiKey.allowed_extract_templates || [],
     });
@@ -520,9 +484,8 @@ function ApiKeysContent() {
                 </div>
               </div>
 
-              {/* Model Restrictions - Hidden for chatbot API keys since model is already selected by chatbot */}
-              {newKeyData.allowed_chatbots.length === 0 && (
-                <div className="space-y-2">
+              {/* Model Restrictions */}
+              <div className="space-y-2">
                   <Label>Model Restrictions (Optional)</Label>
                   <p className="text-sm text-muted-foreground mb-2">
                     Leave empty to allow all models, or select specific models to restrict access.
@@ -554,43 +517,6 @@ function ApiKeysContent() {
                       <p className="text-sm text-muted-foreground">No models available</p>
                     )}
                   </div>
-                </div>
-              )}
-              
-
-              {/* Chatbot Restrictions */}
-              <div className="space-y-2">
-                <Label>Chatbot Restrictions (Optional)</Label>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Leave empty to allow all chatbots, or select specific chatbots to restrict access.
-                </p>
-                <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto border rounded-md p-2">
-                  {availableChatbots.map((chatbot) => (
-                    <div key={chatbot.id} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`chatbot-${chatbot.id}`}
-                        checked={newKeyData.allowed_chatbots.includes(chatbot.id)}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setNewKeyData(prev => ({
-                            ...prev,
-                            allowed_chatbots: checked
-                              ? [...prev.allowed_chatbots, chatbot.id]
-                              : prev.allowed_chatbots.filter(c => c !== chatbot.id)
-                          }));
-                        }}
-                        className="rounded"
-                      />
-                      <Label htmlFor={`chatbot-${chatbot.id}`} className="text-sm">
-                        {chatbot.name}
-                      </Label>
-                    </div>
-                  ))}
-                  {availableChatbots.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No chatbots available</p>
-                  )}
-                </div>
               </div>
 
               {/* Agent Restrictions */}
@@ -979,9 +905,8 @@ function ApiKeysContent() {
               </div>
             </div>
 
-            {/* Model Restrictions - Hidden for chatbot API keys since model is already selected by chatbot */}
-            {(editKeyData.allowed_chatbots || []).length === 0 && (
-              <div className="space-y-2">
+            {/* Model Restrictions */}
+            <div className="space-y-2">
                 <Label>Model Restrictions (Optional)</Label>
                 <p className="text-sm text-muted-foreground mb-2">
                   Leave empty to allow all models, or select specific models to restrict access.
@@ -1013,42 +938,6 @@ function ApiKeysContent() {
                     <p className="text-sm text-muted-foreground">No models available</p>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* Chatbot Restrictions */}
-            <div className="space-y-2">
-              <Label>Chatbot Restrictions (Optional)</Label>
-              <p className="text-sm text-muted-foreground mb-2">
-                Leave empty to allow all chatbots, or select specific chatbots to restrict access.
-              </p>
-              <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto border rounded-md p-2">
-                {availableChatbots.map((chatbot) => (
-                  <div key={chatbot.id} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id={`edit-chatbot-${chatbot.id}`}
-                      checked={(editKeyData.allowed_chatbots || []).includes(chatbot.id)}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setEditKeyData(prev => ({
-                          ...prev,
-                          allowed_chatbots: checked
-                            ? [...(prev.allowed_chatbots || []), chatbot.id]
-                            : (prev.allowed_chatbots || []).filter(c => c !== chatbot.id)
-                        }));
-                      }}
-                      className="rounded"
-                    />
-                    <Label htmlFor={`edit-chatbot-${chatbot.id}`} className="text-sm">
-                      {chatbot.name}
-                    </Label>
-                  </div>
-                ))}
-                {availableChatbots.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No chatbots available</p>
-                )}
-              </div>
             </div>
 
             {/* Agent Restrictions */}
@@ -1199,4 +1088,3 @@ export default function ApiKeysPage() {
     </Suspense>
   );
 }
-

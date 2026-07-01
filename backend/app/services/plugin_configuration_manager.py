@@ -4,7 +4,7 @@ Elegant, secure, and developer-friendly plugin configuration system
 
 Design Principles:
 1. Schemas embedded in plugin manifests (no hardcoding)
-2. Automatic encryption for sensitive fields 
+2. Automatic encryption for sensitive fields
 3. Intelligent field type handling
 4. Configuration resolution chain (defaults → user overrides)
 5. Schema validation and caching
@@ -13,15 +13,16 @@ Design Principles:
 
 import json
 import uuid
-from typing import Dict, Any, List, Optional, Union, Tuple
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import jsonschema
 from cryptography.fernet import Fernet
 from pydantic import BaseModel, ValidationError
-import jsonschema
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -561,9 +562,9 @@ class PluginConfigurationManager:
                 name=config_name,
                 description=config_description,
                 config_data=non_sensitive,
-                encrypted_data=json.dumps(encrypted_sensitive)
-                if encrypted_sensitive
-                else None,
+                encrypted_data=(
+                    json.dumps(encrypted_sensitive) if encrypted_sensitive else None
+                ),
                 is_active=True,
                 is_default=True,  # First config is default
                 created_by_user_id=user_id,

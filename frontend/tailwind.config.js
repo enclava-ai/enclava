@@ -78,6 +78,9 @@ module.exports = {
         },
         // Legacy alias
         empire: {
+          gold: '#22d3ee',
+          dark: '#0f172a',
+          darker: '#020617',
           50: '#ecfeff',
           100: '#cffafe',
           200: '#a5f3fc',

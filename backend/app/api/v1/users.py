@@ -2,22 +2,23 @@
 User management API endpoints
 """
 
-from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
 from sqlalchemy.orm import selectinload
 
+from app.core.logging import get_logger
+from app.core.security import get_current_user, get_password_hash, verify_password
 from app.db.database import get_db
-from app.models.user import User
 from app.models.api_key import APIKey
 from app.models.budget import Budget
-from app.core.security import get_current_user, get_password_hash, verify_password
-from app.services.permission_manager import require_permission
+from app.models.user import User
 from app.services.audit_service import log_audit_event
-from app.core.logging import get_logger
+from app.services.permission_manager import require_permission
 
 logger = get_logger(__name__)
 
@@ -475,12 +476,12 @@ async def get_user_api_keys(
             "scopes": api_key.scopes,
             "is_active": api_key.is_active,
             "created_at": api_key.created_at.isoformat(),
-            "expires_at": api_key.expires_at.isoformat()
-            if api_key.expires_at
-            else None,
-            "last_used_at": api_key.last_used_at.isoformat()
-            if api_key.last_used_at
-            else None,
+            "expires_at": (
+                api_key.expires_at.isoformat() if api_key.expires_at else None
+            ),
+            "last_used_at": (
+                api_key.last_used_at.isoformat() if api_key.last_used_at else None
+            ),
         }
         for api_key in api_keys
     ]

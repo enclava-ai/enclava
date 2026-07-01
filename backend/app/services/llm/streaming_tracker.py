@@ -7,7 +7,8 @@ where token counts may come incrementally or only in the final chunk.
 
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,6 +17,7 @@ logger = get_logger(__name__)
 @dataclass
 class StreamingUsage:
     """Final usage statistics from a streaming session."""
+
     input_tokens: int
     output_tokens: int
     total_tokens: int
@@ -124,7 +126,9 @@ class StreamingTokenTracker:
         self._last_usage_snapshot = {
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
-            "total_tokens": usage.get("total_tokens", prompt_tokens + completion_tokens),
+            "total_tokens": usage.get(
+                "total_tokens", prompt_tokens + completion_tokens
+            ),
         }
 
         logger.debug(
@@ -219,7 +223,8 @@ class StreamingTokenTracker:
         return {
             "input_tokens": self.input_tokens or self._estimated_input_tokens,
             "output_tokens": self.output_tokens,
-            "total_tokens": (self.input_tokens or self._estimated_input_tokens) + self.output_tokens,
+            "total_tokens": (self.input_tokens or self._estimated_input_tokens)
+            + self.output_tokens,
             "chunk_count": self._chunk_count,
         }
 

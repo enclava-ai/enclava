@@ -2,27 +2,33 @@
 Base Plugin Class and Plugin Runtime Environment
 Provides the foundation for all Enclava plugins with security and isolation
 """
-from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass
-from fastapi import APIRouter, Request, HTTPException, Depends
-import asyncio
-import aiohttp
-import logging
-import time
-import json
-from pathlib import Path
-import importlib.util
-import sys
 
-from app.schemas.plugin_manifest import PluginManifest, PluginManifestValidator
-from app.core.logging import get_logger
+import asyncio
+import importlib.util
+import json
+import logging
+import sys
+import time
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import aiohttp
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
-from app.utils.exceptions import SecurityError, ValidationError
+from app.core.logging import get_logger
+from app.db.database import get_db
 from app.models.plugin import PluginConfiguration
 from app.models.user import User
-from app.db.database import get_db
-from sqlalchemy.orm import Session
+from app.schemas.plugin_manifest import (
+    PluginManifest,
+    PluginManifestValidator,
+    validate_manifest_file,
+)
+from app.utils.exceptions import SecurityError, ValidationError
 
 
 @dataclass
@@ -108,13 +114,13 @@ class PlatformAPIClient:
         return await self._make_request("DELETE", endpoint, **kwargs)
 
     # Platform-specific API methods
-    async def call_chatbot_api(
-        self, chatbot_id: str, message: str, context: Dict[str, Any] = None
+    async def call_agent_api(
+        self, agent_id: int, messages: List[Dict[str, Any]], **kwargs
     ) -> Dict[str, Any]:
-        """Consume platform chatbot API"""
+        """Consume platform agent API"""
         return await self.post(
-            f"/api/v1/chatbot/external/{chatbot_id}/chat",
-            {"message": message, "context": context or {}},
+            f"/agent/{agent_id}/v1/chat/completions",
+            {"messages": messages, **kwargs},
         )
 
     async def call_llm_api(
@@ -311,7 +317,7 @@ class PluginLogger:
         filtered_message = message
         for pattern in self.sensitive_patterns:
             filtered_message = re.sub(
-                f"{pattern}[=:]\s*[\"']?([^\"'\\s]+)[\"']?",
+                rf"{pattern}[=:]\s*['\"]?([^'\"\s]+)['\"]?",
                 f"{pattern}=***REDACTED***",
                 filtered_message,
                 flags=re.IGNORECASE,

@@ -5,9 +5,9 @@ This file defines the interface contracts that modules must implement for inter-
 Using Python protocols provides compile-time type checking with zero runtime overhead.
 """
 
-from typing import Protocol, Dict, List, Any, Optional, Union
-from datetime import datetime, timezone
 from abc import abstractmethod
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Protocol, Union
 
 
 class RAGServiceProtocol(Protocol):
@@ -60,36 +60,23 @@ class RAGServiceProtocol(Protocol):
         ...
 
 
-class ChatbotServiceProtocol(Protocol):
-    """Protocol for Chatbot service interface"""
+class AgentServiceProtocol(Protocol):
+    """Protocol for agent service interface"""
 
     @abstractmethod
-    async def chat_completion(self, request: Any, user_id: str, db: Any) -> Any:
+    async def chat_with_agent(
+        self, request: Any, current_user: Dict[str, Any], db: Any
+    ) -> Any:
         """
-        Generate chat completion response
+        Generate an agent chat response.
 
         Args:
-            request: Chat request object
-            user_id: ID of the user making the request
+            request: Agent chat request object
+            current_user: Authenticated user context
             db: Database session
 
         Returns:
-            Chat response object
-        """
-        ...
-
-    @abstractmethod
-    async def create_chatbot(self, config: Any, user_id: str, db: Any) -> Any:
-        """
-        Create a new chatbot instance
-
-        Args:
-            config: Chatbot configuration
-            user_id: ID of the user creating the chatbot
-            db: Database session
-
-        Returns:
-            Created chatbot instance
+            Agent response object
         """
         ...
 

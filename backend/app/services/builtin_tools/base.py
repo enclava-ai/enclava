@@ -19,6 +19,7 @@ class ToolExecutionContext:
         config: Optional configuration dict for tool-specific settings
         tool_resources: Optional tool resources from agent config (e.g., file_search.vector_store_ids)
     """
+
     user_id: int
     db: Any  # AsyncSession - using Any to avoid circular imports
     config: Dict[str, Any] = field(default_factory=dict)
@@ -34,6 +35,7 @@ class ToolResult:
         output: Tool output data (any serializable type)
         error: Error message if execution failed
     """
+
     success: bool
     output: Any
     error: Optional[str] = None

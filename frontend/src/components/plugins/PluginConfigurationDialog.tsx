@@ -31,9 +31,7 @@ import {
   RotateCw, 
   AlertCircle, 
   CheckCircle,
-  Info,
-  Eye,
-  EyeOff
+  Info
 } from 'lucide-react';
 import { usePlugin, type PluginInfo, type PluginConfiguration } from '../../contexts/PluginContext';
 import { apiClient } from '@/lib/api-client';
@@ -79,12 +77,6 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
   const [config, setConfig] = useState<Record<string, any>>({});
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [testingConnection, setTestingConnection] = useState(false);
-  const [testingCredentials, setTestingCredentials] = useState(false);
-  const [credentialsTestResult, setCredentialsTestResult] = useState<{
-    success: boolean;
-    message: string;
-  } | null>(null);
-  const [showApiToken, setShowApiToken] = useState(false);
 
   // Load configuration and schema when dialog opens
   useEffect(() => {
@@ -219,48 +211,6 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
       setError(`Connection test error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setTestingConnection(false);
-    }
-  };
-
-  const handleTestCredentials = async () => {
-    if (!formValues.zammad_url || !formValues.api_token) {
-      setCredentialsTestResult({
-        success: false,
-        message: 'Please provide both Zammad URL and API Token'
-      });
-      return;
-    }
-
-    setTestingCredentials(true);
-    setCredentialsTestResult(null);
-
-    try {
-      // Test credentials using Zammad API test endpoint
-      const result = await apiClient.post(`/api-internal/v1/plugins/${plugin.id}/test-credentials`, {
-        zammad_url: formValues.zammad_url,
-        api_token: formValues.api_token
-      });
-
-      if (result.success) {
-        setCredentialsTestResult({
-          success: true,
-          message: result.message || 'Credentials verified successfully!'
-        });
-        // Auto-hide success message after 3 seconds
-        setTimeout(() => setCredentialsTestResult(null), 3000);
-      } else {
-        setCredentialsTestResult({
-          success: false,
-          message: result.message || result.error || 'Credential test failed'
-        });
-      }
-    } catch (err) {
-      setCredentialsTestResult({
-        success: false,
-        message: `Test failed: ${err instanceof Error ? err.message : 'Network error'}`
-      });
-    } finally {
-      setTestingCredentials(false);
     }
   };
 
@@ -698,132 +648,11 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
                   renderFieldGroup(group, schema.properties)
                 )
               ) : (
-                /* Custom rendering for Zammad plugin */
-                plugin.name?.toLowerCase() === 'zammad' ? (
-                  <div className="space-y-6">
-                    {/* Zammad Credentials Section with Test Button */}
-                    <div className="space-y-4 p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
-                      <div>
-                        <h4 className="font-medium text-sm text-blue-800 dark:text-blue-200 border-b border-blue-200 dark:border-blue-800 pb-2">
-                          Zammad Connection Settings
-                        </h4>
-                      </div>
-                      <div className="space-y-4 ml-2">
-                        {/* Zammad URL Field */}
-                        {schema.properties.zammad_url && renderField('zammad_url', schema.properties.zammad_url)}
-                        
-                        {/* API Token Field with Show/Hide Toggle */}
-                        {schema.properties.api_token && (
-                          <div className="space-y-2">
-                            <Label htmlFor="api_token" className="text-sm font-medium">
-                              {schema.properties.api_token.title || 'API Token'}
-                              <span className="text-red-500 ml-1">*</span>
-                            </Label>
-                            <div className="relative">
-                              <Input
-                                id="api_token"
-                                type={showApiToken ? "text" : "password"}
-                                value={String(formValues.api_token || '')}
-                                onChange={(e) => handleFieldChange('api_token', e.target.value)}
-                                placeholder={config.api_token ? "••••••••••••••••••••••••••••••••••••••• (saved)" : "Enter API Token"}
-                                className="pr-10"
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                onClick={() => setShowApiToken(!showApiToken)}
-                              >
-                                {showApiToken ? (
-                                  <EyeOff className="h-4 w-4" />
-                                ) : (
-                                  <Eye className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
-                            {schema.properties.api_token.description && (
-                              <p className="text-xs text-muted-foreground">
-                                {schema.properties.api_token.description}
-                              </p>
-                            )}
-                            {config.api_token && (
-                              <p className="text-xs text-blue-600 dark:text-blue-400">
-                                Leave empty to keep your existing saved token
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Test Credentials Button and Result */}
-                        {formValues.zammad_url && formValues.api_token && (
-                          <div className="space-y-2">
-                            <Button 
-                              onClick={handleTestCredentials}
-                              variant="outline"
-                              disabled={testingCredentials}
-                              className="flex items-center gap-2"
-                              size="sm"
-                            >
-                              {testingCredentials ? (
-                                <>
-                                  <RotateCw className="h-4 w-4 animate-spin" />
-                                  Testing Credentials...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="h-4 w-4" />
-                                  Test Credentials
-                                </>
-                              )}
-                            </Button>
-                            
-                            {/* Credentials test result */}
-                            {credentialsTestResult && (
-                              <Alert variant={credentialsTestResult.success ? "default" : "destructive"} className="mt-2">
-                                {credentialsTestResult.success ? (
-                                  <CheckCircle className="h-4 w-4" />
-                                ) : (
-                                  <AlertCircle className="h-4 w-4" />
-                                )}
-                                <AlertDescription>
-                                  {credentialsTestResult.message}
-                                </AlertDescription>
-                              </Alert>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Chatbot Selection */}
-                    {schema.properties.chatbot_id && (
-                      <div className="space-y-4">
-                        <h4 className="font-medium text-sm text-muted-foreground border-b pb-2">
-                          AI Integration
-                        </h4>
-                        <div className="ml-2">
-                          {renderField('chatbot_id', schema.properties.chatbot_id)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Render other object fields */}
-                    {Object.entries(schema.properties).map(([key, field]: [string, any]) => {
-                      if (['zammad_url', 'api_token', 'chatbot_id'].includes(key)) {
-                        return null; // Already rendered above
-                      }
-                      return renderField(key, field);
-                    })}
-                  </div>
-                ) : (
-                  /* Fallback to rendering all fields without groups */
-                  <div className="space-y-4">
-                    {Object.entries(schema.properties).map(([key, field]: [string, any]) =>
-                      renderField(key, field)
-                    )}
-                  </div>
-                )
+                <div className="space-y-4">
+                  {Object.entries(schema.properties).map(([key, field]: [string, any]) =>
+                    renderField(key, field)
+                  )}
+                </div>
               )}
               
               {/* Connection test button if validation is configured */}

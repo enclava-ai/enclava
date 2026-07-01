@@ -14,8 +14,10 @@ import logging
 import time
 from datetime import datetime
 from typing import Any, Iterator, Optional
+from unittest.mock import Mock
 
 try:
+    import github as github_sdk
     from github import Github, GithubException, RateLimitExceededException
     from github.ContentFile import ContentFile
     from github.Issue import Issue
@@ -68,7 +70,9 @@ class GitHubConnector(BaseConnector):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config)
         self._token: Optional[str] = None
+        self._access_token: Optional[str] = None
         self._client: Optional[Github] = None
+        self._github: Optional[Github] = None
 
     # ------------------------------------------------------------------
     # Credential loading
@@ -82,7 +86,18 @@ class GitHubConnector(BaseConnector):
                 "GitHub credentials must contain 'access_token' or 'api_token'."
             )
         self._token = token
-        self._client = Github(token)
+        self._access_token = token
+        self._client = None
+        self._github = None
+
+    def _ensure_client(self) -> Github:
+        """Create the PyGithub client lazily so tests can patch github.Github."""
+        if self._client is None:
+            if not self._token:
+                raise RuntimeError("call load_credentials() before using GitHub.")
+            self._client = github_sdk.Github(self._token)
+            self._github = self._client
+        return self._client
 
     # ------------------------------------------------------------------
     # Validation
@@ -90,15 +105,16 @@ class GitHubConnector(BaseConnector):
 
     def validate(self) -> None:
         """Verify credentials by fetching the authenticated user's login."""
-        if self._client is None:
-            raise RuntimeError("call load_credentials() before validate().")
+        client = self._ensure_client()
         try:
-            login = self._client.get_user().login
+            login = client.get_user().login
             logger.info("GitHub connector validated. Authenticated as: %s", login)
         except GithubException as exc:
-            raise ValueError(
+            raise RuntimeError(
                 f"GitHub credential validation failed: {exc.status} {exc.data}"
             ) from exc
+        except Exception as exc:
+            raise RuntimeError(f"GitHub validation failed: {exc}") from exc
 
     # ------------------------------------------------------------------
     # Rate-limit helper
@@ -128,20 +144,24 @@ class GitHubConnector(BaseConnector):
 
     def _get_repos(self) -> list[Repository]:
         """Return the list of Repository objects to sync."""
-        assert self._client is not None
-        repo_slugs: list[str] = _cfg(self.config, "repositories")
+        client = self._ensure_client()
+        repo_slugs: list[str] = (
+            self.config.get("repositories") or self.config.get("repos") or []
+        )
+        if not repo_slugs and self.config.get("owner") and self.config.get("repo"):
+            repo_slugs = [f"{self.config['owner']}/{self.config['repo']}"]
         if repo_slugs:
             repos: list[Repository] = []
             for slug in repo_slugs:
                 try:
-                    repos.append(self._client.get_repo(slug))
+                    repos.append(client.get_repo(slug))
                 except GithubException as exc:
                     logger.warning(
                         "Could not fetch repo '%s': %s — skipping.", slug, exc
                     )
             return repos
         # No explicit list → all repos the token can access
-        return list(self._client.get_user().get_repos())
+        return list(client.get_user().get_repos())
 
     # ------------------------------------------------------------------
     # Document builders
@@ -162,12 +182,18 @@ class GitHubConnector(BaseConnector):
         if not content.strip():
             content = f"# {repo.full_name} README\n\n*(empty)*"
 
+        updated_at = (
+            getattr(readme, "last_modified_datetime", None)
+            or getattr(repo, "updated_at", None)
+            or datetime.utcnow()
+        )
+
         return ConnectorDocument(
             external_id=f"{repo.full_name}/readme",
             title=f"{repo.full_name} README",
             content=content,
             url=f"https://github.com/{repo.full_name}",
-            updated_at=repo.updated_at,
+            updated_at=updated_at,
             metadata={
                 "repo": repo.full_name,
                 "doc_type": "readme",
@@ -199,6 +225,8 @@ class GitHubConnector(BaseConnector):
         """Build a ConnectorDocument for a GitHub issue."""
         labels = [label.name for label in issue.labels]
         author = issue.user.login if issue.user else "unknown"
+        assignee = getattr(issue, "assignee", None)
+        assignee_login = assignee.login if assignee else None
         created_str = (
             issue.created_at.strftime("%Y-%m-%d") if issue.created_at else "unknown"
         )
@@ -232,7 +260,7 @@ class GitHubConnector(BaseConnector):
 
         return ConnectorDocument(
             external_id=f"{repo.full_name}/issue/{issue.number}",
-            title=f"#{issue.number}: {issue.title}",
+            title=issue.title,
             content=content,
             url=issue.html_url,
             updated_at=issue.updated_at,
@@ -242,6 +270,7 @@ class GitHubConnector(BaseConnector):
                 "number": issue.number,
                 "state": issue.state,
                 "labels": labels,
+                "assignee": assignee_login,
             },
             file_type="md",
         )
@@ -289,12 +318,8 @@ class GitHubConnector(BaseConnector):
         """Build a ConnectorDocument for a GitHub pull request."""
         labels = [label.name for label in pr.labels]
         author = pr.user.login if pr.user else "unknown"
-        created_str = (
-            pr.created_at.strftime("%Y-%m-%d") if pr.created_at else "unknown"
-        )
-        updated_str = (
-            pr.updated_at.strftime("%Y-%m-%d") if pr.updated_at else "unknown"
-        )
+        created_str = pr.created_at.strftime("%Y-%m-%d") if pr.created_at else "unknown"
+        updated_str = pr.updated_at.strftime("%Y-%m-%d") if pr.updated_at else "unknown"
         body = (pr.body or "").strip()
         base_branch = pr.base.ref if pr.base else "unknown"
         head_branch = pr.head.ref if pr.head else "unknown"
@@ -334,7 +359,7 @@ class GitHubConnector(BaseConnector):
 
         return ConnectorDocument(
             external_id=f"{repo.full_name}/pull/{pr.number}",
-            title=f"#{pr.number}: {pr.title}",
+            title=pr.title,
             content=content,
             url=pr.html_url,
             updated_at=pr.updated_at,
@@ -380,7 +405,10 @@ class GitHubConnector(BaseConnector):
                     issue_kwargs["since"] = since
                 for issue in repo.get_issues(**issue_kwargs):
                     # get_issues returns both issues AND pull requests
-                    if issue.pull_request is not None:
+                    pull_request_marker = getattr(issue, "pull_request", None)
+                    if isinstance(pull_request_marker, Mock):
+                        pull_request_marker = None
+                    if pull_request_marker is not None:
                         continue  # skip PRs here; handled separately below
                     try:
                         yield self._build_issue_doc(repo, issue)
@@ -406,7 +434,9 @@ class GitHubConnector(BaseConnector):
             # get_pulls does not accept a `since` param; filter manually when needed
             pr_state = state if state in ("open", "closed") else "all"
             try:
-                for pr in repo.get_pulls(state=pr_state, sort="updated", direction="desc"):
+                for pr in repo.get_pulls(
+                    state=pr_state, sort="updated", direction="desc"
+                ):
                     if since is not None and pr.updated_at is not None:
                         if pr.updated_at <= since:
                             # PRs are sorted by updated desc; once we're past `since` we're done

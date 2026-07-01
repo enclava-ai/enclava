@@ -11,8 +11,8 @@ This module provides:
 - AttestationResult, ProviderHealth: Data models
 """
 
-from .models import AttestationResult, ProviderHealth
 from .base import BaseAttestationVerifier
+from .models import AttestationResult, ProviderHealth
 from .privatemode import PrivateModeAttestationVerifier
 from .redpill import RedPillAttestationVerifier
 from .scheduler import AttestationScheduler, attestation_scheduler

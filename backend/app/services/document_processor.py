@@ -5,18 +5,19 @@ Handles async document processing with queue management
 
 import asyncio
 import logging
-from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from dataclasses import dataclass
 from pathlib import Path
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.database import get_db, utc_now
-from app.models.rag_document import RagDocument
 from app.models.rag_collection import RagCollection
+from app.models.rag_document import RagDocument
 from app.services.module_manager import module_manager
 
 logger = logging.getLogger(__name__)
@@ -150,9 +151,7 @@ class DocumentProcessor:
                     # Retry logic
                     if task.retry_count < task.max_retries:
                         task.retry_count += 1
-                        await asyncio.sleep(
-                            2**task.retry_count
-                        )  # Exponential backoff
+                        await asyncio.sleep(2**task.retry_count)  # Exponential backoff
                         try:
                             await asyncio.wait_for(
                                 self.processing_queue.put(task), timeout=5.0
@@ -231,6 +230,7 @@ class DocumentProcessor:
     async def _process_document(self, task: ProcessingTask) -> bool:
         """Process a single document"""
         from datetime import datetime, timezone
+
         from app.db.database import async_session_factory
 
         async with async_session_factory() as session:
@@ -371,9 +371,10 @@ class DocumentProcessor:
                         # For JSONL files, we need to use the processed document flow
                         if document.file_type == "jsonl":
                             # Create a ProcessedDocument for the JSONL processor
-                            from app.modules.rag.main import ProcessedDocument
-                            from datetime import datetime, timezone
                             import hashlib
+                            from datetime import datetime, timezone
+
+                            from app.modules.rag.main import ProcessedDocument
 
                             # Calculate file hash
                             processed_at = utc_now()

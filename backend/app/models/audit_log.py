@@ -1,21 +1,24 @@
 """
 Audit log model for tracking system events and user actions
 """
+
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from enum import Enum
+from typing import Any, Dict, Optional
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    ForeignKey,
     Integer,
     String,
-    DateTime,
-    JSON,
-    ForeignKey,
     Text,
-    Boolean,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
-from enum import Enum
 
 
 class AuditAction(str, Enum):
@@ -97,6 +100,16 @@ class AuditLog(Base):
 
     # Timestamp
     created_at = Column(DateTime, default=utc_now, index=True)
+
+    def __init__(self, **kwargs):
+        legacy_metadata = kwargs.pop("metadata", None)
+        if legacy_metadata is not None:
+            kwargs.setdefault("audit_metadata", legacy_metadata)
+        if not kwargs.get("description"):
+            action = kwargs.get("action", "audit event")
+            resource_type = kwargs.get("resource_type", "resource")
+            kwargs["description"] = f"{action} on {resource_type}"
+        super().__init__(**kwargs)
 
     def __repr__(self):
         return (
@@ -254,9 +267,11 @@ class AuditLog(Base):
             resource_id=str(budget_id),
             description=f"Budget {action}: {budget_name}",
             details=details or {},
-            severity=AuditSeverity.MEDIUM
-            if action == AuditAction.BUDGET_EXCEED
-            else AuditSeverity.LOW,
+            severity=(
+                AuditSeverity.MEDIUM
+                if action == AuditAction.BUDGET_EXCEED
+                else AuditSeverity.LOW
+            ),
             category="financial",
             success=success,
             tags=["budget", action],
@@ -397,3 +412,14 @@ class AuditLog(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "user_id": self.user_id,
         }
+
+
+def _get_legacy_metadata(self) -> Dict[str, Any]:
+    return self.audit_metadata or {}
+
+
+def _set_legacy_metadata(self, value: Dict[str, Any]) -> None:
+    self.audit_metadata = value
+
+
+AuditLog.metadata = property(_get_legacy_metadata, _set_legacy_metadata)

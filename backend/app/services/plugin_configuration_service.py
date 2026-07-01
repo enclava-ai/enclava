@@ -2,20 +2,22 @@
 Plugin Configuration Service
 Handles persistent storage and caching of plugin configurations
 """
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_
-from sqlalchemy.orm import selectinload
-import json
-import redis
-import logging
 
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+import redis
+from sqlalchemy import and_, delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.config import settings
+from app.db.database import utc_now
 from app.models.plugin import Plugin, PluginConfiguration
 from app.models.user import User
-from app.core.config import settings
 from app.utils.exceptions import APIException
-from app.db.database import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -137,9 +139,7 @@ class PluginConfigurationService:
                 stmt = (
                     update(PluginConfiguration)
                     .where(PluginConfiguration.id == config.id)
-                    .values(
-                        config_data=config.config_data, updated_at=utc_now()
-                    )
+                    .values(config_data=config.config_data, updated_at=utc_now())
                 )
                 await self.db.execute(stmt)
             else:
@@ -227,9 +227,7 @@ class PluginConfigurationService:
                 stmt = (
                     update(PluginConfiguration)
                     .where(PluginConfiguration.id == config.id)
-                    .values(
-                        config_data=config.config_data, updated_at=utc_now()
-                    )
+                    .values(config_data=config.config_data, updated_at=utc_now())
                 )
                 await self.db.execute(stmt)
             else:
@@ -288,9 +286,7 @@ class PluginConfigurationService:
                 stmt = (
                     update(PluginConfiguration)
                     .where(PluginConfiguration.id == config.id)
-                    .values(
-                        config_data=config.config_data, updated_at=utc_now()
-                    )
+                    .values(config_data=config.config_data, updated_at=utc_now())
                 )
                 await self.db.execute(stmt)
                 await self.db.commit()
@@ -414,4 +410,7 @@ class PluginConfigurationService:
 
         except Exception as e:
             logger.error(f"Failed to get configuration stats: {e}")
-            return {"error": str(e), "timestamp": datetime.now(timezone.utc).isoformat()}
+            return {
+                "error": str(e),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }

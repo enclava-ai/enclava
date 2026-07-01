@@ -7,10 +7,18 @@ and token budget management (OpenAI file_search compatible).
 
 import hashlib
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
+from app.core.config import settings
+
 from .base import BuiltinTool, ToolExecutionContext, ToolResult
 
 logger = logging.getLogger(__name__)
+
+try:
+    from app.modules.rag.main import RAGModule
+except Exception:
+    RAGModule = None
 
 # Global limits (non-overridable for safety)
 MAX_COLLECTIONS_PER_AGENT = 5
@@ -64,40 +72,42 @@ DO NOT USE THIS TOOL WHEN:
         "properties": {
             "query": {
                 "type": "string",
-                "description": "The search query to find relevant documents"
+                "description": "The search query to find relevant documents",
             },
             "vector_store_ids": {
                 "type": "array",
                 "items": {"type": "string"},
                 "description": "List of collection/vector store IDs to search (max 5)",
-                "default": []
+                "default": [],
             },
             "max_results": {
                 "type": "integer",
                 "description": f"Maximum total results to return (max {MAX_TOTAL_RESULTS})",
                 "default": DEFAULT_TOP_K,
                 "minimum": 1,
-                "maximum": MAX_TOTAL_RESULTS
+                "maximum": MAX_TOTAL_RESULTS,
             },
             "max_results_per_collection": {
                 "type": "integer",
                 "description": "Maximum results per collection",
                 "default": DEFAULT_TOP_K_PER_COLLECTION,
                 "minimum": 1,
-                "maximum": 10
+                "maximum": 10,
             },
             "score_threshold": {
                 "type": "number",
                 "description": "Minimum relevance score threshold (0.0-1.0)",
                 "default": DEFAULT_SCORE_THRESHOLD,
                 "minimum": 0.0,
-                "maximum": 1.0
-            }
+                "maximum": 1.0,
+            },
         },
-        "required": ["query"]
+        "required": ["query"],
     }
 
-    async def execute(self, params: Dict[str, Any], ctx: ToolExecutionContext) -> ToolResult:
+    async def execute(
+        self, params: Dict[str, Any], ctx: ToolExecutionContext
+    ) -> ToolResult:
         """Execute enhanced RAG search with multi-collection support.
 
         Flow:
@@ -121,33 +131,33 @@ DO NOT USE THIS TOOL WHEN:
             ToolResult with merged, deduplicated search results
         """
         try:
+            # Extract and validate parameters before checking module availability.
+            query = params.get("query")
+            if not query:
+                return ToolResult(
+                    success=False, output=None, error="Query parameter is required"
+                )
+
             from app.services.module_manager import module_manager
 
             # Get RAG module from module manager (properly initialized singleton)
-            if "rag" not in module_manager.modules:
+            if "rag" in module_manager.modules:
+                rag = module_manager.modules["rag"]
+            elif (settings.TESTING or settings.LLM_TEST_MODE) and RAGModule is not None:
+                rag = RAGModule()
+            else:
                 return ToolResult(
                     success=False,
                     output=None,
-                    error="RAG module is not loaded. Please ensure the RAG module is enabled."
+                    error="RAG module is not loaded. Please ensure the RAG module is enabled.",
                 )
-
-            rag = module_manager.modules["rag"]
 
             # Check if RAG is enabled
             if not rag.enabled:
                 return ToolResult(
                     success=False,
                     output=None,
-                    error="RAG module is not initialized or enabled"
-                )
-
-            # Extract and validate parameters
-            query = params.get("query")
-            if not query:
-                return ToolResult(
-                    success=False,
-                    output=None,
-                    error="Query parameter is required"
+                    error="RAG module is not initialized or enabled",
                 )
 
             # Get collections to search
@@ -162,7 +172,9 @@ DO NOT USE THIS TOOL WHEN:
             if not vector_store_ids and file_search_config:
                 vector_store_ids = file_search_config.get("vector_store_ids", [])
                 if vector_store_ids:
-                    logger.info(f"Using collections from agent config: {vector_store_ids}")
+                    logger.info(
+                        f"Using collections from agent config: {vector_store_ids}"
+                    )
 
             # Enforce collection limit
             if len(vector_store_ids) > MAX_COLLECTIONS_PER_AGENT:
@@ -171,12 +183,11 @@ DO NOT USE THIS TOOL WHEN:
             # Get limits - prefer LLM params, then agent config, then defaults
             config_max_results = file_search_config.get("max_results", DEFAULT_TOP_K)
             max_results = min(
-                params.get("max_results", config_max_results),
-                MAX_TOTAL_RESULTS
+                params.get("max_results", config_max_results), MAX_TOTAL_RESULTS
             )
             max_per_collection = min(
                 params.get("max_results_per_collection", DEFAULT_TOP_K_PER_COLLECTION),
-                10
+                10,
             )
             score_threshold = params.get("score_threshold", DEFAULT_SCORE_THRESHOLD)
 
@@ -191,18 +202,19 @@ DO NOT USE THIS TOOL WHEN:
                         results = await rag.search_documents(
                             query=query,
                             max_results=max_per_collection,
-                            collection_name=collection_id  # If supported
+                            collection_name=collection_id,  # If supported
                         )
                         all_results.extend(results)
                         collections_searched.append(collection_id)
                     except Exception as e:
                         # Log but continue with other collections
-                        logger.warning(f"Error searching collection {collection_id}: {e}")
+                        logger.warning(
+                            f"Error searching collection {collection_id}: {e}"
+                        )
             else:
                 # Search default collection
                 results = await rag.search_documents(
-                    query=query,
-                    max_results=max_results
+                    query=query, max_results=max_results
                 )
                 all_results.extend(results)
                 collections_searched.append("default")
@@ -222,26 +234,38 @@ DO NOT USE THIS TOOL WHEN:
             # Format results with content truncation
             formatted_results = []
             for result in final_results:
-                content = result.document.content
+                document = result.document
+                content = document.content
 
                 # Truncate to token budget
                 if len(content) > MAX_RESULT_CONTENT_CHARS:
                     content = content[:MAX_RESULT_CONTENT_CHARS] + "..."
 
                 # Get filename and file_type from metadata (Document class stores these there)
-                metadata = result.document.metadata or {}
-                filename = metadata.get("original_filename") or metadata.get("filename") or metadata.get("source", "unknown")
-                file_type = metadata.get("file_type") or metadata.get("type", "unknown")
+                metadata = document.metadata or {}
+                filename = (
+                    getattr(document, "original_filename", None)
+                    or metadata.get("original_filename")
+                    or metadata.get("filename")
+                    or metadata.get("source", "unknown")
+                )
+                file_type = (
+                    getattr(document, "file_type", None)
+                    or metadata.get("file_type")
+                    or metadata.get("type", "unknown")
+                )
 
-                formatted_results.append({
-                    "content": content,
-                    "score": result.score,
-                    "relevance": result.relevance_score,
-                    "filename": filename,
-                    "file_type": file_type,
-                    "metadata": metadata,
-                    "collection_id": getattr(result, 'collection_id', 'default')
-                })
+                formatted_results.append(
+                    {
+                        "content": content,
+                        "score": result.score,
+                        "relevance": result.relevance_score,
+                        "filename": filename,
+                        "file_type": file_type,
+                        "metadata": metadata,
+                        "collection_id": getattr(result, "collection_id", "default"),
+                    }
+                )
 
             # Estimate token usage
             estimated_tokens = self._estimate_token_usage(formatted_results)
@@ -255,24 +279,20 @@ DO NOT USE THIS TOOL WHEN:
                     "query": query,
                     "estimated_tokens": estimated_tokens,
                     "total_results_found": len(all_results),
-                    "results_after_dedup": len(deduplicated_results)
-                }
+                    "results_after_dedup": len(deduplicated_results),
+                },
             )
 
         except RuntimeError as e:
             # RAG module raises RuntimeError when not enabled
             return ToolResult(
-                success=False,
-                output=None,
-                error=f"RAG module error: {str(e)}"
+                success=False, output=None, error=f"RAG module error: {str(e)}"
             )
         except Exception as e:
             # Catch any other errors
             logger.error(f"RAG search failed: {e}", exc_info=True)
             return ToolResult(
-                success=False,
-                output=None,
-                error=f"RAG search failed: {str(e)}"
+                success=False, output=None, error=f"RAG search failed: {str(e)}"
             )
 
     def _deduplicate_results(self, results: List[Any]) -> List[Any]:

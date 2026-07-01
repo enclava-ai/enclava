@@ -2,21 +2,23 @@
 Plugin System Database Models
 Defines the database schema for the isolated plugin architecture
 """
+
+import uuid
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    DateTime,
-    Boolean,
-    JSON,
-    ForeignKey,
-    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import uuid
 
 from app.db.database import Base
 
@@ -292,8 +294,8 @@ class PluginAPIGateway(Base):
     # API routing configuration
     base_path = Column(
         String(200), nullable=False, unique=True
-    )  # /api/v1/plugins/zammad
-    internal_url = Column(String(500), nullable=False)  # http://plugin-zammad:8000
+    )  # /api/v1/plugins/example
+    internal_url = Column(String(500), nullable=False)  # http://plugin-example:8000
 
     # Security settings
     require_authentication = Column(Boolean, default=True, nullable=False)
@@ -352,7 +354,7 @@ class PluginPermission(Base):
     # Permission details
     permission_name = Column(
         String(200), nullable=False
-    )  # e.g., 'chatbot:invoke', 'rag:query'
+    )  # e.g., 'agent:invoke', 'rag:query'
     granted = Column(
         Boolean, default=True, nullable=False
     )  # True=granted, False=revoked

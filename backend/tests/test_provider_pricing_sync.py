@@ -4,18 +4,20 @@ Unit tests for Provider Pricing Sync Service.
 Tests ProviderPricingSyncService functionality including API fetching,
 pricing conversion, database operations, and error handling.
 """
-import pytest
+
+import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
-import uuid
 
+import pytest
+
+from app.models.provider_pricing import PricingAuditLog, ProviderPricing
 from app.services.provider_pricing_sync import (
     ProviderPricingSyncService,
     SyncResult,
     SyncResultModel,
 )
-from app.models.provider_pricing import ProviderPricing, PricingAuditLog
 
 
 @pytest.mark.unit
@@ -254,7 +256,9 @@ class TestSyncProviderOperations:
         """Test sync_provider handles missing API key."""
         with patch.dict("os.environ", {}, clear=True):
             with patch.object(
-                sync_service, "_fetch_redpill_models", side_effect=ValueError("Missing API key: REDPILL_API_KEY")
+                sync_service,
+                "_fetch_redpill_models",
+                side_effect=ValueError("Missing API key: REDPILL_API_KEY"),
             ):
                 result = await sync_service.sync_provider("redpill")
 
@@ -263,7 +267,9 @@ class TestSyncProviderOperations:
                 assert "Missing API key" in result.errors[0]
 
     @patch("aiohttp.ClientSession")
-    async def test_sync_provider_successful_sync(self, mock_session_class, sync_service, mock_db):
+    async def test_sync_provider_successful_sync(
+        self, mock_session_class, sync_service, mock_db
+    ):
         """Test successful sync from RedPill API."""
         # Mock API response
         mock_response = AsyncMock()
@@ -290,8 +296,12 @@ class TestSyncProviderOperations:
 
         # Setup mock session context managers
         mock_session = AsyncMock()
-        mock_session.get = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
-        mock_session_class.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.get = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
+        mock_session_class.return_value.__aenter__ = AsyncMock(
+            return_value=mock_session
+        )
         mock_session_class.return_value.__aexit__ = AsyncMock()
 
         # Mock database query for existing pricing (no existing records)
@@ -580,8 +590,12 @@ class TestSyncErrorHandling:
         mock_response.text = AsyncMock(return_value="Internal Server Error")
 
         mock_session = AsyncMock()
-        mock_session.get = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response)))
-        mock_session_class.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.get = MagicMock(
+            return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_response))
+        )
+        mock_session_class.return_value.__aenter__ = AsyncMock(
+            return_value=mock_session
+        )
         mock_session_class.return_value.__aexit__ = AsyncMock()
 
         with patch.dict("os.environ", {"REDPILL_API_KEY": "test-key"}):
@@ -592,15 +606,23 @@ class TestSyncErrorHandling:
         assert "HTTP 500" in result.errors[0]
 
     @patch("aiohttp.ClientSession")
-    async def test_sync_handles_connection_error(self, mock_session_class, sync_service, mock_db):
+    async def test_sync_handles_connection_error(
+        self, mock_session_class, sync_service, mock_db
+    ):
         """Test sync handles connection error gracefully."""
         import aiohttp
 
         mock_session = AsyncMock()
         mock_session.get = MagicMock(
-            return_value=AsyncMock(__aenter__=AsyncMock(side_effect=aiohttp.ClientError("Connection refused")))
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(
+                    side_effect=aiohttp.ClientError("Connection refused")
+                )
+            )
         )
-        mock_session_class.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_class.return_value.__aenter__ = AsyncMock(
+            return_value=mock_session
+        )
         mock_session_class.return_value.__aexit__ = AsyncMock()
 
         with patch.dict("os.environ", {"REDPILL_API_KEY": "test-key"}):

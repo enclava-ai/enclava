@@ -7,8 +7,9 @@ scraped by Prometheus from internal network.
 """
 
 from fastapi import APIRouter, Response
-from app.services.metrics import get_metrics_service
+
 from app.core.logging import get_logger
+from app.services.metrics import get_metrics_service
 
 logger = get_logger(__name__)
 
@@ -19,13 +20,13 @@ router = APIRouter()
 async def get_metrics():
     """
     Get Prometheus metrics in text format.
-    
+
     Returns metrics for:
     - Usage tracking (requests, tokens, costs, latency)
     - Budget monitoring
     - Pricing sync operations
     - API key status
-    
+
     This endpoint is designed to be scraped by Prometheus and
     typically does not require authentication.
     """
@@ -33,7 +34,7 @@ async def get_metrics():
         metrics_service = get_metrics_service()
         metrics_data = metrics_service.get_metrics()
         content_type = metrics_service.get_content_type()
-        
+
         return Response(
             content=metrics_data,
             media_type=content_type,

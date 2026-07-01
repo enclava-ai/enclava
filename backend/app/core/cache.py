@@ -6,11 +6,12 @@ Consolidates all caching functionality into core system infrastructure
 import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional, Union
-from datetime import datetime, timedelta, timezone
-import redis.asyncio as redis
-from redis.asyncio import Redis, ConnectionPool
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional, Union
+
+import redis.asyncio as redis
+from redis.asyncio import ConnectionPool, Redis
 
 from app.core.config import settings
 
@@ -206,14 +207,16 @@ class CoreCacheService:
                         "redis_total_commands": info.get("total_commands_processed", 0),
                         "redis_keyspace_hits": info.get("keyspace_hits", 0),
                         "redis_keyspace_misses": info.get("keyspace_misses", 0),
-                        "connection_pool_size": self.redis_pool.connection_pool_size
-                        if self.redis_pool
-                        else 0,
-                        "hit_rate": round(
-                            (stats["hits"] / stats["total_requests"]) * 100, 2
-                        )
-                        if stats["total_requests"] > 0
-                        else 0,
+                        "connection_pool_size": (
+                            self.redis_pool.connection_pool_size
+                            if self.redis_pool
+                            else 0
+                        ),
+                        "hit_rate": (
+                            round((stats["hits"] / stats["total_requests"]) * 100, 2)
+                            if stats["total_requests"] > 0
+                            else 0
+                        ),
                         "enabled": True,
                     }
                 )
@@ -289,7 +292,9 @@ class CoreCacheService:
 
             remaining = max(0, limit - count)
             reset_time = int(
-                (datetime.now(timezone.utc) + timedelta(seconds=window_seconds)).timestamp()
+                (
+                    datetime.now(timezone.utc) + timedelta(seconds=window_seconds)
+                ).timestamp()
             )
 
             return {
@@ -307,7 +312,9 @@ class CoreCacheService:
                 "limit": limit,
                 "remaining": limit,
                 "reset_time": int(
-                    (datetime.now(timezone.utc) + timedelta(seconds=window_seconds)).timestamp()
+                    (
+                        datetime.now(timezone.utc) + timedelta(seconds=window_seconds)
+                    ).timestamp()
                 ),
                 "exceeded": False,
             }

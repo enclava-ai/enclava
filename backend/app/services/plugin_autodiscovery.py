@@ -4,18 +4,19 @@ Automatically discovers and registers plugins from the /plugins directory on sta
 """
 
 import asyncio
+import hashlib
 import os
 import uuid
-import hashlib
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.models.plugin import Plugin
 from app.db.database import SessionLocal, utc_now
+from app.models.plugin import Plugin
 from app.schemas.plugin_manifest import validate_manifest_file
 from app.services.plugin_database import plugin_db_manager
 from app.services.plugin_sandbox import plugin_loader

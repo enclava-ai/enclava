@@ -9,8 +9,9 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from .embedding_service import EmbeddingService
 from app.core.config import settings
+
+from .embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 

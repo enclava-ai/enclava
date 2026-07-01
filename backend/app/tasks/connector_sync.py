@@ -18,9 +18,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import AsyncSessionLocal
+from app.db.database import async_session_factory
 from app.models.connector_source import ConnectorSource, ConnectorStatus
 
 logger = logging.getLogger(__name__)
@@ -53,14 +52,16 @@ def _parse_duration(iso_duration: str) -> timedelta:
 # One-shot sync helper
 # ---------------------------------------------------------------------------
 
+
 async def sync_connector_now(connector_id: int) -> dict:
     """
     Run a sync for *connector_id* immediately, using a fresh DB session.
 
     Returns a summary dict suitable for an API response.
     """
-    async with AsyncSessionLocal() as db:
+    async with async_session_factory() as db:
         from app.services.connector_sync_service import ConnectorSyncService
+
         service = ConnectorSyncService(db)
         job = await service.run_sync(connector_id)
         return job.to_dict()
@@ -69,6 +70,7 @@ async def sync_connector_now(connector_id: int) -> dict:
 # ---------------------------------------------------------------------------
 # Periodic scheduler
 # ---------------------------------------------------------------------------
+
 
 class ConnectorSyncScheduler:
     """
@@ -117,7 +119,7 @@ class ConnectorSyncScheduler:
         """Find connectors due for a sync and fire them."""
         now = datetime.now(timezone.utc)
 
-        async with AsyncSessionLocal() as db:
+        async with async_session_factory() as db:
             stmt = select(ConnectorSource).where(
                 ConnectorSource.is_active.is_(True),
                 ConnectorSource.status != ConnectorStatus.PAUSED,

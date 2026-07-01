@@ -9,26 +9,26 @@ import json
 import logging
 import time
 import uuid
-from typing import List, Dict, Any, Optional, AsyncGenerator, Set
 from datetime import datetime, timezone
+from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 
 import aiohttp
 
-from .base import BaseLLMProvider
+from ..config import ProviderConfig
+from ..exceptions import ProviderError, TimeoutError, ValidationError
 from ..models import (
+    ChatChoice,
+    ChatMessage,
     ChatRequest,
     ChatResponse,
-    ChatMessage,
-    ChatChoice,
-    TokenUsage,
+    EmbeddingData,
     EmbeddingRequest,
     EmbeddingResponse,
-    EmbeddingData,
     ModelInfo,
     ProviderStatus,
+    TokenUsage,
 )
-from ..config import ProviderConfig
-from ..exceptions import ProviderError, ValidationError, TimeoutError
+from .base import BaseLLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ class RedPillProvider(BaseLLMProvider):
         """Provider is available only if attestation is healthy."""
         # Import here to avoid circular dependency
         from ..attestation.scheduler import attestation_scheduler
+
         return attestation_scheduler.is_healthy(self.provider_name)
 
     def supports_model(self, model: str) -> bool:
@@ -195,7 +196,10 @@ class RedPillProvider(BaseLLMProvider):
 
                         # Embeddings capability: check model name for embedding models
                         model_name_lower = model_id.lower()
-                        if "embed" in model_name_lower or "embedding" in model_name_lower:
+                        if (
+                            "embed" in model_name_lower
+                            or "embedding" in model_name_lower
+                        ):
                             capabilities.append("embeddings")
 
                         # Vision capability: model accepts image input
@@ -220,18 +224,24 @@ class RedPillProvider(BaseLLMProvider):
                             provider=self.provider_name,
                             capabilities=capabilities,
                             # Redpill uses context_length instead of context_window
-                            context_window=model_data.get("context_length") or model_data.get("context_window"),
+                            context_window=model_data.get("context_length")
+                            or model_data.get("context_window"),
                             # Redpill uses max_output_length instead of max_output_tokens
-                            max_output_tokens=model_data.get("max_output_length") or model_data.get("max_output_tokens"),
+                            max_output_tokens=model_data.get("max_output_length")
+                            or model_data.get("max_output_tokens"),
                             # Streaming is generally supported by all models
-                            supports_streaming=model_data.get("supports_streaming", True),
+                            supports_streaming=model_data.get(
+                                "supports_streaming", True
+                            ),
                             supports_function_calling=supports_function_calling,
                             # Store modalities for reference
                             tasks=input_modalities,  # Store input_modalities as tasks for compatibility
                         )
                         models.append(model_info)
 
-                    logger.info(f"Retrieved {len(models)} confidential models from RedPill")
+                    logger.info(
+                        f"Retrieved {len(models)} confidential models from RedPill"
+                    )
                     return models
                 else:
                     error_text = await response.text()
@@ -267,6 +277,7 @@ class RedPillProvider(BaseLLMProvider):
         if not self.is_available():
             # Import here to avoid circular dependency
             from ..attestation.scheduler import attestation_scheduler
+
             health = attestation_scheduler.get_health(self.provider_name)
             error_msg = health.error if health else "unknown"
             raise ProviderError(
@@ -288,11 +299,25 @@ class RedPillProvider(BaseLLMProvider):
                         "role": msg.role,
                         "content": msg.content,
                         **({"name": msg.name} if msg.name else {}),
-                        **({"tool_calls": [
-                            {"id": tc.id, "type": tc.type, "function": tc.function}
-                            for tc in msg.tool_calls
-                        ]} if msg.tool_calls else {}),
-                        **({"tool_call_id": msg.tool_call_id} if msg.tool_call_id else {}),
+                        **(
+                            {
+                                "tool_calls": [
+                                    {
+                                        "id": tc.id,
+                                        "type": tc.type,
+                                        "function": tc.function,
+                                    }
+                                    for tc in msg.tool_calls
+                                ]
+                            }
+                            if msg.tool_calls
+                            else {}
+                        ),
+                        **(
+                            {"tool_call_id": msg.tool_call_id}
+                            if msg.tool_call_id
+                            else {}
+                        ),
                     }
                     for msg in request.messages
                 ],
@@ -341,7 +366,9 @@ class RedPillProvider(BaseLLMProvider):
                     data = await response.json()
 
                     # Debug: Log raw response only at debug level
-                    logger.debug(f"Raw RedPill API response: {json.dumps(data, default=str)[:2000]}")
+                    logger.debug(
+                        f"Raw RedPill API response: {json.dumps(data, default=str)[:2000]}"
+                    )
 
                     # Parse response
                     choices = []
@@ -352,11 +379,12 @@ class RedPillProvider(BaseLLMProvider):
                         tool_calls = None
                         if "tool_calls" in message_data and message_data["tool_calls"]:
                             from ..models import ToolCall
+
                             tool_calls = [
                                 ToolCall(
                                     id=tc.get("id"),
                                     type=tc.get("type", "function"),
-                                    function=tc.get("function", {})
+                                    function=tc.get("function", {}),
                                 )
                                 for tc in message_data.get("tool_calls", [])
                             ]
@@ -466,6 +494,7 @@ class RedPillProvider(BaseLLMProvider):
         if not self.is_available():
             # Import here to avoid circular dependency
             from ..attestation.scheduler import attestation_scheduler
+
             health = attestation_scheduler.get_health(self.provider_name)
             error_msg = health.error if health else "unknown"
             raise ProviderError(
@@ -485,11 +514,25 @@ class RedPillProvider(BaseLLMProvider):
                         "role": msg.role,
                         "content": msg.content,
                         **({"name": msg.name} if msg.name else {}),
-                        **({"tool_calls": [
-                            {"id": tc.id, "type": tc.type, "function": tc.function}
-                            for tc in msg.tool_calls
-                        ]} if msg.tool_calls else {}),
-                        **({"tool_call_id": msg.tool_call_id} if msg.tool_call_id else {}),
+                        **(
+                            {
+                                "tool_calls": [
+                                    {
+                                        "id": tc.id,
+                                        "type": tc.type,
+                                        "function": tc.function,
+                                    }
+                                    for tc in msg.tool_calls
+                                ]
+                            }
+                            if msg.tool_calls
+                            else {}
+                        ),
+                        **(
+                            {"tool_call_id": msg.tool_call_id}
+                            if msg.tool_call_id
+                            else {}
+                        ),
                     }
                     for msg in request.messages
                 ],
@@ -571,6 +614,7 @@ class RedPillProvider(BaseLLMProvider):
         if not self.is_available():
             # Import here to avoid circular dependency
             from ..attestation.scheduler import attestation_scheduler
+
             health = attestation_scheduler.get_health(self.provider_name)
             error_msg = health.error if health else "unknown"
             raise ProviderError(

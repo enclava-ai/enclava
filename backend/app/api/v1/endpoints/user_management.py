@@ -2,23 +2,24 @@
 User Management API endpoints
 Admin endpoints for managing users, roles, and audit logs
 """
-import logging
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer
-from pydantic import BaseModel, EmailStr, validator, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
 from app.db.database import get_db
-from app.models.user import User
-from app.models.role import Role
 from app.models.audit_log import AuditLog
-from app.services.user_management_service import UserManagementService
-from app.services.permission_manager import require_permission
+from app.models.role import Role
+from app.models.user import User
 from app.schemas.role import RoleCreate, RoleUpdate
+from app.services.permission_manager import require_permission
+from app.services.user_management_service import UserManagementService
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,9 @@ class CreateUserRequest(BaseModel):
         if len(v) < 3:
             raise ValueError("Username must be at least 3 characters long")
         if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username must contain only alphanumeric characters, underscores, and hyphens")
+            raise ValueError(
+                "Username must contain only alphanumeric characters, underscores, and hyphens"
+            )
         return v
 
 
@@ -154,7 +157,7 @@ async def get_users(
     require_permission(
         current_user.get("permissions", []),
         "platform:users:read",
-        context={"user_id": current_user["id"]}
+        context={"user_id": current_user["id"]},
     )
 
     service = UserManagementService(db)
@@ -201,7 +204,7 @@ async def get_user(
     require_permission(
         current_user.get("permissions", []),
         "platform:users:read",
-        context={"user_id": current_user["id"], "owner_id": user_id}
+        context={"user_id": current_user["id"], "owner_id": user_id},
     )
 
     service = UserManagementService(db)
@@ -209,8 +212,7 @@ async def get_user(
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
     user_dict = user.to_dict()
@@ -285,7 +287,7 @@ async def update_user(
     require_permission(
         current_user.get("permissions", []),
         "platform:users:update",
-        context={"user_id": current_user["id"], "owner_id": user_id}
+        context={"user_id": current_user["id"], "owner_id": user_id},
     )
 
     service = UserManagementService(db)
@@ -294,8 +296,7 @@ async def update_user(
     current_user_data = await service.get_user_by_id(user_id)
     if not current_user_data:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
     old_values = current_user_data.to_dict()
@@ -383,8 +384,7 @@ async def delete_user(
     user = await service.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
     user_email = user.email
@@ -504,15 +504,13 @@ async def update_role(
     current_role = await service.get_role_by_id(role_id)
     if not current_role:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Role not found"
         )
 
     # Prevent updating system roles
     if current_role.is_system_role:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot modify system roles"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify system roles"
         )
 
     old_values = current_role.to_dict()
@@ -569,15 +567,13 @@ async def delete_role(
     role = await service.get_role_by_id(role_id)
     if not role:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Role not found"
         )
 
     # Prevent deleting system roles
     if role.is_system_role:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot delete system roles"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot delete system roles"
         )
 
     role_name = role.name
@@ -621,7 +617,7 @@ async def get_user_audit_logs(
     require_permission(
         current_user.get("permissions", []),
         "platform:audit:read",
-        context={"user_id": current_user["id"], "owner_id": user_id}
+        context={"user_id": current_user["id"], "owner_id": user_id},
     )
 
     service = UserManagementService(db)
@@ -654,7 +650,7 @@ async def get_all_audit_logs(
     )
 
     # Direct database query for audit logs with filters
-    from sqlalchemy import select, and_, desc
+    from sqlalchemy import and_, desc, select
 
     query = select(AuditLog)
     conditions = []

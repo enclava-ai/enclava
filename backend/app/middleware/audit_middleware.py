@@ -2,19 +2,20 @@
 Audit Logging Middleware
 Automatically logs user actions and system events
 """
-import time
+
 import json
 import logging
-from typing import Callable, Optional, Dict, Any
+import time
 from datetime import datetime, timezone
+from typing import Any, Callable, Dict, Optional
 
 from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.models.audit_log import AuditLog, AuditAction, AuditSeverity
-from app.db.database import get_db_session
 from app.core.security import verify_token
+from app.db.database import get_db_session
+from app.models.audit_log import AuditAction, AuditLog, AuditSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,8 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
             auth_header = request.headers.get("authorization")
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
+                if not token.startswith("eyJ"):
+                    return None
                 payload = verify_token(token)
                 return {
                     "user_id": int(payload.get("sub")) if payload.get("sub") else None,
@@ -133,7 +136,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         self,
         user_info: Optional[Dict[str, Any]],
         audit_data: Dict[str, Any],
-        request: Request
+        request: Request,
     ):
         """Log the audit event to database"""
 
@@ -144,10 +147,14 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         resource_type, resource_id = self._parse_resource_from_path(request.url.path)
 
         # Create description
-        description = self._create_description(request.method, request.url.path, audit_data["success"])
+        description = self._create_description(
+            request.method, request.url.path, audit_data["success"]
+        )
 
         # Determine severity
-        severity = self._determine_severity(request.method, audit_data["status_code"], request.url.path)
+        severity = self._determine_severity(
+            request.method, audit_data["status_code"], request.url.path
+        )
 
         # Create audit log entry
         try:
@@ -243,7 +250,10 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         """Determine severity level based on action and outcome"""
 
         # Critical operations
-        if any(keyword in path.lower() for keyword in ["delete", "password", "admin", "key"]):
+        if any(
+            keyword in path.lower()
+            for keyword in ["delete", "password", "admin", "key"]
+        ):
             return AuditSeverity.HIGH
 
         # Failed operations
@@ -268,7 +278,9 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
 
         if any(keyword in path for keyword in ["auth", "login", "logout", "token"]):
             return "authentication"
-        elif any(keyword in path for keyword in ["user", "admin", "role", "permission"]):
+        elif any(
+            keyword in path for keyword in ["user", "admin", "role", "permission"]
+        ):
             return "user_management"
         elif any(keyword in path for keyword in ["api-key", "key"]):
             return "security"
@@ -303,7 +315,10 @@ class LoginAuditMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Only process auth-related endpoints
-        if not any(path in request.url.path for path in ["/auth/login", "/auth/logout", "/auth/refresh"]):
+        if not any(
+            path in request.url.path
+            for path in ["/auth/login", "/auth/logout", "/auth/refresh"]
+        ):
             return await call_next(request)
 
         start_time = time.time()
@@ -316,8 +331,10 @@ class LoginAuditMiddleware(BaseHTTPMiddleware):
                 if body:
                     request_body = json.loads(body.decode())
                     # Re-create request with body for downstream processing
-                    from starlette.requests import Request as StarletteRequest
                     from io import BytesIO
+
+                    from starlette.requests import Request as StarletteRequest
+
                     request._body = body
             except Exception as e:
                 logger.warning(f"Failed to parse login request body: {e}")
@@ -326,13 +343,21 @@ class LoginAuditMiddleware(BaseHTTPMiddleware):
 
         # Log login/logout events
         try:
-            await self._log_auth_event(request, response, request_body, time.time() - start_time)
+            await self._log_auth_event(
+                request, response, request_body, time.time() - start_time
+            )
         except Exception as e:
             logger.error(f"Failed to log auth event: {e}")
 
         return response
 
-    async def _log_auth_event(self, request: Request, response: Response, request_body: dict, process_time: float):
+    async def _log_auth_event(
+        self,
+        request: Request,
+        response: Response,
+        request_body: dict,
+        process_time: float,
+    ):
         """Log authentication events"""
 
         success = 200 <= response.status_code < 300
@@ -352,14 +377,18 @@ class LoginAuditMiddleware(BaseHTTPMiddleware):
                     success=success,
                     ip_address=self._get_client_ip(request),
                     user_agent=request.headers.get("user-agent"),
-                    error_message=f"HTTP {response.status_code}" if not success else None,
+                    error_message=(
+                        f"HTTP {response.status_code}" if not success else None
+                    ),
                 )
 
                 # Add additional details
-                audit_log.details.update({
-                    "identifier": identifier,
-                    "response_time_ms": round(process_time * 1000, 2),
-                })
+                audit_log.details.update(
+                    {
+                        "identifier": identifier,
+                        "response_time_ms": round(process_time * 1000, 2),
+                    }
+                )
 
                 db.add(audit_log)
                 await db.commit()
@@ -371,6 +400,8 @@ class LoginAuditMiddleware(BaseHTTPMiddleware):
                 auth_header = request.headers.get("authorization")
                 if auth_header and auth_header.startswith("Bearer "):
                     token = auth_header.split(" ")[1]
+                    if not token.startswith("eyJ"):
+                        raise ValueError("Bearer token is not a JWT")
                     payload = verify_token(token)
                     user_id = int(payload.get("sub")) if payload.get("sub") else None
             except Exception:

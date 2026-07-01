@@ -7,11 +7,12 @@ Background task for archiving expired responses and cleaning up old archived res
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict
-from sqlalchemy import select, update, delete
+
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.response import Response
 from app.db.database import utc_now
+from app.models.response import Response
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class ResponseArchivalTask:
                 .where(
                     Response.expires_at < now,
                     Response.archived_at.is_(None),
-                    Response.store == True  # Only archive stored responses
+                    Response.store == True,  # Only archive stored responses
                 )
                 .values(archived_at=now)
             )
@@ -74,8 +75,7 @@ class ResponseArchivalTask:
 
             # Delete old archived responses
             stmt = delete(Response).where(
-                Response.archived_at < cutoff_date,
-                Response.archived_at.isnot(None)
+                Response.archived_at < cutoff_date, Response.archived_at.isnot(None)
             )
 
             result = await self.db.execute(stmt)
@@ -110,8 +110,7 @@ class ResponseArchivalTask:
 
             # Delete old non-stored responses
             stmt = delete(Response).where(
-                Response.store == False,
-                Response.created_at < cutoff_date
+                Response.store == False, Response.created_at < cutoff_date
             )
 
             result = await self.db.execute(stmt)
@@ -150,11 +149,11 @@ class ResponseArchivalTask:
                 select(Response.id)
                 .outerjoin(
                     PreviousResponse,
-                    Response.previous_response_id == PreviousResponse.id
+                    Response.previous_response_id == PreviousResponse.id,
                 )
                 .where(
                     Response.previous_response_id.isnot(None),
-                    PreviousResponse.id.is_(None)  # Previous response doesn't exist
+                    PreviousResponse.id.is_(None),  # Previous response doesn't exist
                 )
             )
 
@@ -188,7 +187,7 @@ class ResponseArchivalTask:
             "archived": 0,
             "deleted_old_archived": 0,
             "deleted_non_stored": 0,
-            "deleted_orphaned": 0
+            "deleted_orphaned": 0,
         }
 
         try:

@@ -6,22 +6,23 @@ Every LLM request (success or failure) creates a record here.
 """
 
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from sqlalchemy import (
-    Column,
-    Integer,
     BigInteger,
-    String,
-    DateTime,
     Boolean,
-    Text,
+    CheckConstraint,
+    Column,
+    DateTime,
     ForeignKey,
     Index,
-    CheckConstraint,
+    Integer,
+    String,
+    Text,
 )
-from sqlalchemy.dialects.postgresql import UUID as PGUUID, INET
+from sqlalchemy.dialects.postgresql import INET
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base, utc_now
@@ -35,7 +36,7 @@ class UsageRecord(Base):
     - Token usage (input, output, total)
     - Cost in cents (derived from tokens + pricing snapshot)
     - Provider information
-    - Request context (endpoint, chatbot, agent)
+    - Request context (endpoint, agent)
     - Performance metrics (latency, TTFT)
     - Status and error information
 
@@ -65,9 +66,15 @@ class UsageRecord(Base):
     user = relationship("User", back_populates="usage_records")
 
     # Provider Information (critical for multi-provider billing)
-    provider_id = Column(String(50), nullable=False, index=True)  # 'privatemode', 'redpill', etc.
-    provider_model = Column(String(255), nullable=False)  # Full model name from provider
-    normalized_model = Column(String(255), nullable=False, index=True)  # Our normalized model name
+    provider_id = Column(
+        String(50), nullable=False, index=True
+    )  # 'privatemode', 'redpill', etc.
+    provider_model = Column(
+        String(255), nullable=False
+    )  # Full model name from provider
+    normalized_model = Column(
+        String(255), nullable=False, index=True
+    )  # Our normalized model name
 
     # Token Metrics (core billing data - source of truth)
     input_tokens = Column(Integer, nullable=False, default=0)
@@ -84,14 +91,17 @@ class UsageRecord(Base):
     # This is critical for audit trail - prices change over time
     input_price_per_million_cents = Column(BigInteger, nullable=False)
     output_price_per_million_cents = Column(BigInteger, nullable=False)
-    pricing_source = Column(String(20), nullable=False)  # 'api_sync', 'manual', 'default'
+    pricing_source = Column(
+        String(20), nullable=False
+    )  # 'api_sync', 'manual', 'default'
     pricing_effective_from = Column(DateTime, nullable=False)  # Price validity start
 
     # Request Context
     endpoint = Column(String(255), nullable=False)
     method = Column(String(10), nullable=False, default="POST")
-    chatbot_id = Column(String(50), nullable=True, index=True)  # NULL if direct API call
-    agent_config_id = Column(Integer, nullable=True, index=True)  # NULL if not agent request
+    agent_config_id = Column(
+        Integer, nullable=True, index=True
+    )  # NULL if not agent request
     session_id = Column(String(100), nullable=True)  # For conversation grouping
 
     # Request Characteristics
@@ -104,8 +114,12 @@ class UsageRecord(Base):
     ttft_ms = Column(Integer, nullable=True)  # Time to first token (streaming only)
 
     # Status
-    status = Column(String(20), nullable=False, default="success")  # success, error, timeout, budget_exceeded
-    error_type = Column(String(50), nullable=True)  # null, 'rate_limit', 'model_error', 'timeout', etc.
+    status = Column(
+        String(20), nullable=False, default="success"
+    )  # success, error, timeout, budget_exceeded
+    error_type = Column(
+        String(50), nullable=True
+    )  # null, 'rate_limit', 'model_error', 'timeout', etc.
     error_message = Column(Text, nullable=True)
 
     # Client Info (for abuse detection and debugging)
@@ -163,12 +177,13 @@ class UsageRecord(Base):
             "input_price_per_million_cents": self.input_price_per_million_cents,
             "output_price_per_million_cents": self.output_price_per_million_cents,
             "pricing_source": self.pricing_source,
-            "pricing_effective_from": self.pricing_effective_from.isoformat()
-            if self.pricing_effective_from
-            else None,
+            "pricing_effective_from": (
+                self.pricing_effective_from.isoformat()
+                if self.pricing_effective_from
+                else None
+            ),
             "endpoint": self.endpoint,
             "method": self.method,
-            "chatbot_id": self.chatbot_id,
             "agent_config_id": self.agent_config_id,
             "session_id": self.session_id,
             "is_streaming": self.is_streaming,

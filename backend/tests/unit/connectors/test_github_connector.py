@@ -11,13 +11,15 @@ Tests the contract:
 - Rate limit exception: caught and retried (mock RateLimitExceededException)
 """
 
-import pytest
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
+
+import pytest
 
 # Import with defensive try/except since SDK may not be installed
 try:
     from app.connectors.github import GitHubConnector
+
     GITHUB_AVAILABLE = True
 except (ImportError, RuntimeError):
     GITHUB_AVAILABLE = False
@@ -31,13 +33,15 @@ class TestGitHubConnector:
     @pytest.fixture
     def connector(self):
         """Create a GitHubConnector with test config."""
-        connector = GitHubConnector(config={
-            "owner": "testowner",
-            "repo": "testrepo",
-            "include_issues": True,
-            "include_pull_requests": True,
-            "include_readme": True,
-        })
+        connector = GitHubConnector(
+            config={
+                "owner": "testowner",
+                "repo": "testrepo",
+                "include_issues": True,
+                "include_pull_requests": True,
+                "include_readme": True,
+            }
+        )
         return connector
 
     @pytest.fixture
@@ -47,13 +51,15 @@ class TestGitHubConnector:
 
     def test_init(self):
         """Test connector initialization."""
-        connector = GitHubConnector(config={
-            "owner": "myorg",
-            "repo": "myrepo",
-            "include_issues": True,
-            "include_pull_requests": False,
-            "include_readme": True
-        })
+        connector = GitHubConnector(
+            config={
+                "owner": "myorg",
+                "repo": "myrepo",
+                "include_issues": True,
+                "include_pull_requests": False,
+                "include_readme": True,
+            }
+        )
         assert connector.config["owner"] == "myorg"
         assert connector.config["repo"] == "myrepo"
         assert connector.config["include_issues"] is True
@@ -79,7 +85,7 @@ class TestGitHubConnector:
         mock_user = MagicMock()
         mock_user.login = "testuser"
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_user.return_value = mock_user
             mock_github_class.return_value = mock_github
@@ -92,7 +98,7 @@ class TestGitHubConnector:
         """Test validate() raises RuntimeError on auth failure."""
         connector.load_credentials({"access_token": "ghp_test"})
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_user.side_effect = Exception("Bad credentials")
             mock_github_class.return_value = mock_github
@@ -109,10 +115,10 @@ class TestGitHubConnector:
         mock_repo.get_readme.return_value = MagicMock(
             decoded_content=b"# README\n\nThis is the readme content",
             html_url="https://github.com/testowner/testrepo/blob/main/README.md",
-            last_modified_datetime=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+            last_modified_datetime=datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
         )
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -135,19 +141,21 @@ class TestGitHubConnector:
 
     def test_fetch_all_skips_readme_when_not_configured(self):
         """Test that README is not fetched when include_readme=False."""
-        connector = GitHubConnector(config={
-            "owner": "testowner",
-            "repo": "testrepo",
-            "include_issues": True,
-            "include_readme": False
-        })
+        connector = GitHubConnector(
+            config={
+                "owner": "testowner",
+                "repo": "testrepo",
+                "include_issues": True,
+                "include_readme": False,
+            }
+        )
         connector.load_credentials({"access_token": "ghp_test"})
 
         mock_repo = MagicMock()
         mock_repo.get_readme.return_value = None
         mock_repo.get_issues.return_value = []
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -176,7 +184,7 @@ class TestGitHubConnector:
         mock_repo.get_issues.return_value = [mock_issue]
         mock_repo.get_readme.return_value = None
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -217,7 +225,7 @@ class TestGitHubConnector:
         mock_repo.get_pulls.return_value = [mock_pr]
         mock_repo.get_readme.return_value = None
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -238,19 +246,21 @@ class TestGitHubConnector:
 
     def test_fetch_all_skips_pull_requests_when_not_configured(self):
         """Test that PRs are not fetched when include_pull_requests=False."""
-        connector = GitHubConnector(config={
-            "owner": "testowner",
-            "repo": "testrepo",
-            "include_issues": True,
-            "include_pull_requests": False
-        })
+        connector = GitHubConnector(
+            config={
+                "owner": "testowner",
+                "repo": "testrepo",
+                "include_issues": True,
+                "include_pull_requests": False,
+            }
+        )
         connector.load_credentials({"access_token": "ghp_test"})
 
         mock_repo = MagicMock()
         mock_repo.get_issues.return_value = []
         mock_repo.get_readme.return_value = None
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -268,7 +278,7 @@ class TestGitHubConnector:
         mock_repo.get_issues.return_value = []
         mock_repo.get_readme.return_value = None
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -290,7 +300,7 @@ class TestGitHubConnector:
         mock_repo.get_issues.return_value = []
         mock_repo.get_readme.return_value = None
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -310,18 +320,14 @@ class TestGitHubConnector:
 
         # First two calls raise rate limit, third succeeds
         rate_limit_error = Exception("Rate limit exceeded")
-        mock_repo.get_issues.side_effect = [
-            rate_limit_error,
-            rate_limit_error,
-            []
-        ]
+        mock_repo.get_issues.side_effect = [rate_limit_error, rate_limit_error, []]
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
 
-            with patch('time.sleep'):  # Speed up test
+            with patch("time.sleep"):  # Speed up test
                 batches = list(connector.fetch_all())
 
         # Should have retried
@@ -354,7 +360,7 @@ class TestGitHubConnector:
         mock_repo.get_issues.return_value = [mock_issue]
         mock_repo.get_readme.return_value = None
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -381,7 +387,7 @@ class TestGitHubConnector:
         mock_repo.get_pulls.return_value = []
         mock_repo.get_readme.return_value = None
 
-        with patch('github.Github') as mock_github_class:
+        with patch("github.Github") as mock_github_class:
             mock_github = MagicMock()
             mock_github.get_repo.return_value = mock_repo
             mock_github_class.return_value = mock_github
@@ -394,11 +400,13 @@ class TestGitHubConnector:
 
     def test_multiple_owners_repos_in_config(self):
         """Test connector with multiple repos specified."""
-        connector = GitHubConnector(config={
-            "repos": ["owner1/repo1", "owner2/repo2"],
-            "include_issues": True,
-            "include_readme": True
-        })
+        connector = GitHubConnector(
+            config={
+                "repos": ["owner1/repo1", "owner2/repo2"],
+                "include_issues": True,
+                "include_readme": True,
+            }
+        )
         connector.load_credentials({"access_token": "ghp_test"})
 
         assert "repos" in connector.config

@@ -8,26 +8,26 @@ import json
 import logging
 import time
 import uuid
-from typing import List, Dict, Any, Optional, AsyncGenerator
 from datetime import datetime, timezone
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import aiohttp
 
-from .base import BaseLLMProvider
+from ..config import ProviderConfig
+from ..exceptions import ProviderError, TimeoutError, ValidationError
 from ..models import (
+    ChatChoice,
+    ChatMessage,
     ChatRequest,
     ChatResponse,
-    ChatMessage,
-    ChatChoice,
-    TokenUsage,
+    EmbeddingData,
     EmbeddingRequest,
     EmbeddingResponse,
-    EmbeddingData,
     ModelInfo,
     ProviderStatus,
+    TokenUsage,
 )
-from ..config import ProviderConfig
-from ..exceptions import ProviderError, ValidationError, TimeoutError
+from .base import BaseLLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -162,12 +162,18 @@ class PrivateModeProvider(BaseLLMProvider):
 
                         # Add capabilities based on modalities (Redpill-style) or tasks (legacy)
                         # Chat capability
-                        if ("text" in input_modalities and "text" in output_modalities) or "generate" in tasks:
+                        if (
+                            "text" in input_modalities and "text" in output_modalities
+                        ) or "generate" in tasks:
                             capabilities.append("chat")
 
                         # Embeddings capability
                         model_name_lower = model_id.lower()
-                        if "embed" in tasks or "embedding" in tasks or "embed" in model_name_lower:
+                        if (
+                            "embed" in tasks
+                            or "embedding" in tasks
+                            or "embed" in model_name_lower
+                        ):
                             capabilities.append("embeddings")
 
                         # Vision capability
@@ -191,9 +197,13 @@ class PrivateModeProvider(BaseLLMProvider):
                             provider=self.provider_name,
                             capabilities=capabilities,
                             # Support both field naming conventions
-                            context_window=model_data.get("context_length") or model_data.get("context_window"),
-                            max_output_tokens=model_data.get("max_output_length") or model_data.get("max_output_tokens"),
-                            supports_streaming=model_data.get("supports_streaming", True),
+                            context_window=model_data.get("context_length")
+                            or model_data.get("context_window"),
+                            max_output_tokens=model_data.get("max_output_length")
+                            or model_data.get("max_output_tokens"),
+                            supports_streaming=model_data.get(
+                                "supports_streaming", True
+                            ),
                             supports_function_calling=supports_function_calling,
                             # Store modalities or tasks for reference
                             tasks=input_modalities if input_modalities else tasks,
@@ -238,11 +248,25 @@ class PrivateModeProvider(BaseLLMProvider):
                         "role": msg.role,
                         "content": msg.content,
                         **({"name": msg.name} if msg.name else {}),
-                        **({"tool_calls": [
-                            {"id": tc.id, "type": tc.type, "function": tc.function}
-                            for tc in msg.tool_calls
-                        ]} if msg.tool_calls else {}),
-                        **({"tool_call_id": msg.tool_call_id} if msg.tool_call_id else {}),
+                        **(
+                            {
+                                "tool_calls": [
+                                    {
+                                        "id": tc.id,
+                                        "type": tc.type,
+                                        "function": tc.function,
+                                    }
+                                    for tc in msg.tool_calls
+                                ]
+                            }
+                            if msg.tool_calls
+                            else {}
+                        ),
+                        **(
+                            {"tool_call_id": msg.tool_call_id}
+                            if msg.tool_call_id
+                            else {}
+                        ),
                     }
                     for msg in request.messages
                 ],
@@ -299,11 +323,12 @@ class PrivateModeProvider(BaseLLMProvider):
                         tool_calls = None
                         if "tool_calls" in message_data and message_data["tool_calls"]:
                             from ..models import ToolCall
+
                             tool_calls = [
                                 ToolCall(
                                     id=tc.get("id"),
                                     type=tc.get("type", "function"),
-                                    function=tc.get("function", {})
+                                    function=tc.get("function", {}),
                                 )
                                 for tc in message_data.get("tool_calls", [])
                             ]
@@ -312,7 +337,9 @@ class PrivateModeProvider(BaseLLMProvider):
                             index=choice_data.get("index", 0),
                             message=ChatMessage(
                                 role=message_data.get("role", "assistant"),
-                                content=message_data.get("content"),  # Can be None with tool calls
+                                content=message_data.get(
+                                    "content"
+                                ),  # Can be None with tool calls
                                 tool_calls=tool_calls,
                                 tool_call_id=message_data.get("tool_call_id"),
                             ),
@@ -392,11 +419,25 @@ class PrivateModeProvider(BaseLLMProvider):
                         "role": msg.role,
                         "content": msg.content,
                         **({"name": msg.name} if msg.name else {}),
-                        **({"tool_calls": [
-                            {"id": tc.id, "type": tc.type, "function": tc.function}
-                            for tc in msg.tool_calls
-                        ]} if msg.tool_calls else {}),
-                        **({"tool_call_id": msg.tool_call_id} if msg.tool_call_id else {}),
+                        **(
+                            {
+                                "tool_calls": [
+                                    {
+                                        "id": tc.id,
+                                        "type": tc.type,
+                                        "function": tc.function,
+                                    }
+                                    for tc in msg.tool_calls
+                                ]
+                            }
+                            if msg.tool_calls
+                            else {}
+                        ),
+                        **(
+                            {"tool_call_id": msg.tool_call_id}
+                            if msg.tool_call_id
+                            else {}
+                        ),
                     }
                     for msg in request.messages
                 ],

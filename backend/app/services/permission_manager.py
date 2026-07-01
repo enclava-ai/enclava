@@ -6,11 +6,12 @@ dynamic module permission registration, and fine-grained access control.
 """
 
 import re
-from typing import Dict, List, Set, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import HTTPException, status
+
 from app.core.logging import get_logger
 from app.utils.exceptions import CustomHTTPException
 
@@ -445,8 +446,8 @@ def require_permission(
             detail=error_message,
             details={
                 "required_permission": required_permission,
-                "suggestion": "Contact your administrator to request the necessary permissions for this operation."
-            }
+                "suggestion": "Contact your administrator to request the necessary permissions for this operation.",
+            },
         )
 
 

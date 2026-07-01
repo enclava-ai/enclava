@@ -2,17 +2,19 @@
 Tool Management Service
 Service for managing custom tools and their lifecycle
 """
+
 import logging
-from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import HTTPException, status
+from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import and_, or_, desc, func
-from fastapi import HTTPException, status
-from datetime import datetime, timedelta, timezone
 
-from app.models.tool import Tool, ToolExecution, ToolCategory, ToolType, ToolStatus
-from app.models.user import User
 from app.db.database import utc_now
+from app.models.tool import Tool, ToolCategory, ToolExecution, ToolStatus, ToolType
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 

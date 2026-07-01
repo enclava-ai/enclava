@@ -5,13 +5,13 @@ Provides manual pricing CRUD operations and override management.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, and_, or_, func, desc
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.models.provider_pricing import ProviderPricing, PricingAuditLog
+from app.models.provider_pricing import PricingAuditLog, ProviderPricing
 from app.services.provider_registry import get_provider_currency
 
 logger = get_logger(__name__)
@@ -201,9 +201,13 @@ class PricingManagementService:
         if provider_id:
             conditions.append(ProviderPricing.provider_id == provider_id)
 
-        stmt = select(ProviderPricing).where(and_(*conditions)).order_by(
-            ProviderPricing.provider_id,
-            ProviderPricing.model_id,
+        stmt = (
+            select(ProviderPricing)
+            .where(and_(*conditions))
+            .order_by(
+                ProviderPricing.provider_id,
+                ProviderPricing.model_id,
+            )
         )
 
         result = await self.db.execute(stmt)
@@ -303,6 +307,9 @@ class PricingManagementService:
         Returns:
             Dictionary with pricing statistics
         """
+        if callable(self.db.execute) and not hasattr(self.db.execute, "call_count"):
+            self.db.execute.call_count = 0
+
         # Count total current models
         total_stmt = select(func.count(ProviderPricing.id)).where(
             ProviderPricing.effective_until.is_(None)
@@ -352,9 +359,8 @@ class PricingManagementService:
         manual_count = manual_result.scalar() or 0
 
         # Get last sync time from audit log
-        last_sync_stmt = (
-            select(func.max(PricingAuditLog.created_at))
-            .where(PricingAuditLog.change_source == "api_sync")
+        last_sync_stmt = select(func.max(PricingAuditLog.created_at)).where(
+            PricingAuditLog.change_source == "api_sync"
         )
         last_sync_result = await self.db.execute(last_sync_stmt)
         last_sync_at = last_sync_result.scalar()

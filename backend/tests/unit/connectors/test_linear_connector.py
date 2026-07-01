@@ -10,13 +10,15 @@ Tests the contract:
 - fetch_updated(since, checkpoint) - passes correct updatedAt filter to GraphQL
 """
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Import with defensive try/except since SDK may not be installed
 try:
     from app.connectors.linear import LinearConnector
+
     LINEAR_AVAILABLE = True
 except (ImportError, RuntimeError):
     LINEAR_AVAILABLE = False
@@ -30,10 +32,12 @@ class TestLinearConnector:
     @pytest.fixture
     def connector(self):
         """Create a LinearConnector with test config."""
-        connector = LinearConnector(config={
-            "team_ids": ["team-123"],
-            "include_issues": True,
-        })
+        connector = LinearConnector(
+            config={
+                "team_ids": ["team-123"],
+                "include_issues": True,
+            }
+        )
         return connector
 
     @pytest.fixture
@@ -43,11 +47,13 @@ class TestLinearConnector:
 
     def test_init(self):
         """Test connector initialization."""
-        connector = LinearConnector(config={
-            "team_ids": ["team-1", "team-2"],
-            "include_issues": True,
-            "include_comments": True
-        })
+        connector = LinearConnector(
+            config={
+                "team_ids": ["team-1", "team-2"],
+                "include_issues": True,
+                "include_comments": True,
+            }
+        )
         assert connector.config["team_ids"] == ["team-1", "team-2"]
         assert connector.config["include_issues"] is True
         assert connector.config["include_comments"] is True
@@ -68,11 +74,11 @@ class TestLinearConnector:
         """Test validate() passes when GraphQL returns viewer data."""
         connector.load_credentials({"api_key": "lin_api_test"})
 
-        mock_response = {
-            "data": {"viewer": {"id": "u1", "name": "Test User"}}
-        }
+        mock_response = {"data": {"viewer": {"id": "u1", "name": "Test User"}}}
 
-        with patch.object(connector, '_make_graphql_request', return_value=mock_response):
+        with patch.object(
+            connector, "_make_graphql_request", return_value=mock_response
+        ):
             # Should not raise
             connector.validate()
 
@@ -81,11 +87,11 @@ class TestLinearConnector:
         connector.load_credentials({"api_key": "lin_api_test"})
 
         # Error response
-        mock_response = {
-            "errors": [{"message": "Authentication failed"}]
-        }
+        mock_response = {"errors": [{"message": "Authentication failed"}]}
 
-        with patch.object(connector, '_make_graphql_request', return_value=mock_response):
+        with patch.object(
+            connector, "_make_graphql_request", return_value=mock_response
+        ):
             with pytest.raises(RuntimeError, match="Linear validation failed"):
                 connector.validate()
 
@@ -93,11 +99,11 @@ class TestLinearConnector:
         """Test validate() raises when viewer data is missing."""
         connector.load_credentials({"api_key": "lin_api_test"})
 
-        mock_response = {
-            "data": {}  # No viewer field
-        }
+        mock_response = {"data": {}}  # No viewer field
 
-        with patch.object(connector, '_make_graphql_request', return_value=mock_response):
+        with patch.object(
+            connector, "_make_graphql_request", return_value=mock_response
+        ):
             with pytest.raises(RuntimeError, match="Linear validation failed"):
                 connector.validate()
 
@@ -114,11 +120,11 @@ class TestLinearConnector:
                 "url": "https://linear.app/issue/ENG-123",
                 "updatedAt": "2024-01-15T10:30:00.000Z",
                 "state": {"name": "In Progress"},
-                "assignee": {"name": "John Doe"}
+                "assignee": {"name": "John Doe"},
             }
         ]
 
-        with patch.object(connector, '_fetch_issues', return_value=mock_issues):
+        with patch.object(connector, "_fetch_issues", return_value=mock_issues):
             batches = list(connector.fetch_all())
 
         assert len(batches) > 0
@@ -146,11 +152,11 @@ class TestLinearConnector:
                 "url": "https://linear.app/issue/ENG-456",
                 "updatedAt": "2024-01-16T10:30:00.000Z",
                 "state": {"name": "Todo"},
-                "assignee": None
+                "assignee": None,
             }
         ]
 
-        with patch.object(connector, '_fetch_issues', return_value=mock_issues):
+        with patch.object(connector, "_fetch_issues", return_value=mock_issues):
             batches = list(connector.fetch_all())
 
         docs = batches[0]
@@ -172,11 +178,11 @@ class TestLinearConnector:
                 "url": "https://linear.app/issue/ENG-789",
                 "updatedAt": "2024-01-17T10:30:00.000Z",
                 "state": {"name": "Done"},
-                "assignee": None
+                "assignee": None,
             }
         ]
 
-        with patch.object(connector, '_fetch_issues', return_value=mock_issues):
+        with patch.object(connector, "_fetch_issues", return_value=mock_issues):
             batches = list(connector.fetch_all())
 
         docs = batches[0]
@@ -186,11 +192,13 @@ class TestLinearConnector:
 
     def test_fetch_all_includes_comments_when_configured(self, connector):
         """Test that comments are included in content when include_comments=True."""
-        connector = LinearConnector(config={
-            "team_ids": ["team-123"],
-            "include_issues": True,
-            "include_comments": True
-        })
+        connector = LinearConnector(
+            config={
+                "team_ids": ["team-123"],
+                "include_issues": True,
+                "include_comments": True,
+            }
+        )
         connector.load_credentials({"api_key": "lin_api_test"})
 
         mock_issues = [
@@ -205,13 +213,13 @@ class TestLinearConnector:
                 "comments": {
                     "nodes": [
                         {"user": {"name": "Alice"}, "body": "First comment"},
-                        {"user": {"name": "Bob"}, "body": "Second comment"}
+                        {"user": {"name": "Bob"}, "body": "Second comment"},
                     ]
-                }
+                },
             }
         ]
 
-        with patch.object(connector, '_fetch_issues', return_value=mock_issues):
+        with patch.object(connector, "_fetch_issues", return_value=mock_issues):
             batches = list(connector.fetch_all())
 
         docs = batches[0]
@@ -237,11 +245,11 @@ class TestLinearConnector:
                 "state": {"name": "Backlog", "color": "#ff0000"},
                 "assignee": {"name": "Jane Smith", "email": "jane@example.com"},
                 "priority": 1,
-                "labels": [{"name": "bug"}, {"name": "urgent"}]
+                "labels": [{"name": "bug"}, {"name": "urgent"}],
             }
         ]
 
-        with patch.object(connector, '_fetch_issues', return_value=mock_issues):
+        with patch.object(connector, "_fetch_issues", return_value=mock_issues):
             batches = list(connector.fetch_all())
 
         docs = batches[0]
@@ -259,7 +267,7 @@ class TestLinearConnector:
 
         since = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
-        with patch.object(connector, '_fetch_issues') as mock_fetch:
+        with patch.object(connector, "_fetch_issues") as mock_fetch:
             mock_fetch.return_value = []
             list(connector.fetch_updated(since=since, checkpoint=None))
 
@@ -275,7 +283,7 @@ class TestLinearConnector:
         since = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         checkpoint = {"last_issue_id": "issue-999", "cursor": "cursor-xyz"}
 
-        with patch.object(connector, '_fetch_issues') as mock_fetch:
+        with patch.object(connector, "_fetch_issues") as mock_fetch:
             mock_fetch.return_value = []
             list(connector.fetch_updated(since=since, checkpoint=checkpoint))
 
@@ -306,7 +314,7 @@ class TestLinearConnector:
         """Test that empty issues list yields no documents."""
         connector.load_credentials({"api_key": "lin_api_test"})
 
-        with patch.object(connector, '_fetch_issues', return_value=[]):
+        with patch.object(connector, "_fetch_issues", return_value=[]):
             batches = list(connector.fetch_all())
 
         # Should yield no batches or empty batches
@@ -316,7 +324,7 @@ class TestLinearConnector:
         """Test GraphQL request error handling."""
         connector.load_credentials({"api_key": "lin_api_test"})
 
-        with patch('requests.post') as mock_post:
+        with patch("requests.post") as mock_post:
             mock_post.side_effect = Exception("Network error")
 
             with pytest.raises(RuntimeError):

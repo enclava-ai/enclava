@@ -2,34 +2,35 @@
 Plugin Registry and Discovery System
 Handles plugin installation, updates, discovery, and marketplace functionality
 """
+
 import asyncio
+import base64
+import hashlib
+import json
 import os
 import shutil
 import tempfile
 import zipfile
-import aiohttp
-from typing import Dict, Any, List, Optional, Tuple
-from pathlib import Path
 from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, or_
-import hashlib
-import json
-import base64
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import aiohttp
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from sqlalchemy import and_, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.models.plugin import Plugin, PluginConfiguration, PluginAuditLog
-from app.models.user import User
 from app.db.database import get_db, utc_now
+from app.models.plugin import Plugin, PluginAuditLog, PluginConfiguration
+from app.models.user import User
 from app.schemas.plugin_manifest import PluginManifestValidator, validate_manifest_file
-from app.services.plugin_sandbox import plugin_loader
 from app.services.plugin_database import plugin_db_manager, plugin_migration_manager
+from app.services.plugin_sandbox import plugin_loader
 from app.utils.exceptions import PluginError, SecurityError, ValidationError
-
 
 logger = get_logger("plugin.registry")
 
@@ -742,12 +743,16 @@ class PluginDiscoveryService:
                             "health": health_status,
                             "resource_usage": resource_stats,
                             "database_stats": db_stats,
-                            "installed_at": plugin.installed_at.isoformat()
-                            if plugin.installed_at
-                            else None,
-                            "updated_at": plugin.last_updated_at.isoformat()
-                            if plugin.last_updated_at
-                            else None,
+                            "installed_at": (
+                                plugin.installed_at.isoformat()
+                                if plugin.installed_at
+                                else None
+                            ),
+                            "updated_at": (
+                                plugin.last_updated_at.isoformat()
+                                if plugin.last_updated_at
+                                else None
+                            ),
                         }
                     )
 

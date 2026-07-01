@@ -6,7 +6,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
 # Allowed primitive types for context values
 ContextValue = Optional[Union[str, int, float, bool]]
 
@@ -39,7 +38,9 @@ class ExtractContext(BaseModel):
         invalid_keys = []
         for key, value in values.items():
             if not isinstance(key, str):
-                raise ValueError(f"Context keys must be strings, got {type(key).__name__} for key: {key}")
+                raise ValueError(
+                    f"Context keys must be strings, got {type(key).__name__} for key: {key}"
+                )
 
             # Check for nested objects and arrays
             if isinstance(value, (dict, list)):
@@ -69,7 +70,8 @@ class TemplateCreate(BaseModel):
     description: Optional[str] = Field(None, description="Template description")
     system_prompt: str = Field(..., description="System message for vision model")
     user_prompt: str = Field(
-        ..., description="User message template (supports placeholders like {company_name})"
+        ...,
+        description="User message template (supports placeholders like {company_name})",
     )
     output_schema: Optional[Dict[str, Any]] = Field(
         None, description="Expected JSON schema for validation"
@@ -77,7 +79,9 @@ class TemplateCreate(BaseModel):
     context_schema: Optional[Dict[str, Any]] = Field(
         None, description="Defines context variables (e.g., company_name, currency)"
     )
-    model: Optional[str] = Field(None, description="Vision model to use (overrides module default)")
+    model: Optional[str] = Field(
+        None, description="Vision model to use (overrides module default)"
+    )
 
 
 class TemplateUpdate(BaseModel):
@@ -162,7 +166,9 @@ class JobDetailResponse(BaseModel):
     num_pages: int
     status: str
     template_id: str
-    buyer_context: Optional[str] = Field(None, description="Context JSON string (legacy field name)")
+    buyer_context: Optional[str] = Field(
+        None, description="Context JSON string (legacy field name)"
+    )
     model_used: Optional[str]
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
@@ -223,7 +229,9 @@ class ModelsResponse(BaseModel):
 class ExtractSettingsUpdate(BaseModel):
     """Schema for updating extract settings."""
 
-    default_model: str = Field(..., description="Default vision model for all templates")
+    default_model: str = Field(
+        ..., description="Default vision model for all templates"
+    )
 
 
 class ExtractSettingsResponse(BaseModel):

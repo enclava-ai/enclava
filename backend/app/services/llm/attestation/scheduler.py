@@ -7,10 +7,10 @@ Periodically verifies provider attestations and maintains health state.
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Tuple, Optional
+from typing import Dict, Optional, Tuple
 
 from .base import BaseAttestationVerifier
-from .models import ProviderHealth, AttestationResult
+from .models import AttestationResult, ProviderHealth
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,9 @@ class AttestationScheduler:
         self._verifiers: Dict[str, Tuple[BaseAttestationVerifier, str]] = {}
         self._running = False
         self._task: Optional[asyncio.Task] = None
-        logger.info(f"Initialized attestation scheduler with {verification_interval_seconds}s interval")
+        logger.info(
+            f"Initialized attestation scheduler with {verification_interval_seconds}s interval"
+        )
 
     async def start(self):
         """Start the periodic verification loop."""
@@ -64,10 +66,7 @@ class AttestationScheduler:
         logger.info("Attestation scheduler stopped")
 
     def register_provider(
-        self,
-        provider_id: str,
-        verifier: BaseAttestationVerifier,
-        test_model: str
+        self, provider_id: str, verifier: BaseAttestationVerifier, test_model: str
     ):
         """
         Register a provider for periodic verification.
@@ -81,7 +80,7 @@ class AttestationScheduler:
         self._provider_health[provider_id] = ProviderHealth(
             provider_id=provider_id,
             healthy=False,  # Start unhealthy until first check passes
-            error="Awaiting initial verification"
+            error="Awaiting initial verification",
         )
         logger.info(f"Registered provider '{provider_id}' for attestation monitoring")
 
@@ -136,7 +135,9 @@ class AttestationScheduler:
             logger.debug("No providers registered for verification")
             return
 
-        logger.debug(f"Starting verification round for {len(self._verifiers)} providers")
+        logger.debug(
+            f"Starting verification round for {len(self._verifiers)} providers"
+        )
 
         # Run all verifications in parallel
         tasks = []
@@ -149,10 +150,7 @@ class AttestationScheduler:
         logger.debug("Verification round completed")
 
     async def _verify_single_provider(
-        self,
-        provider_id: str,
-        verifier: BaseAttestationVerifier,
-        test_model: str
+        self, provider_id: str, verifier: BaseAttestationVerifier, test_model: str
     ):
         """
         Verify a single provider.
@@ -189,7 +187,9 @@ class AttestationScheduler:
         else:
             health.healthy = False
             # Join all errors into a single string
-            health.error = "; ".join(result.errors) if result.errors else "Verification failed"
+            health.error = (
+                "; ".join(result.errors) if result.errors else "Verification failed"
+            )
             logger.warning(f"Provider '{provider_id}': unhealthy - {health.error}")
 
     def _mark_unhealthy(self, provider_id: str, error: str):
@@ -201,7 +201,9 @@ class AttestationScheduler:
             error: Error message explaining why provider is unhealthy
         """
         if provider_id not in self._provider_health:
-            logger.error(f"Attempted to mark unknown provider '{provider_id}' as unhealthy")
+            logger.error(
+                f"Attempted to mark unknown provider '{provider_id}' as unhealthy"
+            )
             return
 
         health = self._provider_health[provider_id]
@@ -229,7 +231,9 @@ class AttestationScheduler:
         verifier, test_model = self._verifiers[provider_id]
         result = await verifier.verify_provider(test_model)
         self._update_health(provider_id, result)
-        logger.info(f"Immediate verification completed for '{provider_id}': {'healthy' if result.verified else 'unhealthy'}")
+        logger.info(
+            f"Immediate verification completed for '{provider_id}': {'healthy' if result.verified else 'unhealthy'}"
+        )
 
         return result
 

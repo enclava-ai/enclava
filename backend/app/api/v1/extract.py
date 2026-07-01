@@ -38,9 +38,9 @@ from app.modules.extract.schemas import (
     TemplateResponse,
     TemplateUpdate,
 )
+from app.modules.extract.services.document_processor import DocumentProcessor
 from app.modules.extract.services.extract_service import ExtractService
 from app.modules.extract.services.template_wizard import TemplateWizardService
-from app.modules.extract.services.document_processor import DocumentProcessor
 from app.modules.extract.templates.manager import TemplateManager
 
 router = APIRouter()
@@ -66,7 +66,7 @@ def check_template_management_permission(current_user: User) -> None:
     if not current_user.has_permission(PERMISSION_MANAGE_EXTRACT_TEMPLATES):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permission '{PERMISSION_MANAGE_EXTRACT_TEMPLATES}' required to manage templates"
+            detail=f"Permission '{PERMISSION_MANAGE_EXTRACT_TEMPLATES}' required to manage templates",
         )
 
 
@@ -77,7 +77,9 @@ def check_template_management_permission(current_user: User) -> None:
 async def process_document(
     file: UploadFile = File(..., description="Document to process (PDF, JPG, PNG)"),
     template: Optional[str] = Form(None, description="Template ID to use"),
-    context: Optional[str] = Form(None, description="JSON context for template placeholders"),
+    context: Optional[str] = Form(
+        None, description="JSON context for template placeholders"
+    ),
     db: AsyncSession = Depends(get_db),
     auth: tuple[Dict[str, Any], Optional[APIKey]] = Depends(get_extract_auth_context),
 ):
@@ -100,7 +102,9 @@ async def process_document(
         try:
             parsed_context = json.loads(context)
         except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON in context parameter")
+            raise HTTPException(
+                status_code=400, detail="Invalid JSON in context parameter"
+            )
 
         # Validate context structure and value types
         try:
@@ -115,7 +119,11 @@ async def process_document(
                 if msg.startswith("Value error, "):
                     msg = msg[13:]
                 error_messages.append(msg)
-            detail = "; ".join(error_messages) if error_messages else "Invalid context format"
+            detail = (
+                "; ".join(error_messages)
+                if error_messages
+                else "Invalid context format"
+            )
             raise HTTPException(status_code=400, detail=detail)
 
     # Load settings from database if available
@@ -138,8 +146,7 @@ async def process_document(
     if api_key:
         if not api_key.has_scope("extract"):
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Scope 'extract' required"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Scope 'extract' required"
             )
 
     # Verify template exists BEFORE checking access (prevents enumeration)
@@ -153,7 +160,7 @@ async def process_document(
     if api_key and not api_key.can_access_template(template_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to use this template"
+            detail="Not authorized to use this template",
         )
 
     result = await extract_service.process_document(
@@ -191,11 +198,12 @@ async def list_jobs(
     # API key scope check
     if api_key and not api_key.has_scope("extract"):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Scope 'extract' required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Scope 'extract' required"
         )
 
-    return await extract_service.list_jobs(db, current_user["id"], limit, offset, status)
+    return await extract_service.list_jobs(
+        db, current_user["id"], limit, offset, status
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=JobDetailResponse)
@@ -215,8 +223,7 @@ async def get_job(
     # API key scope check
     if api_key and not api_key.has_scope("extract"):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Scope 'extract' required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Scope 'extract' required"
         )
 
     return await extract_service.get_job(db, str(job_id), current_user["id"])
@@ -241,8 +248,7 @@ async def list_templates(
     # API key scope check
     if api_key and not api_key.has_scope("extract"):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Scope 'extract' required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Scope 'extract' required"
         )
 
     manager = TemplateManager(db)
@@ -267,8 +273,7 @@ async def get_template(
     # API key scope check
     if api_key and not api_key.has_scope("extract"):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Scope 'extract' required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Scope 'extract' required"
         )
 
     manager = TemplateManager(db)
@@ -371,7 +376,9 @@ async def template_wizard(
         raise HTTPException(status_code=400, detail="No valid images found in file")
 
     # Get user_id for tracking
-    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    user_id = (
+        current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    )
 
     # Analyze with wizard (with usage tracking)
     template_data = await wizard_service.analyze_document(
@@ -384,10 +391,7 @@ async def template_wizard(
 
     # Validate template
     if not wizard_service.validate_template(template_data):
-        raise HTTPException(
-            status_code=500,
-            detail="Generated template is invalid"
-        )
+        raise HTTPException(status_code=500, detail="Generated template is invalid")
 
     # Format for frontend
     formatted_template = wizard_service.format_template_for_creation(template_data)
@@ -398,7 +402,7 @@ async def template_wizard(
         "analysis": {
             "document_type": template_data.get("document_type", "unknown"),
             "fields": template_data.get("fields", []),
-        }
+        },
     }
 
 
@@ -453,28 +457,21 @@ async def get_settings(
     result = await db.execute(stmt)
     settings = result.scalar_one_or_none()
 
-    # Auto-populate default_model if not set
+    # Auto-populate default_model if a vision model is available. If providers are
+    # not configured yet, keep settings readable with a null default_model.
     if not settings or not settings.default_model:
-        # Get first available vision model
         try:
             all_models = await llm_service.get_models()
             vision_models = [m for m in all_models if "vision" in m.capabilities]
-
-            if not vision_models:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="No vision-capable models available in the platform",
-                )
-
-            first_model = vision_models[0].id
+            first_model = vision_models[0].id if vision_models else None
 
             # Use upsert to avoid race conditions under concurrent load
-            upsert_stmt = pg_insert(ExtractSettings).values(
-                id=1,
-                default_model=first_model
-            ).on_conflict_do_update(
-                index_elements=['id'],
-                set_={'default_model': first_model}
+            upsert_stmt = (
+                pg_insert(ExtractSettings)
+                .values(id=1, default_model=first_model)
+                .on_conflict_do_update(
+                    index_elements=["id"], set_={"default_model": first_model}
+                )
             )
             await db.execute(upsert_stmt)
             await db.commit()

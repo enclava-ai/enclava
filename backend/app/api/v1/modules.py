@@ -2,13 +2,16 @@
 Modules API endpoints
 """
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
 from fastapi import APIRouter, Depends, HTTPException
-from app.services.module_manager import module_manager, ModuleConfig
-from app.core.logging import log_api_request
+
+from app.core.logging import get_logger, log_api_request
 from app.core.security import get_current_user
+from app.services.module_manager import ModuleConfig, module_manager
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 @router.get("/")
@@ -507,9 +510,10 @@ async def get_module_config(
     """Get module configuration schema and current values"""
     log_api_request("get_module_config", {"module_name": module_name})
 
-    from app.services.module_config_manager import module_config_manager
-    from app.services.llm.service import llm_service
     import copy
+
+    from app.services.llm.service import llm_service
+    from app.services.module_config_manager import module_config_manager
 
     # Get module manifest and schema
     manifest = module_config_manager.get_module_manifest(module_name)

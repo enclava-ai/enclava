@@ -9,20 +9,21 @@ This model provides a centralized audit trail for all billing-related changes:
 """
 
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
 from enum import Enum
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from sqlalchemy import (
-    Column,
     BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
     Integer,
     String,
-    DateTime,
     Text,
-    ForeignKey,
 )
-from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB, INET
+from sqlalchemy.dialects.postgresql import INET, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base, utc_now
@@ -111,7 +112,9 @@ class BillingAuditLog(Base):
     # Actor information
     actor_type = Column(String(20), nullable=False)  # ActorType enum value
     actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    actor_description = Column(Text, nullable=True)  # e.g., "System scheduler", "API sync from RedPill"
+    actor_description = Column(
+        Text, nullable=True
+    )  # e.g., "System scheduler", "API sync from RedPill"
 
     # Context
     reason = Column(Text, nullable=True)

@@ -5,25 +5,25 @@ Provides CRUD operations for MCP server configurations,
 connection testing, and tool discovery.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
-from app.core.security import get_current_user
 from app.core.logging import get_logger
-from app.services.mcp_server_service import MCPServerService
+from app.core.security import get_current_user
+from app.db.database import get_db
 from app.schemas.mcp_server import (
     MCPServerCreate,
-    MCPServerUpdate,
-    MCPServerResponse,
+    MCPServerDeleteResponse,
     MCPServerListResponse,
+    MCPServerRefreshResponse,
+    MCPServerResponse,
     MCPServerTestRequest,
     MCPServerTestResponse,
-    MCPServerRefreshResponse,
-    MCPServerDeleteResponse,
+    MCPServerUpdate,
 )
-
+from app.services.mcp_server_service import MCPServerService
 
 logger = get_logger("api.mcp_servers")
 
@@ -38,8 +38,12 @@ def _get_user_id(current_user: Dict[str, Any]) -> int:
 def _is_admin(current_user: Dict[str, Any]) -> bool:
     """Check if user is an admin."""
     if isinstance(current_user, dict):
-        return current_user.get("is_superuser", False) or current_user.get("is_admin", False)
-    return getattr(current_user, "is_superuser", False) or getattr(current_user, "is_admin", False)
+        return current_user.get("is_superuser", False) or current_user.get(
+            "is_admin", False
+        )
+    return getattr(current_user, "is_superuser", False) or getattr(
+        current_user, "is_admin", False
+    )
 
 
 # =============================================================================
@@ -66,9 +70,7 @@ async def create_mcp_server(
 
     try:
         server = await service.create_server(
-            data=request,
-            user_id=user_id,
-            is_admin=is_admin
+            data=request, user_id=user_id, is_admin=is_admin
         )
         return MCPServerResponse(**server.to_dict())
 
@@ -96,16 +98,14 @@ async def list_mcp_servers(
     service = MCPServerService(db)
 
     servers, user_count, global_count = await service.list_servers(
-        user_id=user_id,
-        is_admin=is_admin,
-        include_inactive=include_inactive
+        user_id=user_id, is_admin=is_admin, include_inactive=include_inactive
     )
 
     return MCPServerListResponse(
         servers=[MCPServerResponse(**s.to_dict()) for s in servers],
         total=len(servers),
         user_servers=user_count,
-        global_servers=global_count
+        global_servers=global_count,
     )
 
 
@@ -143,15 +143,12 @@ async def get_mcp_server(
 
     service = MCPServerService(db)
     server = await service.get_server(
-        server_id=server_id,
-        user_id=user_id,
-        is_admin=is_admin
+        server_id=server_id, user_id=user_id, is_admin=is_admin
     )
 
     if not server:
         raise HTTPException(
-            status_code=404,
-            detail="MCP server not found or access denied"
+            status_code=404, detail="MCP server not found or access denied"
         )
 
     return MCPServerResponse(**server.to_dict())
@@ -177,16 +174,12 @@ async def update_mcp_server(
 
     try:
         server = await service.update_server(
-            server_id=server_id,
-            data=request,
-            user_id=user_id,
-            is_admin=is_admin
+            server_id=server_id, data=request, user_id=user_id, is_admin=is_admin
         )
 
         if not server:
             raise HTTPException(
-                status_code=404,
-                detail="MCP server not found or access denied"
+                status_code=404, detail="MCP server not found or access denied"
             )
 
         return MCPServerResponse(**server.to_dict())
@@ -216,21 +209,18 @@ async def delete_mcp_server(
 
     try:
         deleted = await service.delete_server(
-            server_id=server_id,
-            user_id=user_id,
-            is_admin=is_admin
+            server_id=server_id, user_id=user_id, is_admin=is_admin
         )
 
         if not deleted:
             raise HTTPException(
-                status_code=404,
-                detail="MCP server not found or access denied"
+                status_code=404, detail="MCP server not found or access denied"
             )
 
         return MCPServerDeleteResponse(
             success=True,
             message="MCP server deleted successfully",
-            deleted_id=server_id
+            deleted_id=server_id,
         )
 
     except PermissionError as e:
@@ -275,9 +265,7 @@ async def refresh_server_tools(
 
     service = MCPServerService(db)
     response = await service.refresh_server_tools(
-        server_id=server_id,
-        user_id=user_id,
-        is_admin=is_admin
+        server_id=server_id, user_id=user_id, is_admin=is_admin
     )
 
     return response

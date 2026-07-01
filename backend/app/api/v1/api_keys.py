@@ -2,24 +2,25 @@
 API Key management endpoints
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, func
-from datetime import datetime, timedelta, timezone
 import asyncio
 import secrets
 import string
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.logging import get_logger
+from app.core.security import get_current_user
 from app.db.database import get_db, utc_now
 from app.models.api_key import APIKey
 from app.models.user import User
-from app.core.security import get_current_user
-from app.services.permission_manager import require_permission
 from app.services.audit_service import log_audit_event, log_audit_event_async
-from app.core.logging import get_logger
-from app.core.config import settings
+from app.services.permission_manager import require_permission
 
 logger = get_logger(__name__)
 
@@ -37,9 +38,10 @@ class APIKeyCreate(BaseModel):
     rate_limit_per_day: Optional[int] = Field(None, ge=1, le=1000000)
     allowed_ips: List[str] = Field(default_factory=list)
     allowed_models: List[str] = Field(default_factory=list)  # Model restrictions
-    allowed_chatbots: List[str] = Field(default_factory=list)  # Chatbot restrictions
     allowed_agents: List[str] = Field(default_factory=list)  # Agent config restrictions
-    allowed_extract_templates: List[str] = Field(default_factory=list)  # Extract template restrictions
+    allowed_extract_templates: List[str] = Field(
+        default_factory=list
+    )  # Extract template restrictions
     is_unlimited: bool = True  # Unlimited budget flag
     budget_limit_cents: Optional[int] = Field(None, ge=0)  # Budget limit in cents
     budget_type: Optional[str] = Field(None, pattern="^(total|monthly)$")  # Budget type
@@ -57,9 +59,10 @@ class APIKeyUpdate(BaseModel):
     rate_limit_per_day: Optional[int] = Field(None, ge=1, le=1000000)
     allowed_ips: Optional[List[str]] = None
     allowed_models: Optional[List[str]] = None  # Model restrictions
-    allowed_chatbots: Optional[List[str]] = None  # Chatbot restrictions
     allowed_agents: Optional[List[str]] = None  # Agent config restrictions
-    allowed_extract_templates: Optional[List[str]] = None  # Extract template restrictions
+    allowed_extract_templates: Optional[List[str]] = (
+        None  # Extract template restrictions
+    )
     is_unlimited: Optional[bool] = None  # Unlimited budget flag
     budget_limit_cents: Optional[int] = Field(None, ge=0)  # Budget limit in cents
     budget_type: Optional[str] = Field(None, pattern="^(total|monthly)$")  # Budget type
@@ -84,7 +87,6 @@ class APIKeyResponse(BaseModel):
     rate_limit_per_day: Optional[int] = None
     allowed_ips: List[str]
     allowed_models: List[str]  # Model restrictions
-    allowed_chatbots: List[str]  # Chatbot restrictions
     allowed_agents: List[str]  # Agent config restrictions
     allowed_extract_templates: List[str]  # Extract template restrictions
     budget_limit: Optional[int] = Field(
@@ -121,7 +123,6 @@ class APIKeyResponse(BaseModel):
             "rate_limit_per_day": api_key.rate_limit_per_day,
             "allowed_ips": api_key.allowed_ips,
             "allowed_models": api_key.allowed_models,
-            "allowed_chatbots": api_key.allowed_chatbots,
             "allowed_agents": api_key.allowed_agents or [],
             "budget_limit_cents": api_key.budget_limit_cents,
             "budget_type": api_key.budget_type,
@@ -194,7 +195,6 @@ class APIKeyAdminResponse(APIKeyResponse):
             "rate_limit_per_day": api_key.rate_limit_per_day,
             "allowed_ips": api_key.allowed_ips,
             "allowed_models": api_key.allowed_models,
-            "allowed_chatbots": api_key.allowed_chatbots,
             "allowed_agents": api_key.allowed_agents or [],
             "budget_limit_cents": api_key.budget_limit_cents,
             "budget_type": api_key.budget_type,
@@ -405,13 +405,12 @@ async def create_api_key(
         rate_limit_per_day=api_key_data.rate_limit_per_day,
         allowed_ips=api_key_data.allowed_ips,
         allowed_models=api_key_data.allowed_models,
-        allowed_chatbots=api_key_data.allowed_chatbots,
         allowed_agents=api_key_data.allowed_agents,
         allowed_extract_templates=api_key_data.allowed_extract_templates,
         is_unlimited=api_key_data.is_unlimited,
-        budget_limit_cents=api_key_data.budget_limit_cents
-        if not api_key_data.is_unlimited
-        else None,
+        budget_limit_cents=(
+            api_key_data.budget_limit_cents if not api_key_data.is_unlimited else None
+        ),
         budget_type=api_key_data.budget_type if not api_key_data.is_unlimited else None,
         tags=api_key_data.tags,
     )
@@ -480,6 +479,7 @@ async def update_api_key(
 
     # Invalidate API key cache to ensure changes take effect immediately
     from app.services.cached_api_key import cached_api_key_service
+
     await cached_api_key_service.invalidate_api_key_cache(api_key.key_prefix)
 
     # Log audit event
@@ -811,9 +811,7 @@ async def list_deleted_api_keys(
     """
 
     # Require admin permission
-    require_permission(
-        current_user.get("permissions", []), "platform:api-keys:admin"
-    )
+    require_permission(current_user.get("permissions", []), "platform:api-keys:admin")
 
     # Build query - only deleted keys
     query = select(APIKey).where(APIKey.deleted_at.isnot(None))
@@ -870,7 +868,9 @@ async def list_all_api_keys_admin(
     page: int = Query(1, ge=1),
     size: int = Query(10, ge=1, le=100),
     user_id: Optional[int] = Query(None, description="Filter by user ID"),
-    include_deleted: bool = Query(True, description="Include deleted keys (default: True)"),
+    include_deleted: bool = Query(
+        True, description="Include deleted keys (default: True)"
+    ),
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -884,9 +884,7 @@ async def list_all_api_keys_admin(
     """
 
     # Require admin permission
-    require_permission(
-        current_user.get("permissions", []), "platform:api-keys:admin"
-    )
+    require_permission(current_user.get("permissions", []), "platform:api-keys:admin")
 
     # Build query
     query = select(APIKey)
@@ -956,9 +954,7 @@ async def list_all_api_keys_admin(
 @router.post("/admin/{api_key_id}/restore", response_model=APIKeyAdminResponse)
 async def restore_api_key(
     api_key_id: str,
-    activate: bool = Query(
-        False, description="Also activate the key after restoring"
-    ),
+    activate: bool = Query(False, description="Also activate the key after restoring"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -970,9 +966,7 @@ async def restore_api_key(
     """
 
     # Require admin permission
-    require_permission(
-        current_user.get("permissions", []), "platform:api-keys:admin"
-    )
+    require_permission(current_user.get("permissions", []), "platform:api-keys:admin")
 
     # Get API key
     query = select(APIKey).where(APIKey.id == int(api_key_id))
@@ -1016,9 +1010,9 @@ async def restore_api_key(
         details={
             "name": api_key.name,
             "activated": activate,
-            "original_deleted_at": original_deleted_at.isoformat()
-            if original_deleted_at
-            else None,
+            "original_deleted_at": (
+                original_deleted_at.isoformat() if original_deleted_at else None
+            ),
             "original_deleted_by": original_deleted_by,
             "original_reason": original_reason,
         },
@@ -1046,9 +1040,7 @@ async def get_api_key_admin(
     """
 
     # Require admin permission
-    require_permission(
-        current_user.get("permissions", []), "platform:api-keys:admin"
-    )
+    require_permission(current_user.get("permissions", []), "platform:api-keys:admin")
 
     # Get API key (including deleted ones)
     query = select(APIKey).where(APIKey.id == int(api_key_id))

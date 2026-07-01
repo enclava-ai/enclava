@@ -2,19 +2,21 @@
 Settings management endpoints
 """
 
-from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
 
+from app.core.config import settings as app_settings
+from app.core.logging import get_logger
+from app.core.security import get_current_user
 from app.db.database import get_db, utc_now
 from app.models.user import User
-from app.core.security import get_current_user
-from app.services.permission_manager import require_permission
 from app.services.audit_service import log_audit_event
-from app.core.logging import get_logger
-from app.core.config import settings as app_settings
+from app.services.permission_manager import require_permission
 
 logger = get_logger(__name__)
 
@@ -397,8 +399,10 @@ async def get_system_info(
     # Check permissions
     require_permission(current_user.get("permissions", []), "platform:settings:read")
 
-    import psutil
     import time
+
+    import psutil
+
     from app.models.api_key import APIKey
 
     # Get database status

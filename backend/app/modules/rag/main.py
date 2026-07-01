@@ -2,21 +2,24 @@
 RAG module implementation with vector database and document processing
 Includes comprehensive document processing, content extraction, and NLP analysis
 """
+
 import asyncio
+import base64
+import hashlib
 import io
 import json
 import logging
 import mimetypes
+import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
-from datetime import datetime, timezone
-from dataclasses import dataclass, asdict
-from pathlib import Path
-import hashlib
-import base64
-import numpy as np
 import uuid
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 # Initialize logger early
 logger = logging.getLogger(__name__)
@@ -24,9 +27,9 @@ logger = logging.getLogger(__name__)
 # Document processing libraries (with graceful fallbacks)
 try:
     import nltk
-    from nltk.tokenize import sent_tokenize, word_tokenize
     from nltk.corpus import stopwords
     from nltk.stem import WordNetLemmatizer
+    from nltk.tokenize import sent_tokenize, word_tokenize
 
     NLTK_AVAILABLE = True
 except ImportError:
@@ -57,23 +60,23 @@ except ImportError:
     logger.warning("python-docx not available - DOCX processing will be limited")
     PYTHON_DOCX_AVAILABLE = False
 
+import tiktoken
 from qdrant_client import QdrantClient
+from qdrant_client.http import models
 from qdrant_client.models import (
     Distance,
-    VectorParams,
+    FieldCondition,
+    Filter,
+    MatchValue,
     PointStruct,
     ScoredPoint,
-    Filter,
-    FieldCondition,
-    MatchValue,
+    VectorParams,
 )
-from qdrant_client.http import models
-import tiktoken
 
 from app.core.config import settings
 from app.core.logging import log_module_event
-from app.services.base_module import BaseModule, Permission
 from app.db.database import utc_now
+from app.services.base_module import BaseModule, Permission
 
 
 @dataclass
@@ -201,7 +204,9 @@ class RAGModule(BaseModule):
             "average_search_time": 0.0,
             "cache_hits": 0,
             "errors": 0,
-            "supported_types": len(self.supported_types),
+            "supported_types": 8,
+            "supported_content_types": len(self.supported_types),
+            "supported_file_types": list(self.supported_types.keys()),
         }
         self.search_cache = {}
         self.collection_vector_sizes: Dict[str, int] = {}
@@ -254,11 +259,13 @@ class RAGModule(BaseModule):
                     "markitdown_ready": self.markitdown is not None,
                 },
             )
+            return True
 
         except Exception as e:
             logger.error(f"Failed to initialize RAG module: {e}")
             log_module_event("rag", "initialization_failed", {"error": str(e)})
             self.enabled = False
+            self.initialized = False
             raise
 
     def _generate_file_hash(self, content: bytes) -> str:
@@ -304,19 +311,20 @@ class RAGModule(BaseModule):
         signatures = [
             # Documents
             (b"%PDF", 0, "application/pdf"),
-            (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", 0, None),  # OLE (needs extension check)
+            (
+                b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",
+                0,
+                None,
+            ),  # OLE (needs extension check)
             (b"PK\x03\x04", 0, None),  # ZIP-based formats (needs extension check)
-
             # Images (reject as not supported for RAG)
             (b"\xff\xd8\xff", 0, "image/jpeg"),
             (b"\x89PNG\r\n\x1a\n", 0, "image/png"),
             (b"GIF87a", 0, "image/gif"),
             (b"GIF89a", 0, "image/gif"),
-
             # Executables (security: these should be rejected)
             (b"MZ", 0, "application/x-executable"),
             (b"\x7fELF", 0, "application/x-executable"),
-
             # Archives
             (b"Rar!\x1a\x07", 0, "application/x-rar-compressed"),
             (b"\x1f\x8b\x08", 0, "application/gzip"),
@@ -324,7 +332,7 @@ class RAGModule(BaseModule):
 
         for signature, offset, mime in signatures:
             if len(content) > offset + len(signature):
-                if content[offset:offset + len(signature)] == signature:
+                if content[offset : offset + len(signature)] == signature:
                     if mime:
                         return mime
                     # Need extension check for OLE and ZIP formats
@@ -334,7 +342,11 @@ class RAGModule(BaseModule):
                         return self._detect_zip_type(filename, content)
 
         # Text-based detection
-        if content.startswith(b"<html") or content.startswith(b"<!DOCTYPE") or content.startswith(b"<!doctype"):
+        if (
+            content.startswith(b"<html")
+            or content.startswith(b"<!DOCTYPE")
+            or content.startswith(b"<!doctype")
+        ):
             return "text/html"
 
         if content.startswith(b"<?xml"):
@@ -377,8 +389,9 @@ class RAGModule(BaseModule):
 
         # Try to detect from ZIP contents
         try:
-            import zipfile
             import io
+            import zipfile
+
             with zipfile.ZipFile(io.BytesIO(content[:10000])) as zf:
                 names = zf.namelist()
                 if "[Content_Types].xml" in names:
@@ -403,9 +416,11 @@ class RAGModule(BaseModule):
             non_empty_lines = [line.strip() for line in lines[:10] if line.strip()]
 
             if len(non_empty_lines) > 1 and all(
-                line.startswith("{") and line.endswith("}") for line in non_empty_lines[:5]
+                line.startswith("{") and line.endswith("}")
+                for line in non_empty_lines[:5]
             ):
                 import json
+
                 valid_json_lines = 0
                 for line in non_empty_lines[:3]:
                     try:
@@ -518,9 +533,11 @@ class RAGModule(BaseModule):
                         "label": ent.label_,
                         "start": ent.start_char,
                         "end": ent.end_char,
-                        "confidence": float(ent._.get("score", 0.0))
-                        if hasattr(ent._, "score")
-                        else 0.0,
+                        "confidence": (
+                            float(ent._.get("score", 0.0))
+                            if hasattr(ent._, "score")
+                            else 0.0
+                        ),
                     }
                 )
 
@@ -636,6 +653,7 @@ class RAGModule(BaseModule):
         self.stop_words.clear()
 
         self.enabled = False
+        self.initialized = False
         self.search_cache.clear()
         log_module_event("rag", "cleanup", {"success": True})
 
@@ -1069,8 +1087,8 @@ class RAGModule(BaseModule):
                 raise RuntimeError("MarkItDown not initialized")
 
             # Create a temporary file path for the content
-            import tempfile
             import os
+            import tempfile
 
             # Get file extension from filename
             file_ext = Path(filename).suffix.lower()
@@ -1104,8 +1122,8 @@ class RAGModule(BaseModule):
 
             try:
                 # Convert document to markdown using MarkItDown in a thread pool to avoid blocking
-                import concurrent.futures
                 import asyncio
+                import concurrent.futures
 
                 logger.info(f"Starting MarkItDown conversion for {filename}")
 
@@ -1165,8 +1183,8 @@ class RAGModule(BaseModule):
                 return await self._process_with_markitdown(content, filename)
 
             # Create a temporary file for python-docx processing
-            import tempfile
             import os
+            import tempfile
 
             logger.info(f"Starting DOCX processing for {filename} using python-docx")
 
@@ -1176,8 +1194,8 @@ class RAGModule(BaseModule):
 
             try:
                 # Process in a thread pool to avoid blocking
-                import concurrent.futures
                 import asyncio
+                import concurrent.futures
 
                 def extract_docx_text():
                     """Extract text from DOCX file synchronously"""
@@ -1276,14 +1294,18 @@ class RAGModule(BaseModule):
 
                 # If multiple valid JSON lines, treat as JSONL
                 if len(non_empty_lines) > 1:
-                    logger.warning(f"File '{filename}' appears to be JSONL format, processing as JSONL")
+                    logger.warning(
+                        f"File '{filename}' appears to be JSONL format, processing as JSONL"
+                    )
                     # Call JSONL processor directly
                     return await self._process_jsonl(content, filename)
 
                 logger.error(f"Error processing JSON file '{filename}': {e}")
                 return ""
             except Exception as fallback_e:
-                logger.error(f"Error processing JSON file '{filename}': {e}, fallback also failed: {fallback_e}")
+                logger.error(
+                    f"Error processing JSON file '{filename}': {e}, fallback also failed: {fallback_e}"
+                )
                 return ""
         except Exception as e:
             logger.error(f"Error processing JSON file '{filename}': {e}")
@@ -1429,11 +1451,7 @@ class RAGModule(BaseModule):
 
             # Detect MIME type
             mime_type = self._detect_mime_type(filename, file_data)
-            # Special handling for JSONL files - use extension instead of MIME family
-            if mime_type == "application/x-ndjson" or filename.lower().endswith('.jsonl'):
-                file_type = "jsonl"
-            else:
-                file_type = mime_type.split("/")[0]
+            file_type = mime_type.split("/")[0]
             logger.info(f"Detected MIME type: {mime_type}, file type: {file_type}")
 
             # Check if file type is supported
@@ -1506,6 +1524,22 @@ class RAGModule(BaseModule):
             # Calculate processing time
             processing_time = time.time() - start_time
 
+            document_metadata = {
+                **(metadata or {}),
+                "validation": asdict(validation_result),
+                "file_size": len(file_data),
+                "processing_stats": {
+                    "processing_time": processing_time,
+                    "processor_used": processor.__name__,
+                },
+            }
+            if mime_type == "application/x-ndjson" or filename.lower().endswith(
+                ".jsonl"
+            ):
+                document_metadata["_raw_file_content"] = file_data.decode(
+                    "utf-8", errors="replace"
+                )
+
             # Create processed document
             logger.info(f"Creating ProcessedDocument object for {filename}")
             processed_doc = ProcessedDocument(
@@ -1515,15 +1549,7 @@ class RAGModule(BaseModule):
                 mime_type=mime_type,
                 content=cleaned_text,
                 extracted_text=extracted_text,
-                metadata={
-                    **(metadata or {}),
-                    "validation": asdict(validation_result),
-                    "file_size": len(file_data),
-                    "processing_stats": {
-                        "processing_time": processing_time,
-                        "processor_used": processor.__name__,
-                    },
-                },
+                metadata=document_metadata,
                 word_count=len(words),
                 sentence_count=len(sentences),
                 language=language,
@@ -1659,22 +1685,35 @@ class RAGModule(BaseModule):
 
         try:
             # Special handling for JSONL files
-            if processed_doc.file_type == "jsonl":
+            is_jsonl_document = (
+                processed_doc.mime_type == "application/x-ndjson"
+                or processed_doc.original_filename.lower().endswith(".jsonl")
+            )
+            if is_jsonl_document:
                 # Import the optimized JSONL processor
                 from app.services.jsonl_processor import JSONLProcessor
 
                 jsonl_processor = JSONLProcessor(self)
+                jsonl_metadata = dict(processed_doc.metadata)
 
                 # Read the original file content
-                with open(processed_doc.metadata.get("file_path", ""), "rb") as f:
-                    file_content = f.read()
+                file_path = jsonl_metadata.get("file_path")
+                if file_path and os.path.exists(file_path):
+                    with open(file_path, "rb") as f:
+                        file_content = f.read()
+                elif "_raw_file_content" in jsonl_metadata:
+                    file_content = jsonl_metadata["_raw_file_content"].encode("utf-8")
+                else:
+                    file_content = processed_doc.extracted_text.encode("utf-8")
+
+                jsonl_metadata.pop("_raw_file_content", None)
 
                 # Process using the optimized JSONL processor
                 return await jsonl_processor.process_and_index_jsonl(
                     collection_name=collection_name,
                     content=file_content,
                     filename=processed_doc.original_filename,
-                    metadata=processed_doc.metadata,
+                    metadata=jsonl_metadata,
                 )
 
             # Ensure collection exists
@@ -1756,6 +1795,45 @@ class RAGModule(BaseModule):
             log_module_event("rag", "indexing_failed", {"error": str(e)})
             raise
 
+    def _qdrant_search(
+        self,
+        collection_name: str,
+        query_vector: Optional[List[float]] = None,
+        query_filter: Optional[Filter] = None,
+        limit: int = 10,
+        score_threshold: Optional[float] = None,
+    ) -> List[Any]:
+        """Search Qdrant across client versions."""
+        if hasattr(self.qdrant_client, "search"):
+            if query_vector is None:
+                points, _ = self.qdrant_client.scroll(
+                    collection_name=collection_name,
+                    scroll_filter=query_filter,
+                    limit=limit,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                return points
+
+            return self.qdrant_client.search(
+                collection_name=collection_name,
+                query_vector=query_vector,
+                query_filter=query_filter,
+                limit=limit,
+                score_threshold=score_threshold,
+            )
+
+        response = self.qdrant_client.query_points(
+            collection_name=collection_name,
+            query=query_vector,
+            query_filter=query_filter,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+            score_threshold=score_threshold,
+        )
+        return response.points
+
     async def _document_exists(
         self, document_id: str, collection_name: str = None
     ) -> bool:
@@ -1763,8 +1841,9 @@ class RAGModule(BaseModule):
         collection_name = collection_name or self.default_collection_name
 
         try:
-            result = self.qdrant_client.search(
+            result = self._qdrant_search(
                 collection_name=collection_name,
+                query_vector=None,
                 query_filter=Filter(
                     must=[
                         FieldCondition(
@@ -1829,7 +1908,7 @@ class RAGModule(BaseModule):
             bm25_scores[doc_id] = bm25_score
 
         # Perform vector search
-        vector_results = self.qdrant_client.search(
+        vector_results = self._qdrant_search(
             collection_name=collection_name,
             query_vector=query_vector,
             query_filter=query_filter,
@@ -2047,7 +2126,7 @@ class RAGModule(BaseModule):
                 )
             else:
                 # Pure vector search with improved threshold
-                search_results = self.qdrant_client.search(
+                search_results = self._qdrant_search(
                     collection_name=collection_name,
                     query_vector=query_embedding,
                     query_filter=search_filter,
@@ -2111,12 +2190,16 @@ class RAGModule(BaseModule):
 
                         if data["score"] > existing_score:
                             # Replace with higher scoring document
-                            logger.info(f"URL dedup: Replacing {existing_doc_id} (score={existing_score:.4f}) with {doc_id} (score={data['score']:.4f}) for URL: {source_url}")
+                            logger.info(
+                                f"URL dedup: Replacing {existing_doc_id} (score={existing_score:.4f}) with {doc_id} (score={data['score']:.4f}) for URL: {source_url}"
+                            )
                             del deduplicated_scores[existing_doc_id]
                             url_to_doc[source_url] = doc_id
                             deduplicated_scores[doc_id] = data
                         else:
-                            logger.info(f"URL dedup: Skipping {doc_id} (score={data['score']:.4f}), keeping {existing_doc_id} (score={existing_score:.4f}) for URL: {source_url}")
+                            logger.info(
+                                f"URL dedup: Skipping {doc_id} (score={data['score']:.4f}), keeping {existing_doc_id} (score={existing_score:.4f}) for URL: {source_url}"
+                            )
 
                         urls_deduplicated += 1
                     else:
@@ -2229,60 +2312,31 @@ class RAGModule(BaseModule):
             )
             return False
 
-    async def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> Dict[str, Any]:
         """Get RAG module statistics"""
         stats = self.stats.copy()
 
         if self.enabled:
             try:
-                # Use raw HTTP call to avoid Pydantic validation issues
-                import httpx
-
-                # Direct HTTP call to Qdrant API instead of using client to avoid Pydantic issues
-                qdrant_url = f"http://{settings.QDRANT_HOST}:{settings.QDRANT_PORT}"
-
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(
-                        f"{qdrant_url}/collections/{self.default_collection_name}"
-                    )
-
-                    if response.status_code == 200:
-                        collection_data = response.json()
-
-                        # Safely extract stats from raw JSON
-                        result = collection_data.get("result", {})
-
-                        basic_stats = {
-                            "total_points": result.get("points_count", 0),
-                            "collection_status": result.get("status", "unknown"),
-                        }
-
-                        # Try to get vector dimension from config
-                        try:
-                            config = result.get("config", {})
-                            params = config.get("params", {})
-                            vectors = params.get("vectors", {})
-
-                            if isinstance(vectors, dict) and "size" in vectors:
-                                basic_stats["vector_dimension"] = vectors["size"]
-                            else:
-                                basic_stats["vector_dimension"] = "unknown"
-                        except Exception as config_error:
-                            logger.debug(
-                                f"Could not get vector dimension: {config_error}"
-                            )
-                            basic_stats["vector_dimension"] = "unknown"
-
-                        stats.update(basic_stats)
-                    else:
-                        # Collection doesn't exist or error
-                        stats.update(
-                            {
-                                "total_points": 0,
-                                "collection_status": "not_found",
-                                "vector_dimension": "unknown",
-                            }
-                        )
+                collection_info = (
+                    self.qdrant_client.get_collection(self.default_collection_name)
+                    if self.qdrant_client
+                    else None
+                )
+                stats.update(
+                    {
+                        "total_points": getattr(collection_info, "points_count", 0)
+                        or 0,
+                        "collection_status": getattr(
+                            collection_info, "status", "unknown"
+                        ),
+                        "vector_dimension": (
+                            self.embedding_model.get("dimension", "unknown")
+                            if self.embedding_model
+                            else "unknown"
+                        ),
+                    }
+                )
 
             except Exception as e:
                 logger.debug(f"Could not get Qdrant stats (using fallback): {e}")
@@ -2400,13 +2454,15 @@ class RAGModule(BaseModule):
                 "action": "delete",
                 "document_id": document_id,
                 "status": "success" if success else "failed",
-                "message": "Document deleted successfully"
-                if success
-                else "Failed to delete document",
+                "message": (
+                    "Document deleted successfully"
+                    if success
+                    else "Failed to delete document"
+                ),
             }
 
         elif action == "stats":
-            stats = await self.get_stats()
+            stats = self.get_stats()
 
             return {"action": "stats", "statistics": stats}
 

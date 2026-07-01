@@ -5,6 +5,7 @@ services:
     container_name: enclava-nginx-test
     ports:
       - "3005:80"  # Different port from main app
+      - "3001:80"  # Legacy test suite port
     volumes:
       - ./nginx/nginx.test.conf:/etc/nginx/nginx.conf:ro
       - nginx-test-logs:/var/log/nginx
@@ -13,7 +14,7 @@ services:
     networks:
       - enclava-test-network
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -45,6 +46,7 @@ services:
     container_name: enclava-redis-test
     ports:
       - "6380:6379"  # Different port from main Redis
+      - "6379:6379"  # Legacy test suite port
     networks:
       - enclava-test-network
     healthcheck:
@@ -58,7 +60,8 @@ services:
     image: qdrant/qdrant:latest
     container_name: enclava-qdrant-test
     ports:
-      - "6334:6333"  # Different port from main Qdrant
+      - "56335:6333"  # Different port from main Qdrant
+      - "56336:6335"  # Different port from main Qdrant gRPC
     volumes:
       - qdrant-test-data:/qdrant/storage
     environment:
@@ -124,6 +127,7 @@ services:
       
     ports:
       - "8001:8000"  # Different port from main backend
+      - "58000:8000"  # Legacy integration test port
     volumes:
       - ./backend:/app
       - ./backend/tests:/app/tests
@@ -145,25 +149,28 @@ services:
         python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       "
 
-  # Test Frontend Service (simplified - skip for now to focus on backend testing)
-  # enclava-frontend-test:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: enclava-frontend-test
-  #   environment:
-  #     NODE_ENV: test
-  #     BASE_URL: enclava-nginx-test
-  #     NEXT_PUBLIC_INTERNAL_API_URL: http://enclava-nginx-test/api-internal
-  #   ports:
-  #     - "3003:3000"  # Different port from main frontend
-  #   volumes:
-  #     - ./frontend:/app
-  #     - ./frontend/tests:/app/tests
-  #     - /app/node_modules  # Prevent overwriting node_modules
-  #   networks:
-  #     - enclava-test-network
-  #   command: npm run dev
+  # Test Frontend Service
+  enclava-frontend-test:
+    image: node:26-alpine
+    container_name: enclava-frontend-test
+    working_dir: /app
+    command: sh -c "npm ci --ignore-scripts && npm run dev -- -H 0.0.0.0 -p 3000"
+    environment:
+      NODE_ENV: development
+      BASE_URL: http://localhost:58000
+      NEXT_PUBLIC_BASE_URL: http://localhost:58000
+      INTERNAL_API_URL: http://enclava-backend-test:8000
+    depends_on:
+      - enclava-backend-test
+    ports:
+      - "53000:3000"  # Legacy integration test port
+    volumes:
+      - ./frontend:/app:z
+      - enclava-frontend-test-node-modules:/app/node_modules
+    networks:
+      - enclava-test-network
+    security_opt:
+      - label=disable
 
   # Test Runner Container (for E2E tests)
   enclava-test-runner:
@@ -202,8 +209,11 @@ services:
     depends_on:
       - enclava-nginx-test
       - enclava-backend-test
+      - enclava-frontend-test
     networks:
       - enclava-test-network
+    healthcheck:
+      disable: true
     command: >
       sh -c "
         echo 'Test runner ready. Use docker exec to run tests.' &&
@@ -219,3 +229,4 @@ volumes:
   qdrant-test-data:
   test-uploads:
   nginx-test-logs:
+  enclava-frontend-test-node-modules:

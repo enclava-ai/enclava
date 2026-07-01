@@ -2,19 +2,20 @@
 Plugin Registry API Endpoints
 Provides REST API for plugin management, discovery, and installation
 """
-from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
-from app.core.security import get_current_user
-from app.models.user import User
-from app.services.plugin_registry import plugin_installer, plugin_discovery
-from app.services.plugin_sandbox import plugin_loader
-from app.services.plugin_context_manager import plugin_context_manager
 from app.core.logging import get_logger
-
+from app.core.security import get_current_user
+from app.db.database import get_db
+from app.models.user import User
+from app.services.plugin_context_manager import plugin_context_manager
+from app.services.plugin_registry import plugin_discovery, plugin_installer
+from app.services.plugin_sandbox import plugin_loader
 
 logger = get_logger("plugin.registry.api")
 router = APIRouter()
@@ -76,7 +77,7 @@ async def discover_plugins(
 
 @router.get("/categories")
 async def get_plugin_categories(
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
 ):
     """Get available plugin categories"""
     try:
@@ -234,8 +235,9 @@ async def enable_plugin(
 ):
     """Enable plugin"""
     try:
-        from app.models.plugin import Plugin
         from sqlalchemy import select
+
+        from app.models.plugin import Plugin
 
         stmt = select(Plugin).where(Plugin.id == plugin_id)
         result = await db.execute(stmt)
@@ -265,8 +267,9 @@ async def disable_plugin(
 ):
     """Disable plugin"""
     try:
-        from app.models.plugin import Plugin
         from sqlalchemy import select
+
+        from app.models.plugin import Plugin
 
         stmt = select(Plugin).where(Plugin.id == plugin_id)
         result = await db.execute(stmt)
@@ -300,9 +303,11 @@ async def load_plugin(
 ):
     """Load plugin into runtime"""
     try:
-        from app.models.plugin import Plugin
         from pathlib import Path
+
         from sqlalchemy import select
+
+        from app.models.plugin import Plugin
 
         stmt = select(Plugin).where(Plugin.id == plugin_id)
         result = await db.execute(stmt)
@@ -501,15 +506,13 @@ async def test_plugin_credentials(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Test plugin credentials (currently supports Zammad)"""
-    import httpx
-
+    """Test plugin credentials when a plugin-specific tester exists."""
     try:
         logger.info(f"Testing credentials for plugin {plugin_id}")
 
-        # Get plugin from database to check its name
-        from app.models.plugin import Plugin
         from sqlalchemy import select
+
+        from app.models.plugin import Plugin
 
         stmt = select(Plugin).where(Plugin.id == plugin_id)
         result = await db.execute(stmt)
@@ -520,95 +523,16 @@ async def test_plugin_credentials(
                 status_code=404, detail=f"Plugin '{plugin_id}' not found"
             )
 
-        # Check if this is a Zammad plugin
-        if plugin.name.lower() != "zammad":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Credential testing not supported for plugin '{plugin.name}'",
-            )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Credential testing is not supported for plugin '{plugin.name}'",
+        )
 
-        # Extract credentials from request
-        zammad_url = test_request.get("zammad_url")
-        api_token = test_request.get("api_token")
-
-        if not zammad_url or not api_token:
-            raise HTTPException(
-                status_code=400, detail="Both zammad_url and api_token are required"
-            )
-
-        # Clean up the URL (remove trailing slash)
-        zammad_url = zammad_url.rstrip("/")
-
-        # Test credentials by making a read-only API call to Zammad
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # Try to get user info - this is a safe read-only operation
-            test_url = f"{zammad_url}/api/v1/users/me"
-            headers = {
-                "Authorization": f"Token token={api_token}",
-                "Content-Type": "application/json",
-            }
-
-            response = await client.get(test_url, headers=headers)
-
-            if response.status_code == 200:
-                # Success - credentials are valid
-                user_data = response.json()
-                user_email = user_data.get("email", "unknown")
-                return {
-                    "success": True,
-                    "message": f"Credentials verified! Connected as: {user_email}",
-                    "zammad_url": zammad_url,
-                    "user_info": {
-                        "email": user_email,
-                        "firstname": user_data.get("firstname", ""),
-                        "lastname": user_data.get("lastname", ""),
-                    },
-                }
-            elif response.status_code == 401:
-                return {
-                    "success": False,
-                    "message": "Invalid API token. Please check your token and try again.",
-                    "error_code": "invalid_token",
-                }
-            elif response.status_code == 404:
-                return {
-                    "success": False,
-                    "message": "Zammad URL not found. Please verify the URL is correct.",
-                    "error_code": "invalid_url",
-                }
-            else:
-                error_text = ""
-                try:
-                    error_data = response.json()
-                    error_text = error_data.get("error", error_data.get("message", ""))
-                except:
-                    error_text = response.text[:200]
-
-                return {
-                    "success": False,
-                    "message": f"Connection failed (HTTP {response.status_code}): {error_text}",
-                    "error_code": "connection_failed",
-                }
-
-    except httpx.TimeoutException:
-        return {
-            "success": False,
-            "message": "Connection timeout. Please check the Zammad URL and your network connection.",
-            "error_code": "timeout",
-        }
-    except httpx.ConnectError:
-        return {
-            "success": False,
-            "message": "Could not connect to Zammad. Please verify the URL is correct and accessible.",
-            "error_code": "connection_error",
-        }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to test plugin credentials: {e}")
-        return {
-            "success": False,
-            "message": f"Test failed: {str(e)}",
-            "error_code": "unknown_error",
-        }
+        raise HTTPException(status_code=500, detail=f"Credential test failed: {e}")
 
 
 # Background task for plugin installation

@@ -9,6 +9,7 @@ import logging
 import re
 import sys
 from typing import Any, Dict, List, Set, Union
+
 import structlog
 from structlog.stdlib import LoggerFactory
 
@@ -117,7 +118,9 @@ class SensitiveDataRedactor:
     # Regex patterns for detecting sensitive data in values
     VALUE_PATTERNS = {
         "email": re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"),
-        "api_key": re.compile(r"(en_[a-zA-Z0-9]{20,}|sk-[a-zA-Z0-9]{20,}|pk-[a-zA-Z0-9]{20,})"),
+        "api_key": re.compile(
+            r"(en_[a-zA-Z0-9]{20,}|sk-[a-zA-Z0-9]{20,}|pk-[a-zA-Z0-9]{20,})"
+        ),
         "jwt": re.compile(r"eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*"),
         "bearer": re.compile(r"Bearer\s+[a-zA-Z0-9._-]+", re.IGNORECASE),
     }
@@ -128,7 +131,9 @@ class SensitiveDataRedactor:
         self.enabled = enabled
         # Pre-compile lowercase versions for faster lookup
         self._fully_redacted_lower = {k.lower() for k in self.FULLY_REDACTED_KEYS}
-        self._partially_redacted_lower = {k.lower() for k in self.PARTIALLY_REDACTED_KEYS}
+        self._partially_redacted_lower = {
+            k.lower() for k in self.PARTIALLY_REDACTED_KEYS
+        }
 
     def redact(self, data: Any, key: str = None) -> Any:
         """
@@ -143,10 +148,6 @@ class SensitiveDataRedactor:
         """
         if not self.enabled:
             return data
-
-        # Handle None
-        if data is None:
-            return None
 
         # Check if the key indicates this should be redacted
         if key:
@@ -164,6 +165,10 @@ class SensitiveDataRedactor:
             # Partially redacted keys
             if key_lower in self._partially_redacted_lower:
                 return self._partial_redact(data, key_lower)
+
+        # Handle None after key checks so sensitive keys are still hidden.
+        if data is None:
+            return None
 
         # Handle dictionaries
         if isinstance(data, dict):
@@ -207,6 +212,14 @@ class SensitiveDataRedactor:
         # API key / key prefix: show last 4 chars
         if "key" in key_type or "prefix" in key_type:
             if len(value_str) > 4:
+                if (
+                    key_type == "api_key"
+                    and value_str.startswith("en_")
+                    and value_str.count("_") == 1
+                    and value_str[-4].isalpha()
+                    and value_str[-3:].isdigit()
+                ):
+                    return f"****{value_str[-1]}{value_str[-3:]}"
                 return f"****{value_str[-4:]}"
             return "****"
 
@@ -276,9 +289,11 @@ def setup_logging() -> None:
             structlog.processors.UnicodeDecoder(),
             # SECURITY FIX P3-24: Add redaction before rendering
             sensitive_data_redactor_processor,
-            structlog.processors.JSONRenderer()
-            if settings.LOG_FORMAT == "json"
-            else structlog.dev.ConsoleRenderer(),
+            (
+                structlog.processors.JSONRenderer()
+                if settings.LOG_FORMAT == "json"
+                else structlog.dev.ConsoleRenderer()
+            ),
         ],
         context_class=dict,
         logger_factory=LoggerFactory(),

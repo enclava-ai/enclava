@@ -1,11 +1,14 @@
 """
 Module model for tracking installed modules and their configurations
 """
+
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text
-from app.db.database import Base, utc_now
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
+
+from app.db.database import Base, utc_now
 
 
 class ModuleStatus(str, Enum):
@@ -138,20 +141,20 @@ class Module(Base):
             "metadata": self.module_metadata,
             "last_error": self.last_error,
             "error_count": self.error_count,
-            "last_started": self.last_started.isoformat()
-            if self.last_started
-            else None,
-            "last_stopped": self.last_stopped.isoformat()
-            if self.last_stopped
-            else None,
+            "last_started": (
+                self.last_started.isoformat() if self.last_started else None
+            ),
+            "last_stopped": (
+                self.last_stopped.isoformat() if self.last_stopped else None
+            ),
             "request_count": self.request_count,
             "success_count": self.success_count,
             "error_count_runtime": self.error_count_runtime,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "installed_at": self.installed_at.isoformat()
-            if self.installed_at
-            else None,
+            "installed_at": (
+                self.installed_at.isoformat() if self.installed_at else None
+            ),
             "success_rate": self.get_success_rate(),
             "uptime": self.get_uptime_seconds() if self.is_running() else 0,
         }
@@ -507,7 +510,26 @@ class Module(Base):
             "uptime_seconds": self.get_uptime_seconds() if self.is_running() else 0,
             "last_error": self.last_error,
             "error_count": self.error_count_runtime,
-            "last_started": self.last_started.isoformat()
-            if self.last_started
-            else None,
+            "last_started": (
+                self.last_started.isoformat() if self.last_started else None
+            ),
         }
+
+
+class ModuleConfig(Base):
+    """Legacy module configuration table kept for older tests/import paths."""
+
+    __tablename__ = "module_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+    enabled = Column(Boolean, default=True)
+    config = Column(JSON, default=dict)
+    dependencies = Column(JSON, default=list)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    def __repr__(self):
+        return (
+            f"<ModuleConfig(id={self.id}, name='{self.name}', enabled={self.enabled})>"
+        )

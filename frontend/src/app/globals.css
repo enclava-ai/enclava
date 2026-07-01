@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.js";
 
 @layer base {
   /* Light Theme - Clean, professional with cyan/teal accents */
@@ -95,16 +94,19 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-family: var(--font-sans);
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    @apply tracking-tight;
+    letter-spacing: 0;
   }
   code, pre {
     font-family: var(--font-mono);
@@ -131,7 +133,9 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+    background-image: linear-gradient(to right, hsl(var(--primary)), hsl(var(--secondary)));
+    background-clip: text;
+    color: transparent;
   }
 }
 
@@ -141,15 +145,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-muted;
+  background-color: hsl(var(--muted));
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-border rounded-full;
+  background-color: hsl(var(--border));
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground;
+  background-color: hsl(var(--muted-foreground));
 }
 
 /* Loading animation */
@@ -165,7 +170,10 @@
 
 /* Focus styles */
 .focus-visible:focus {
-  @apply outline-none ring-2 ring-ring ring-offset-2;
+  outline: none;
+  box-shadow:
+    0 0 0 2px hsl(var(--background)),
+    0 0 0 4px hsl(var(--ring));
 }
 
 /* Custom enclava branding styles - matching website theme */

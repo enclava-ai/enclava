@@ -3,22 +3,25 @@ Budget model for managing spending limits and cost control
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
 from enum import Enum
+from typing import Any, Dict, Optional
+
 from sqlalchemy import (
-    Column,
-    Integer,
-    BigInteger,
-    String,
-    DateTime,
-    Boolean,
-    Text,
     JSON,
-    ForeignKey,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
     Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
+from app.models.usage_tracking import UsageTracking
 
 
 class BudgetType(str, Enum):
@@ -122,7 +125,180 @@ class Budget(Base):
     # The budget system now uses a simpler track-actual-usage pattern.
     # Fields kept for backward compatibility with existing databases.
     last_reconciled_at = Column(DateTime, nullable=True)  # Deprecated - no longer used
-    last_reconciliation_diff_cents = Column(Integer, nullable=True)  # Deprecated - no longer used
+    last_reconciliation_diff_cents = Column(
+        Integer, nullable=True
+    )  # Deprecated - no longer used
+
+    def __init__(self, **kwargs):
+        raw_id = kwargs.get("id")
+        if isinstance(raw_id, str) and not raw_id.isdigit():
+            kwargs.pop("id", None)
+        elif isinstance(raw_id, str):
+            kwargs["id"] = int(raw_id)
+
+        for int_field in ("user_id", "api_key_id"):
+            raw_value = kwargs.get(int_field)
+            if isinstance(raw_value, str) and raw_value.isdigit():
+                kwargs[int_field] = int(raw_value)
+
+        budget_type = kwargs.pop("budget_type", None)
+        target_id = kwargs.pop("target_id", None)
+        limit_amount = kwargs.pop("limit_amount", None)
+        monthly_limit = kwargs.pop("monthly_limit", None)
+        current_usage = kwargs.pop("current_usage", None)
+        is_enabled = kwargs.pop("is_enabled", None)
+        period = kwargs.pop("period", None)
+        kwargs.pop("reset_day", None)
+        alert_threshold = kwargs.pop("alert_threshold", None)
+        hard_limit = kwargs.pop("hard_limit", None)
+        alert_threshold_percent = kwargs.pop("alert_threshold_percent", None)
+        allowed_resources = kwargs.pop("allowed_resources", None)
+        legacy_metadata = kwargs.pop("metadata", None)
+
+        if monthly_limit is not None and limit_amount is None:
+            limit_amount = monthly_limit
+        if period is not None:
+            kwargs.setdefault("period_type", getattr(period, "value", period))
+        if "period_type" in kwargs:
+            kwargs["period_type"] = getattr(
+                kwargs["period_type"], "value", kwargs["period_type"]
+            )
+        if limit_amount is not None:
+            kwargs.setdefault("limit_cents", int(float(limit_amount) * 100))
+        if current_usage is not None:
+            kwargs.setdefault("current_usage_cents", int(float(current_usage) * 100))
+        if is_enabled is not None:
+            kwargs.setdefault("is_active", is_enabled)
+        if hard_limit is not None:
+            kwargs.setdefault("enforce_hard_limit", hard_limit)
+        if allowed_resources is not None:
+            kwargs.setdefault("allowed_models", allowed_resources)
+        if legacy_metadata is not None:
+            kwargs.setdefault("notification_settings", legacy_metadata)
+        if alert_threshold is not None:
+            alert_threshold_percent = alert_threshold
+        if alert_threshold_percent is not None:
+            limit_cents = kwargs.get("limit_cents")
+            if limit_cents:
+                kwargs.setdefault(
+                    "warning_threshold_cents",
+                    int(float(limit_cents) * (float(alert_threshold_percent) / 100)),
+                )
+
+        period_type = kwargs.get("period_type", "monthly")
+        now = utc_now()
+        kwargs.setdefault("name", "Default Budget")
+        kwargs.setdefault("period_start", now)
+        kwargs.setdefault("period_end", self._default_period_end(now, period_type))
+        kwargs.setdefault("limit_cents", 0)
+        kwargs.setdefault("current_usage_cents", 0)
+        kwargs.setdefault("created_at", now)
+        kwargs.setdefault("updated_at", now)
+        kwargs.setdefault("user_id", 0)
+
+        super().__init__(**kwargs)
+        self._legacy_budget_type = budget_type or "dollars"
+        self._legacy_target_id = target_id
+        self._legacy_alert_threshold_percent = alert_threshold_percent
+
+    @staticmethod
+    def _default_period_end(start: datetime, period_type: str) -> datetime:
+        if period_type == "daily":
+            return start + timedelta(days=1)
+        if period_type == "weekly":
+            return start + timedelta(weeks=1)
+        if period_type == "yearly":
+            return start + timedelta(days=365)
+        return start + timedelta(days=30)
+
+    @property
+    def budget_type(self) -> str:
+        return getattr(self, "_legacy_budget_type", "dollars")
+
+    @budget_type.setter
+    def budget_type(self, value: str) -> None:
+        self._legacy_budget_type = value
+
+    @property
+    def target_id(self) -> Optional[str]:
+        return getattr(self, "_legacy_target_id", None) or str(self.user_id)
+
+    @target_id.setter
+    def target_id(self, value: str) -> None:
+        self._legacy_target_id = value
+
+    @property
+    def period(self) -> BudgetPeriod:
+        return BudgetPeriod(self.period_type)
+
+    @period.setter
+    def period(self, value: BudgetPeriod | str) -> None:
+        self.period_type = getattr(value, "value", value)
+
+    @property
+    def alert_threshold(self) -> float:
+        return self.alert_threshold_percent
+
+    @alert_threshold.setter
+    def alert_threshold(self, value: float) -> None:
+        self.alert_threshold_percent = value
+
+    @property
+    def hard_limit(self) -> bool:
+        return self.enforce_hard_limit
+
+    @hard_limit.setter
+    def hard_limit(self, value: bool) -> None:
+        self.enforce_hard_limit = value
+
+    @property
+    def limit_amount(self) -> float:
+        return (self.limit_cents or 0) / 100
+
+    @limit_amount.setter
+    def limit_amount(self, value: float) -> None:
+        self.limit_cents = int(float(value) * 100)
+
+    @property
+    def current_usage(self) -> float:
+        return (self.current_usage_cents or 0) / 100
+
+    @current_usage.setter
+    def current_usage(self, value: float) -> None:
+        self.current_usage_cents = int(float(value) * 100)
+
+    @property
+    def is_enabled(self) -> bool:
+        return self.is_active
+
+    @is_enabled.setter
+    def is_enabled(self, value: bool) -> None:
+        self.is_active = value
+
+    @property
+    def alert_threshold_percent(self) -> float:
+        legacy_value = getattr(self, "_legacy_alert_threshold_percent", None)
+        if legacy_value is not None:
+            return float(legacy_value)
+        if self.limit_cents and self.warning_threshold_cents is not None:
+            return (self.warning_threshold_cents / self.limit_cents) * 100
+        return 80.0
+
+    @alert_threshold_percent.setter
+    def alert_threshold_percent(self, value: float) -> None:
+        self._legacy_alert_threshold_percent = float(value)
+        if self.limit_cents:
+            self.warning_threshold_cents = int(
+                float(self.limit_cents) * (float(value) / 100)
+            )
+
+    @property
+    def allowed_resources(self) -> list:
+        return self.allowed_models or []
+
+    @allowed_resources.setter
+    def allowed_resources(self, value: list) -> None:
+        self.allowed_models = value
 
     def __repr__(self):
         return f"<Budget(id={self.id}, name='{self.name}', user_id={self.user_id}, limit=${self.limit_cents/100:.2f})>"
@@ -137,13 +313,15 @@ class Budget(Base):
             "limit_cents": self.limit_cents,
             "limit_dollars": self.limit_cents / 100,
             "warning_threshold_cents": self.warning_threshold_cents,
-            "warning_threshold_dollars": self.warning_threshold_cents / 100
-            if self.warning_threshold_cents
-            else None,
+            "warning_threshold_dollars": (
+                self.warning_threshold_cents / 100
+                if self.warning_threshold_cents
+                else None
+            ),
             "period_type": self.period_type,
-            "period_start": self.period_start.isoformat()
-            if self.period_start
-            else None,
+            "period_start": (
+                self.period_start.isoformat() if self.period_start else None
+            ),
             "period_end": self.period_end.isoformat() if self.period_end else None,
             "current_usage_cents": self.current_usage_cents,
             "current_usage_dollars": self.current_usage_cents / 100,
@@ -151,9 +329,11 @@ class Budget(Base):
             "remaining_dollars": max(
                 0, (self.limit_cents - self.current_usage_cents) / 100
             ),
-            "usage_percentage": (self.current_usage_cents / self.limit_cents * 100)
-            if self.limit_cents > 0
-            else 0,
+            "usage_percentage": (
+                (self.current_usage_cents / self.limit_cents * 100)
+                if self.limit_cents > 0
+                else 0
+            ),
             "is_active": self.is_active,
             "is_exceeded": self.is_exceeded,
             "is_warning_sent": self.is_warning_sent,
@@ -169,9 +349,9 @@ class Budget(Base):
             "notification_settings": self.notification_settings,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "last_reset_at": self.last_reset_at.isoformat()
-            if self.last_reset_at
-            else None,
+            "last_reset_at": (
+                self.last_reset_at.isoformat() if self.last_reset_at else None
+            ),
         }
 
     def is_in_period(self) -> bool:

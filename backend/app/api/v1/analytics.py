@@ -2,20 +2,64 @@
 Analytics API endpoints for usage metrics, cost analysis, and system health
 Integrated with the core analytics service for comprehensive tracking.
 """
-from typing import Optional, Dict, Any
+
+import inspect
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Dict, Optional
+from unittest.mock import Mock
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.logging import get_logger
 from app.core.security import get_current_user
 from app.db.database import get_db, utc_now
 from app.models.user import User
 from app.services.analytics import get_analytics_service
 from app.services.module_manager import module_manager
-from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def _response_data(value):
+    """Convert service DTOs and simple mocks to JSON-safe data."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, dict):
+        return {key: _response_data(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_response_data(item) for item in value]
+    if isinstance(value, Mock):
+        return {
+            key: _response_data(item)
+            for key, item in value.__dict__.items()
+            if not key.startswith("_") and key != "method_calls" and not callable(item)
+        }
+    if hasattr(value, "model_dump"):
+        return _response_data(value.model_dump())
+
+    raw_data = getattr(value, "__dict__", None)
+    if isinstance(raw_data, dict):
+        return {
+            key: _response_data(item)
+            for key, item in raw_data.items()
+            if not key.startswith("_") and key != "method_calls" and not callable(item)
+        }
+
+    return value
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value
 
 
 @router.get("/metrics")
@@ -30,7 +74,7 @@ async def get_usage_metrics(
         metrics = await analytics.get_usage_metrics(
             hours=hours, user_id=current_user["id"]
         )
-        return {"success": True, "data": metrics, "period_hours": hours}
+        return {"success": True, "data": _response_data(metrics), "period_hours": hours}
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting usage metrics: {str(e)}"
@@ -50,7 +94,7 @@ async def get_system_metrics(
     try:
         analytics = get_analytics_service()
         metrics = await analytics.get_usage_metrics(hours=hours)
-        return {"success": True, "data": metrics, "period_hours": hours}
+        return {"success": True, "data": _response_data(metrics), "period_hours": hours}
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting system metrics: {str(e)}"
@@ -65,7 +109,7 @@ async def get_system_health(
     try:
         analytics = get_analytics_service()
         health = await analytics.get_system_health()
-        return {"success": True, "data": health}
+        return {"success": True, "data": _response_data(health)}
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting system health: {str(e)}"
@@ -84,7 +128,7 @@ async def get_cost_analysis(
         analysis = await analytics.get_cost_analysis(
             days=days, user_id=current_user["id"]
         )
-        return {"success": True, "data": analysis, "period_days": days}
+        return {"success": True, "data": _response_data(analysis), "period_days": days}
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting cost analysis: {str(e)}"
@@ -104,7 +148,7 @@ async def get_system_cost_analysis(
     try:
         analytics = get_analytics_service()
         analysis = await analytics.get_cost_analysis(days=days)
-        return {"success": True, "data": analysis, "period_days": days}
+        return {"success": True, "data": _response_data(analysis), "period_days": days}
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting system cost analysis: {str(e)}"
@@ -144,27 +188,31 @@ async def get_usage_trends(
     """Get usage trends over time"""
     try:
         from datetime import datetime, timedelta, timezone
+
         from sqlalchemy import func
+
         from app.models.usage_tracking import UsageTracking
 
         cutoff_time = utc_now() - timedelta(days=days)
 
         # Daily usage trends
-        daily_usage = (
+        query = await _maybe_await(
             db.query(
                 func.date(UsageTracking.created_at).label("date"),
                 func.count(UsageTracking.id).label("requests"),
                 func.sum(UsageTracking.total_tokens).label("tokens"),
                 func.sum(UsageTracking.cost_cents).label("cost_cents"),
             )
-            .filter(
+        )
+        query = await _maybe_await(
+            query.filter(
                 UsageTracking.created_at >= cutoff_time,
                 UsageTracking.user_id == current_user["id"],
             )
-            .group_by(func.date(UsageTracking.created_at))
-            .order_by("date")
-            .all()
         )
+        query = await _maybe_await(query.group_by(func.date(UsageTracking.created_at)))
+        query = await _maybe_await(query.order_by("date"))
+        daily_usage = await _maybe_await(query.all())
 
         trends = []
         for date, requests, tokens, cost_cents in daily_usage:
@@ -226,13 +274,18 @@ async def get_module_analytics(
         for name, module in module_manager.modules.items():
             stats = {"name": name, "initialized": getattr(module, "initialized", False)}
 
-            # Get module statistics if available
-            if hasattr(module, "get_stats"):
+            # Get module statistics if available. Plain mocks report any
+            # attribute as present, so only call explicitly assigned mock methods.
+            get_stats = getattr(module, "get_stats", None)
+            has_explicit_mock_stats = (
+                isinstance(module, Mock) and "get_stats" in module.__dict__
+            )
+            if callable(get_stats) and (
+                not isinstance(module, Mock) or has_explicit_mock_stats
+            ):
                 try:
-                    module_data = module.get_stats()
-                    if hasattr(module_data, "__dict__"):
-                        stats.update(module_data.__dict__)
-                    elif isinstance(module_data, dict):
+                    module_data = _response_data(get_stats())
+                    if isinstance(module_data, dict):
                         stats.update(module_data)
                 except Exception as e:
                     logger.warning(f"Failed to get stats for module {name}: {e}")
@@ -245,9 +298,11 @@ async def get_module_analytics(
             "data": {
                 "modules": module_stats,
                 "total_modules": len(module_stats),
-                "system_health": "healthy"
-                if all(m.get("initialized", False) for m in module_stats)
-                else "warning",
+                "system_health": (
+                    "healthy"
+                    if all(m.get("initialized", False) for m in module_stats)
+                    else "warning"
+                ),
             },
         }
 

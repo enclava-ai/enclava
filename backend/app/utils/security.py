@@ -101,9 +101,7 @@ def encode_content_disposition(filename: str, disposition: str = "attachment") -
         encoded = urllib.parse.quote(safe_filename, safe="")
         # Provide both for maximum compatibility
         # ASCII fallback (may be mangled) + RFC 5987 version
-        ascii_fallback = "".join(
-            c if ord(c) < 128 else "_" for c in safe_filename
-        )
+        ascii_fallback = "".join(c if ord(c) < 128 else "_" for c in safe_filename)
         return (
             f'{disposition}; filename="{ascii_fallback}"; '
             f"filename*=UTF-8''{encoded}"

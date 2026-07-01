@@ -12,13 +12,15 @@ Tests the contract:
 - Rate limit: SlackApiError with error="ratelimited" causes sleep+retry
 """
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Import with defensive try/except since SDK may not be installed
 try:
     from app.connectors.slack import SlackConnector
+
     SLACK_AVAILABLE = True
 except (ImportError, RuntimeError):
     SLACK_AVAILABLE = False
@@ -32,10 +34,12 @@ class TestSlackConnector:
     @pytest.fixture
     def connector(self):
         """Create a SlackConnector with test config."""
-        connector = SlackConnector(config={
-            "channel_ids": ["C123456"],
-            "include_threads": True,
-        })
+        connector = SlackConnector(
+            config={
+                "channel_ids": ["C123456"],
+                "include_threads": True,
+            }
+        )
         return connector
 
     @pytest.fixture
@@ -45,11 +49,13 @@ class TestSlackConnector:
 
     def test_init(self):
         """Test connector initialization."""
-        connector = SlackConnector(config={
-            "channel_ids": ["C123", "C456"],
-            "include_threads": True,
-            "include_private": False
-        })
+        connector = SlackConnector(
+            config={
+                "channel_ids": ["C123", "C456"],
+                "include_threads": True,
+                "include_private": False,
+            }
+        )
         assert connector.config["channel_ids"] == ["C123", "C456"]
         assert connector.config["include_threads"] is True
         assert connector.config["include_private"] is False
@@ -72,7 +78,7 @@ class TestSlackConnector:
         mock_client.auth_test.return_value = {
             "ok": True,
             "team": "Test Team",
-            "user": "bot"
+            "user": "bot",
         }
         connector._client = mock_client
 
@@ -83,10 +89,7 @@ class TestSlackConnector:
     def test_validate_raises_on_failure(self, connector, mock_client):
         """Test validate() raises RuntimeError when auth_test() fails."""
         connector.load_credentials({"bot_token": "xoxb-test"})
-        mock_client.auth_test.return_value = {
-            "ok": False,
-            "error": "invalid_auth"
-        }
+        mock_client.auth_test.return_value = {"ok": False, "error": "invalid_auth"}
         connector._client = mock_client
 
         with pytest.raises(RuntimeError, match="Slack validation failed"):
@@ -113,28 +116,28 @@ class TestSlackConnector:
                     "ts": "1705312800.000000",  # 2024-01-15 10:00:00
                     "text": "First message",
                     "user": "U123",
-                    "thread_ts": None
+                    "thread_ts": None,
                 },
                 {
                     "ts": "1705316400.000000",  # 2024-01-15 11:00:00
                     "text": "Second message",
                     "user": "U456",
-                    "thread_ts": None
+                    "thread_ts": None,
                 },
                 {
                     "ts": "1705320000.000000",  # 2024-01-15 12:00:00
                     "text": "Third message",
                     "user": "U789",
-                    "thread_ts": None
-                }
+                    "thread_ts": None,
+                },
             ],
-            "has_more": False
+            "has_more": False,
         }
 
         # Mock channel info
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "general"}
+            "channel": {"name": "general"},
         }
 
         connector._client = mock_client
@@ -153,7 +156,9 @@ class TestSlackConnector:
         assert "Second message" in doc.content
         assert "Third message" in doc.content
 
-    def test_fetch_all_creates_multiple_documents_for_different_days(self, connector, mock_client):
+    def test_fetch_all_creates_multiple_documents_for_different_days(
+        self, connector, mock_client
+    ):
         """Test that messages on different days create multiple documents."""
         connector.load_credentials({"bot_token": "xoxb-test"})
 
@@ -165,21 +170,21 @@ class TestSlackConnector:
                     "ts": "1705312800.000000",  # 2024-01-15
                     "text": "Message on day 1",
                     "user": "U123",
-                    "thread_ts": None
+                    "thread_ts": None,
                 },
                 {
                     "ts": "1705485600.000000",  # 2024-01-17
                     "text": "Message on day 2",
                     "user": "U456",
-                    "thread_ts": None
-                }
+                    "thread_ts": None,
+                },
             ],
-            "has_more": False
+            "has_more": False,
         }
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "general"}
+            "channel": {"name": "general"},
         }
 
         connector._client = mock_client
@@ -208,15 +213,15 @@ class TestSlackConnector:
                     "ts": "1705312800.000000",  # 2024-01-15
                     "text": "Test message",
                     "user": "U123",
-                    "thread_ts": None
+                    "thread_ts": None,
                 }
             ],
-            "has_more": False
+            "has_more": False,
         }
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "general"}
+            "channel": {"name": "general"},
         }
 
         connector._client = mock_client
@@ -234,12 +239,12 @@ class TestSlackConnector:
         mock_client.conversations_history.return_value = {
             "ok": True,
             "messages": [],
-            "has_more": False
+            "has_more": False,
         }
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "empty-channel"}
+            "channel": {"name": "empty-channel"},
         }
 
         connector._client = mock_client
@@ -263,10 +268,10 @@ class TestSlackConnector:
                     "text": "Parent message",
                     "user": "U123",
                     "thread_ts": "1705312800.000000",  # Has thread
-                    "reply_count": 2
+                    "reply_count": 2,
                 }
             ],
-            "has_more": False
+            "has_more": False,
         }
 
         # Thread replies
@@ -277,24 +282,16 @@ class TestSlackConnector:
                     "ts": "1705312800.000000",
                     "text": "Parent message",
                     "user": "U123",
-                    "thread_ts": "1705312800.000000"
+                    "thread_ts": "1705312800.000000",
                 },
-                {
-                    "ts": "1705312900.000000",
-                    "text": "Reply 1",
-                    "user": "U456"
-                },
-                {
-                    "ts": "1705313000.000000",
-                    "text": "Reply 2",
-                    "user": "U789"
-                }
-            ]
+                {"ts": "1705312900.000000", "text": "Reply 1", "user": "U456"},
+                {"ts": "1705313000.000000", "text": "Reply 2", "user": "U789"},
+            ],
         }
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "general"}
+            "channel": {"name": "general"},
         }
 
         connector._client = mock_client
@@ -308,10 +305,9 @@ class TestSlackConnector:
 
     def test_thread_replies_excluded_when_not_configured(self):
         """Test that thread replies are excluded when include_threads=False."""
-        connector = SlackConnector(config={
-            "channel_ids": ["C123456"],
-            "include_threads": False
-        })
+        connector = SlackConnector(
+            config={"channel_ids": ["C123456"], "include_threads": False}
+        )
         connector.load_credentials({"bot_token": "xoxb-test"})
 
         mock_client = MagicMock()
@@ -323,15 +319,15 @@ class TestSlackConnector:
                     "text": "Parent message",
                     "user": "U123",
                     "thread_ts": "1705312800.000000",
-                    "reply_count": 2
+                    "reply_count": 2,
                 }
             ],
-            "has_more": False
+            "has_more": False,
         }
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "general"}
+            "channel": {"name": "general"},
         }
 
         connector._client = mock_client
@@ -357,21 +353,21 @@ class TestSlackConnector:
                         "ts": "1705312800.000000",
                         "text": "Message",
                         "user": "U123",
-                        "thread_ts": None
+                        "thread_ts": None,
                     }
                 ],
-                "has_more": False
-            }
+                "has_more": False,
+            },
         ]
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "general"}
+            "channel": {"name": "general"},
         }
 
         connector._client = mock_client
 
-        with patch('time.sleep') as mock_sleep:  # Speed up test
+        with patch("time.sleep") as mock_sleep:  # Speed up test
             batches = list(connector.fetch_all())
 
         # Should have retried
@@ -385,12 +381,12 @@ class TestSlackConnector:
         mock_client.conversations_history.return_value = {
             "ok": True,
             "messages": [],
-            "has_more": False
+            "has_more": False,
         }
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "general"}
+            "channel": {"name": "general"},
         }
 
         connector._client = mock_client
@@ -403,7 +399,9 @@ class TestSlackConnector:
         call_kwargs = mock_client.conversations_history.call_args.kwargs
         assert "oldest" in call_kwargs
 
-    def test_message_formatting_includes_user_and_timestamp(self, connector, mock_client):
+    def test_message_formatting_includes_user_and_timestamp(
+        self, connector, mock_client
+    ):
         """Test that message content includes user info and timestamp."""
         connector.load_credentials({"bot_token": "xoxb-test"})
 
@@ -414,20 +412,20 @@ class TestSlackConnector:
                     "ts": "1705312800.000000",  # 2024-01-15 10:00:00
                     "text": "Hello team!",
                     "user": "U123",
-                    "thread_ts": None
+                    "thread_ts": None,
                 }
             ],
-            "has_more": False
+            "has_more": False,
         }
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "general"}
+            "channel": {"name": "general"},
         }
 
         mock_client.users_info.return_value = {
             "ok": True,
-            "user": {"real_name": "John Doe", "name": "john"}
+            "user": {"real_name": "John Doe", "name": "john"},
         }
 
         connector._client = mock_client
@@ -440,10 +438,9 @@ class TestSlackConnector:
 
     def test_multiple_channels_processed(self, connector, mock_client):
         """Test that multiple channels are processed."""
-        connector = SlackConnector(config={
-            "channel_ids": ["C123", "C456"],
-            "include_threads": False
-        })
+        connector = SlackConnector(
+            config={"channel_ids": ["C123", "C456"], "include_threads": False}
+        )
         connector.load_credentials({"bot_token": "xoxb-test"})
 
         mock_client.conversations_history.return_value = {
@@ -453,15 +450,15 @@ class TestSlackConnector:
                     "ts": "1705312800.000000",
                     "text": "Message",
                     "user": "U123",
-                    "thread_ts": None
+                    "thread_ts": None,
                 }
             ],
-            "has_more": False
+            "has_more": False,
         }
 
         mock_client.conversations_info.side_effect = [
             {"ok": True, "channel": {"name": "channel-1"}},
-            {"ok": True, "channel": {"name": "channel-2"}}
+            {"ok": True, "channel": {"name": "channel-2"}},
         ]
 
         connector._client = mock_client
@@ -483,15 +480,15 @@ class TestSlackConnector:
                     "ts": "1705312800.000000",
                     "text": "Message",
                     "user": "U123",
-                    "thread_ts": None
+                    "thread_ts": None,
                 }
             ],
-            "has_more": False
+            "has_more": False,
         }
 
         mock_client.conversations_info.return_value = {
             "ok": True,
-            "channel": {"name": "engineering"}
+            "channel": {"name": "engineering"},
         }
 
         connector._client = mock_client
@@ -515,10 +512,9 @@ class TestSlackConnector:
         assert "C123456" in checkpoint.get("processed_channels", [])
 
         # Restore checkpoint
-        connector.restore_checkpoint({
-            "last_message_ts": "1705400000.000000",
-            "processed_channels": ["C789"]
-        })
+        connector.restore_checkpoint(
+            {"last_message_ts": "1705400000.000000", "processed_channels": ["C789"]}
+        )
 
         assert connector._last_message_ts == "1705400000.000000"
         assert connector._processed_channels == ["C789"]

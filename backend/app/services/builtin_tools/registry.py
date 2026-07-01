@@ -5,6 +5,7 @@ Central registry for all built-in tools (RAG, web search, code execution).
 """
 
 from typing import Dict, List, Optional
+
 from .base import BuiltinTool
 
 
@@ -31,6 +32,14 @@ class BuiltinToolRegistry:
     _tools: Dict[str, BuiltinTool] = {}
 
     @classmethod
+    def _get_optional_builtin(cls, name: str) -> Optional[BuiltinTool]:
+        if name == "code_execution":
+            from .code_execution import CodeExecutionTool
+
+            return CodeExecutionTool()
+        return None
+
+    @classmethod
     def register(cls, tool: BuiltinTool):
         """Register a built-in tool.
 
@@ -55,7 +64,7 @@ class BuiltinToolRegistry:
         Returns:
             BuiltinTool instance or None if not found
         """
-        return cls._tools.get(name)
+        return cls._tools.get(name) or cls._get_optional_builtin(name)
 
     @classmethod
     def get_all(cls) -> List[BuiltinTool]:
@@ -80,7 +89,7 @@ class BuiltinToolRegistry:
         Returns:
             True if the tool is registered as a built-in tool
         """
-        return name in cls._tools
+        return name in cls._tools or cls._get_optional_builtin(name) is not None
 
     @classmethod
     def clear(cls):

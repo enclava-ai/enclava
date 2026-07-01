@@ -5,20 +5,21 @@ Syncs model pricing from provider APIs (e.g., RedPill /v1/models)
 and maintains pricing history in the database.
 """
 
+import inspect
 import os
 import uuid
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.models.provider_pricing import ProviderPricing, PricingAuditLog
-from app.services.metrics import get_metrics_service
+from app.models.provider_pricing import PricingAuditLog, ProviderPricing
 from app.services.alerts import get_alert_service
+from app.services.metrics import get_metrics_service
 from app.services.provider_registry import get_provider_currency
 
 logger = get_logger(__name__)
@@ -141,14 +142,18 @@ class ProviderPricingSyncService:
             completed_at=started_at,  # Will be updated
         )
 
-        logger.info(f"Starting pricing sync for provider '{provider_id}' (job: {sync_job_id})")
+        logger.info(
+            f"Starting pricing sync for provider '{provider_id}' (job: {sync_job_id})"
+        )
 
         try:
             # Fetch models from provider API
             if provider_id == "redpill":
                 models = await self._fetch_redpill_models()
             else:
-                raise ValueError(f"No fetch implementation for provider '{provider_id}'")
+                raise ValueError(
+                    f"No fetch implementation for provider '{provider_id}'"
+                )
 
             result.total_models = len(models)
 
@@ -250,23 +255,84 @@ class ProviderPricingSyncService:
 
         logger.debug(f"Fetching models from RedPill: {url}")
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
+        fetch_error = None
+        response_status = None
+        response_text = None
+        response_data = None
+
+        session_context = aiohttp.ClientSession()
+        session = (
+            await session_context.__aenter__()
+            if hasattr(session_context, "__aenter__")
+            else session_context
+        )
+
+        try:
+            request_context = session.get(
                 url,
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=30),
-            ) as response:
-                if response.status != 200:
-                    text = await response.text()
-                    raise Exception(f"RedPill API returned HTTP {response.status}: {text}")
+            )
+            if inspect.isawaitable(request_context) and not hasattr(
+                request_context, "__aenter__"
+            ):
+                request_context = await request_context
 
-                data = await response.json()
+            if hasattr(request_context, "__aenter__"):
+                response = await request_context.__aenter__()
+                try:
+                    if response is None:
+                        raise Exception("RedPill API returned no response")
 
-                # RedPill returns {"data": [...], "object": "list"}
-                models = data.get("data", [])
-                logger.info(f"Fetched {len(models)} models from RedPill API")
+                    response_status = response.status
+                    if inspect.isawaitable(response_status):
+                        response_status = await response_status
 
-                return models
+                    if response_status != 200:
+                        response_text = await response.text()
+                    else:
+                        response_data = await response.json()
+                finally:
+                    await request_context.__aexit__(None, None, None)
+            else:
+                response = request_context
+                if response is None:
+                    raise Exception("RedPill API returned no response")
+
+                response_status = response.status
+                if inspect.isawaitable(response_status):
+                    response_status = await response_status
+
+                if response_status != 200:
+                    response_text = await response.text()
+                else:
+                    response_data = await response.json()
+
+        except Exception as e:
+            fetch_error = e
+        finally:
+            if hasattr(session_context, "__aexit__"):
+                await session_context.__aexit__(None, None, None)
+            else:
+                close = getattr(session_context, "close", None)
+                if close:
+                    close_result = close()
+                    if inspect.isawaitable(close_result):
+                        await close_result
+
+        if fetch_error:
+            raise fetch_error
+
+        if response_status != 200:
+            raise Exception(
+                f"RedPill API returned HTTP {response_status}: {response_text}"
+            )
+
+        # RedPill returns {"data": [...], "object": "list"}
+        models = (response_data or {}).get("data", [])
+        logger.info(f"Fetched {len(models)} models from RedPill API")
+
+        return models
 
     def _convert_redpill_pricing(self, model: Dict[str, Any]) -> Tuple[int, int]:
         """
@@ -311,7 +377,9 @@ class ProviderPricingSyncService:
 
         else:
             # No pricing data available, use defaults
-            logger.warning(f"No pricing data for model {model.get('id')}, using defaults")
+            logger.warning(
+                f"No pricing data for model {model.get('id')}, using defaults"
+            )
             input_cents = 100  # $1 per million
             output_cents = 200  # $2 per million
 
@@ -404,9 +472,7 @@ class ProviderPricingSyncService:
 
             # Don't update overrides from API sync
             if existing_pricing.is_override:
-                logger.info(
-                    f"Skipping update for {model_id} - has manual override"
-                )
+                logger.info(f"Skipping update for {model_id} - has manual override")
                 return SyncResultModel(
                     model_id=model_id,
                     model_name=model_name,

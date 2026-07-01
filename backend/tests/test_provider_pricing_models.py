@@ -4,12 +4,14 @@ Unit tests for Provider Pricing models.
 Tests ProviderPricing and PricingAuditLog model creation,
 properties, methods, and edge cases.
 """
-import pytest
+
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 from uuid import uuid4
 
-from app.models.provider_pricing import ProviderPricing, PricingAuditLog
+import pytest
+
+from app.models.provider_pricing import PricingAuditLog, ProviderPricing
 
 
 @pytest.mark.unit
@@ -582,7 +584,11 @@ class TestPricingAuditLogModel:
                 action=action,
                 new_input_price_per_million_cents=100,
                 new_output_price_per_million_cents=200,
-                change_source="api_sync" if action in ["create", "update", "sync"] else "admin_manual",
+                change_source=(
+                    "api_sync"
+                    if action in ["create", "update", "sync"]
+                    else "admin_manual"
+                ),
             )
 
             assert audit.action == action

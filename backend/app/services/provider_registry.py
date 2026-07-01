@@ -98,7 +98,11 @@ def format_price_cents(cents: int, currency: str = "USD") -> str:
 
     if currency == "EUR":
         # European format: €1,50
-        return f"{symbol}{dollars:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return (
+            f"{symbol}{dollars:,.2f}".replace(",", "X")
+            .replace(".", ",")
+            .replace("X", ".")
+        )
     else:
         # US format: $1.50
         return f"{symbol}{dollars:,.2f}"

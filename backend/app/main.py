@@ -7,28 +7,27 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
-
+from app.api.internal_v1 import internal_api_router
+from app.api.public_v1 import public_api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.security import get_current_user
-from app.db.database import init_db, async_session_factory
-from app.api.internal_v1 import internal_api_router
-from app.api.public_v1 import public_api_router
-from app.utils.exceptions import CustomHTTPException
-from app.services.module_manager import module_manager
-from app.services.metrics import setup_metrics
-from app.services.analytics import init_analytics_service
+from app.db.database import async_session_factory, init_db
 from app.middleware.analytics import setup_analytics_middleware
+from app.services.analytics import init_analytics_service
 from app.services.config_manager import init_config_manager
+from app.services.metrics import setup_metrics
+from app.services.module_manager import module_manager
+from app.utils.exceptions import CustomHTTPException
 
 # Setup logging
 setup_logging()
@@ -312,6 +311,7 @@ setup_analytics_middleware(app)
 
 # SECURITY FIX #2, #46, #49: Enable rate limiting middleware
 from app.middleware.rate_limiting import setup_rate_limiting
+
 setup_rate_limiting(app)
 
 
@@ -323,6 +323,7 @@ async def custom_http_exception_handler(request, exc: CustomHTTPException):
         content={
             "error": exc.error_code,
             "message": exc.detail,
+            "detail": exc.detail,
             "details": exc.details,
         },
     )
@@ -335,6 +336,7 @@ async def http_exception_handler(request, exc: HTTPException):
         content={
             "error": "HTTP_ERROR",
             "message": exc.detail,
+            "detail": exc.detail,
         },
     )
 
@@ -365,6 +367,7 @@ async def validation_exception_handler(request, exc: RequestValidationError):
         content={
             "error": "VALIDATION_ERROR",
             "message": "Invalid request data",
+            "detail": errors,
             "details": errors,
         },
     )

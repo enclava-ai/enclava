@@ -7,10 +7,11 @@ Normalizes tool formats between MCP and OpenAI function calling format.
 """
 
 import asyncio
-import aiohttp
 import json
 import uuid
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import aiohttp
 
 from app.core.logging import get_logger
 
@@ -34,7 +35,7 @@ class MCPClient:
         api_key: Optional[str] = None,
         api_key_header_name: str = "Authorization",
         timeout_seconds: int = 30,
-        max_retries: int = 3
+        max_retries: int = 3,
     ):
         """Initialize MCP client.
 
@@ -81,7 +82,7 @@ class MCPClient:
             # Don't send session ID on first request - server will assign one
             headers = {
                 "Content-Type": "application/json",
-                "Accept": "application/json, text/event-stream"
+                "Accept": "application/json, text/event-stream",
             }
             if self.api_key:
                 if self.api_key_header_name.lower() == "authorization":
@@ -89,14 +90,14 @@ class MCPClient:
                 else:
                     headers[self.api_key_header_name] = self.api_key
 
-            payload = self._make_jsonrpc_request("initialize", {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {
-                    "name": "enclava",
-                    "version": "1.0.0"
-                }
-            })
+            payload = self._make_jsonrpc_request(
+                "initialize",
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "enclava", "version": "1.0.0"},
+                },
+            )
 
             logger.info(f"MCP initialize request to {self.server_url}")
 
@@ -105,7 +106,7 @@ class MCPClient:
                     self.server_url,
                     json=payload,
                     headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=self.timeout_seconds)
+                    timeout=aiohttp.ClientTimeout(total=self.timeout_seconds),
                 ) as resp:
                     # Capture session ID from response headers - this is required
                     server_session_id = resp.headers.get("Mcp-Session-Id")
@@ -126,13 +127,19 @@ class MCPClient:
                     elif resp.status in (401, 403):
                         # Authentication failure - don't retry, surface immediately
                         error_text = await resp.text()
-                        self._initialization_error = f"Authentication failed ({resp.status}): {error_text}"
-                        logger.error(f"MCP authentication failed: {self._initialization_error}")
+                        self._initialization_error = (
+                            f"Authentication failed ({resp.status}): {error_text}"
+                        )
+                        logger.error(
+                            f"MCP authentication failed: {self._initialization_error}"
+                        )
                         raise RuntimeError(self._initialization_error)
                     else:
                         # Non-200 but server responded - some servers don't require initialize
                         error_text = await resp.text()
-                        logger.warning(f"MCP initialize returned {resp.status}: {error_text}")
+                        logger.warning(
+                            f"MCP initialize returned {resp.status}: {error_text}"
+                        )
                         # Mark as initialized since server is reachable
                         self._initialized = True
                         self._initialization_error = None
@@ -140,11 +147,15 @@ class MCPClient:
         except aiohttp.ClientError as e:
             # Network/connection errors - store for debuggability and raise
             self._initialization_error = f"Connection failed: {e}"
-            logger.error(f"MCP initialize connection failed: {self._initialization_error}")
+            logger.error(
+                f"MCP initialize connection failed: {self._initialization_error}"
+            )
             raise RuntimeError(self._initialization_error) from e
         except asyncio.TimeoutError as e:
             # Timeout - store for debuggability and raise
-            self._initialization_error = f"Connection timed out after {self.timeout_seconds}s"
+            self._initialization_error = (
+                f"Connection timed out after {self.timeout_seconds}s"
+            )
             logger.error(f"MCP initialize timeout: {self._initialization_error}")
             raise RuntimeError(self._initialization_error) from e
         except RuntimeError:
@@ -173,8 +184,8 @@ class MCPClient:
         """
         result = None
         async for line in resp.content:
-            line = line.decode('utf-8').strip()
-            if line.startswith('data:'):
+            line = line.decode("utf-8").strip()
+            if line.startswith("data:"):
                 data_str = line[5:].strip()
                 if data_str:
                     try:
@@ -219,7 +230,9 @@ class MCPClient:
 
         return headers
 
-    def _make_jsonrpc_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _make_jsonrpc_request(
+        self, method: str, params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Create a JSON-RPC 2.0 request object.
 
         Args:
@@ -229,16 +242,14 @@ class MCPClient:
         Returns:
             JSON-RPC 2.0 request dict
         """
-        request = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "id": str(uuid.uuid4())
-        }
+        request = {"jsonrpc": "2.0", "method": method, "id": str(uuid.uuid4())}
         if params is not None:
             request["params"] = params
         return request
 
-    async def _send_request_raw(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    async def _send_request_raw(
+        self, method: str, params: Optional[Dict[str, Any]] = None
+    ) -> Any:
         """Send a JSON-RPC 2.0 request to the MCP server (without initialization check).
 
         Handles both JSON and SSE (Server-Sent Events) response formats.
@@ -263,7 +274,7 @@ class MCPClient:
                 self.server_url,
                 json=payload,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=self.timeout_seconds)
+                timeout=aiohttp.ClientTimeout(total=self.timeout_seconds),
             ) as resp:
                 if resp.status != 200:
                     error_text = await resp.text()
@@ -288,7 +299,9 @@ class MCPClient:
                 # Return the result
                 return data.get("result", data)
 
-    async def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    async def _send_request(
+        self, method: str, params: Optional[Dict[str, Any]] = None
+    ) -> Any:
         """Send a JSON-RPC 2.0 request, ensuring session is initialized first.
 
         Args:
@@ -361,17 +374,13 @@ class MCPClient:
             "function": {
                 "name": mcp_tool.get("name", ""),
                 "description": mcp_tool.get("description", ""),
-                "parameters": mcp_tool.get("inputSchema", {
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                })
-            }
+                "parameters": mcp_tool.get(
+                    "inputSchema", {"type": "object", "properties": {}, "required": []}
+                ),
+            },
         }
 
-    async def call_tool(
-        self, name: str, arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool on MCP server using JSON-RPC.
 
         Uses JSON-RPC method "tools/call" to execute a tool.
@@ -384,10 +393,9 @@ class MCPClient:
             Dict with output, error_message, and status fields
         """
         try:
-            result = await self._send_request("tools/call", {
-                "name": name,
-                "arguments": arguments
-            })
+            result = await self._send_request(
+                "tools/call", {"name": name, "arguments": arguments}
+            )
 
             # Handle common MCP server errors with user-friendly messages
             if isinstance(result, dict) and result.get("isError"):
@@ -397,16 +405,19 @@ class MCPClient:
                         if isinstance(item, dict) and "text" in item:
                             error_text = item.get("text", "")
                             # Provide helpful context for common errors
-                            if "Chunk too big" in error_text or "too large" in error_text.lower():
+                            if (
+                                "Chunk too big" in error_text
+                                or "too large" in error_text.lower()
+                            ):
                                 return {
                                     "output": None,
                                     "error_message": f"The requested content is too large for the MCP server to return. Try requesting a smaller portion or specific sections. Original error: {error_text}",
-                                    "status": "failed"
+                                    "status": "failed",
                                 }
                             return {
                                 "output": None,
                                 "error_message": error_text,
-                                "status": "failed"
+                                "status": "failed",
                             }
 
             # Handle MCP tool call response formats
@@ -427,7 +438,7 @@ class MCPClient:
                     return {
                         "output": output,
                         "error_message": None,
-                        "status": "completed"
+                        "status": "completed",
                     }
 
                 # Check for isError flag (MCP spec)
@@ -435,7 +446,7 @@ class MCPClient:
                     return {
                         "output": None,
                         "error_message": str(result.get("content", result)),
-                        "status": "failed"
+                        "status": "failed",
                     }
 
                 # If already in expected format, use as-is
@@ -447,23 +458,15 @@ class MCPClient:
                     return {
                         "output": result.get("result"),
                         "error_message": result.get("error"),
-                        "status": "completed" if "result" in result else "failed"
+                        "status": "completed" if "result" in result else "failed",
                     }
 
             # Default: treat entire response as output
-            return {
-                "output": result,
-                "error_message": None,
-                "status": "completed"
-            }
+            return {"output": result, "error_message": None, "status": "completed"}
 
         except RuntimeError as e:
             error_str = str(e)
             # Provide helpful context for common MCP server errors
             if "Chunk too big" in error_str or "too large" in error_str.lower():
                 error_str = f"The requested content is too large for the MCP server. Try requesting specific sections or a smaller scope. Original error: {error_str}"
-            return {
-                "output": None,
-                "error_message": error_str,
-                "status": "failed"
-            }
+            return {"output": None, "error_message": error_str, "status": "failed"}

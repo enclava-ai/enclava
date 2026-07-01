@@ -21,19 +21,19 @@ Usage:
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
 
+from app.core.logging import get_logger
 from app.models.billing_audit_log import (
-    BillingAuditLog,
-    EntityType,
     ActionType,
     ActorType,
+    BillingAuditLog,
+    EntityType,
 )
-from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -370,8 +370,8 @@ class BillingAuditService:
         query = (
             select(BillingAuditLog)
             .where(
-                (BillingAuditLog.actor_user_id == user_id) |
-                (BillingAuditLog.related_user_id == user_id)
+                (BillingAuditLog.actor_user_id == user_id)
+                | (BillingAuditLog.related_user_id == user_id)
             )
             .order_by(desc(BillingAuditLog.created_at))
             .limit(limit)
@@ -460,10 +460,7 @@ class BillingAuditService:
             query = query.where(and_(*conditions))
 
         query = (
-            query
-            .order_by(desc(BillingAuditLog.created_at))
-            .offset(offset)
-            .limit(limit)
+            query.order_by(desc(BillingAuditLog.created_at)).offset(offset).limit(limit)
         )
 
         result = await self.db.execute(query)

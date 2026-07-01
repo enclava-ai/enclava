@@ -117,15 +117,15 @@ DEFAULT_TEMPLATES = [
                 "label": "Your Company Name",
                 "description": "The name of your company to help identify the buyer in invoices",
                 "required": False,
-                "placeholder": "Acme Corporation"
+                "placeholder": "Acme Corporation",
             },
             "currency": {
                 "type": "string",
                 "label": "Expected Currency",
                 "description": "The expected currency for amounts (e.g., USD, EUR, GBP)",
                 "required": False,
-                "placeholder": "USD"
-            }
+                "placeholder": "USD",
+            },
         },
         "is_default": True,
         "is_active": True,
@@ -152,15 +152,15 @@ DEFAULT_TEMPLATES = [
                 "label": "Employee Name",
                 "description": "Name of the employee submitting the expense",
                 "required": False,
-                "placeholder": "John Doe"
+                "placeholder": "John Doe",
             },
             "department": {
                 "type": "string",
                 "label": "Department",
                 "description": "Employee's department",
                 "required": False,
-                "placeholder": "Engineering"
-            }
+                "placeholder": "Engineering",
+            },
         },
         "is_default": True,
         "is_active": True,

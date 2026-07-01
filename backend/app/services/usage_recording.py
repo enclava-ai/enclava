@@ -16,11 +16,11 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.usage_record import UsageRecord
-from app.services.pricing import PricingService
-from app.services.metrics import get_metrics_service
 from app.core.logging import get_logger
 from app.db.database import utc_now
+from app.models.usage_record import UsageRecord
+from app.services.metrics import get_metrics_service
+from app.services.pricing import PricingService
 
 logger = get_logger(__name__)
 
@@ -56,7 +56,6 @@ class UsageRecordingService:
         # Context
         endpoint: str = "",
         method: str = "POST",
-        chatbot_id: Optional[str] = None,
         agent_config_id: Optional[int] = None,
         session_id: Optional[str] = None,
         # Characteristics
@@ -93,7 +92,6 @@ class UsageRecordingService:
             output_tokens: Number of output/completion tokens
             endpoint: API endpoint path
             method: HTTP method
-            chatbot_id: Chatbot ID if request is via chatbot
             agent_config_id: Agent config ID if request is via agent
             session_id: Session ID for conversation grouping
             is_streaming: Whether streaming was used
@@ -156,7 +154,6 @@ class UsageRecordingService:
             pricing_effective_from=pricing.effective_from,
             endpoint=endpoint,
             method=method,
-            chatbot_id=chatbot_id,
             agent_config_id=agent_config_id,
             session_id=session_id,
             is_streaming=is_streaming,
@@ -166,9 +163,13 @@ class UsageRecordingService:
             ttft_ms=ttft_ms,
             status=status,
             error_type=error_type,
-            error_message=error_message[:1000] if error_message else None,  # Truncate long errors
+            error_message=(
+                error_message[:1000] if error_message else None
+            ),  # Truncate long errors
             ip_address=ip_address,
-            user_agent=user_agent[:500] if user_agent else None,  # Truncate long user agents
+            user_agent=(
+                user_agent[:500] if user_agent else None
+            ),  # Truncate long user agents
             created_at=utc_now(),  # Naive datetime for DB compatibility
         )
 

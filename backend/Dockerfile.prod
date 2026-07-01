@@ -43,6 +43,8 @@ RUN set -eux; \
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
+# Install CPU-only PyTorch first so sentence-transformers does not pull CUDA wheels.
+RUN pip install --no-cache-dir torch==2.12.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Optional: Install NLP requirements if needed

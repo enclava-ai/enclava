@@ -9,23 +9,27 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
-from app.models.response import Response
-from app.models.conversation import Conversation
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.database import utc_now
 from app.models.agent_config import AgentConfig
+from app.models.conversation import Conversation
+from app.models.response import Response
 from app.schemas.responses import ResponseCreateRequest, ResponseObject, TokenUsage
+from app.services.async_budget_enforcement import (
+    async_check_budget_for_request,
+    async_record_request_usage,
+)
+from app.services.llm.models import ChatMessage, ChatRequest
+from app.services.llm.service import llm_service
+from app.services.llm.streaming_tracker import StreamingUsage
 from app.services.responses.translator import ItemMessageTranslator
 from app.services.tool_calling_service import ToolCallingService
-from app.services.llm.models import ChatRequest, ChatMessage
-from app.services.llm.service import llm_service
-from app.services.budget_enforcement import BudgetEnforcementService
 from app.services.usage_recording import UsageRecordingService
-from app.services.llm.streaming_tracker import StreamingUsage
-from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +41,9 @@ class ResponsesService:
         self.db = db
         self.translator = ItemMessageTranslator()
         self.tool_calling_service = ToolCallingService(db)
-        self.budget_service = BudgetEnforcementService(db)
 
     async def create_response(
-        self,
-        request: ResponseCreateRequest,
-        api_key_context: Dict[str, Any]
+        self, request: ResponseCreateRequest, api_key_context: Dict[str, Any]
     ) -> ResponseObject:
         """Create a response with automatic tool execution.
 
@@ -82,34 +83,34 @@ class ResponsesService:
             # 3. Load previous response context if chained
             if request.previous_response_id:
                 previous_items = await self._load_previous_response(
-                    request.previous_response_id,
-                    user.id
+                    request.previous_response_id, user.id
                 )
                 if previous_items:
                     input_items = previous_items + input_items
 
             # 4. Load conversation context if specified
             if request.conversation:
-                conv_items = await self._load_conversation(request.conversation, user.id)
+                conv_items = await self._load_conversation(
+                    request.conversation, user.id
+                )
                 if conv_items:
                     input_items = conv_items + input_items
 
             # 5. Estimate tokens for budget check
             estimated_tokens = self._estimate_tokens(input_items, request.instructions)
+            if request.max_tokens:
+                estimated_tokens += request.max_tokens
+            if request.max_tokens:
+                estimated_tokens += request.max_tokens
 
             # 6. Budget check (simple - just check if already exceeded)
-            is_allowed, error_msg, warnings = self.budget_service.check_budget_compliance(
-                api_key,
-                request.model,
-                estimated_tokens
+            is_allowed, error_msg, warnings = await async_check_budget_for_request(
+                self.db, api_key, request.model, estimated_tokens
             )
 
             if not is_allowed:
                 return self._create_error_response(
-                    response_id,
-                    request.model,
-                    "budget_exceeded",
-                    error_msg
+                    response_id, request.model, "budget_exceeded", error_msg
                 )
 
             # 7. Convert items to messages for LLM
@@ -117,7 +118,9 @@ class ResponsesService:
 
             # 8. Add instructions as system message if provided
             if request.instructions:
-                messages.insert(0, ChatMessage(role="system", content=request.instructions))
+                messages.insert(
+                    0, ChatMessage(role="system", content=request.instructions)
+                )
 
             # 9. Determine which provider will handle this model BEFORE making the request
             expected_provider = await llm_service.get_provider_for_model(request.model)
@@ -127,21 +130,22 @@ class ResponsesService:
                 model=request.model,
                 messages=messages,
                 temperature=request.temperature,
-                max_tokens=request.max_tokens,
+                max_tokens=self._llm_max_tokens(request.max_tokens),
                 top_p=request.top_p,
                 tools=None,  # Will be set by tool calling service
-                stream=False
+                stream=False,
+                user_id=str(user.id),
+                api_key_id=api_key.id if api_key else None,
             )
 
             # 11. Execute agentic loop with tool calling
             total_input_tokens = 0
             total_output_tokens = 0
 
-            llm_response = await self.tool_calling_service.create_chat_completion_with_tools(
-                chat_request,
-                user,
-                auto_execute_tools=True,
-                max_tool_calls=5
+            llm_response = (
+                await self.tool_calling_service.create_chat_completion_with_tools(
+                    chat_request, user, auto_execute_tools=True, max_tool_calls=5
+                )
             )
 
             # 11. Extract usage from LLM response
@@ -154,18 +158,17 @@ class ResponsesService:
             output_items = self.translator.messages_to_output_items([assistant_message])
 
             # 13. Record actual budget usage
-            self.budget_service.record_usage(
-                api_key,
-                request.model,
-                total_input_tokens,
-                total_output_tokens
+            await async_record_request_usage(
+                self.db, api_key, request.model, total_input_tokens, total_output_tokens
             )
 
             # 13.5 Record usage to usage_records table (source of truth for billing)
             execution_time = (time.time() - start_time) * 1000
             usage_service = UsageRecordingService(self.db)
             # Use actual provider from LLM response, fallback to expected provider
-            actual_provider = getattr(llm_response, "provider", None) or expected_provider
+            actual_provider = (
+                getattr(llm_response, "provider", None) or expected_provider
+            )
             await usage_service.record_request(
                 request_id=uuid4(),
                 user_id=user.id,
@@ -177,7 +180,11 @@ class ResponsesService:
                 endpoint="/v1/responses",
                 method="POST",
                 is_streaming=False,
-                is_tool_calling=bool(llm_response.choices[0].message.tool_calls) if llm_response.choices else False,
+                is_tool_calling=(
+                    bool(llm_response.choices[0].message.tool_calls)
+                    if llm_response.choices
+                    else False
+                ),
                 message_count=len(messages),
                 latency_ms=int(execution_time),
                 status="success",
@@ -190,33 +197,32 @@ class ResponsesService:
                 created_at=int(time.time()),
                 model=request.model,
                 output=output_items,
-                output_text=self.translator.extract_text_from_output_items(output_items),
+                output_text=self.translator.extract_text_from_output_items(
+                    output_items
+                ),
                 status="completed",
                 usage=TokenUsage(
                     input_tokens=total_input_tokens,
                     output_tokens=total_output_tokens,
-                    total_tokens=total_input_tokens + total_output_tokens
+                    total_tokens=total_input_tokens + total_output_tokens,
                 ),
-                conversation={"id": request.conversation} if request.conversation else None,
+                conversation=(
+                    {"id": request.conversation} if request.conversation else None
+                ),
                 previous_response_id=request.previous_response_id,
-                metadata=request.metadata
+                metadata=request.metadata,
             )
 
             # 15. Store response if requested
             if request.store:
                 await self._store_response(
-                    response_obj,
-                    input_items,
-                    user.id,
-                    api_key.id
+                    response_obj, input_items, user.id, api_key.id
                 )
 
             # 16. Update conversation if specified
             if request.conversation:
                 await self._update_conversation(
-                    request.conversation,
-                    input_items + output_items,
-                    user.id
+                    request.conversation, input_items + output_items, user.id
                 )
 
             logger.info(
@@ -229,16 +235,11 @@ class ResponsesService:
         except Exception as e:
             logger.error(f"Error creating response: {e}", exc_info=True)
             return self._create_error_response(
-                response_id,
-                request.model,
-                "internal_error",
-                str(e)
+                response_id, request.model, "internal_error", str(e)
             )
 
     async def get_response(
-        self,
-        response_id: str,
-        user_id: int
+        self, response_id: str, user_id: int
     ) -> Optional[ResponseObject]:
         """Get a stored response by ID.
 
@@ -251,8 +252,7 @@ class ResponsesService:
         """
         try:
             stmt = select(Response).where(
-                Response.id == response_id,
-                Response.user_id == user_id
+                Response.id == response_id, Response.user_id == user_id
             )
             result = await self.db.execute(stmt)
             response = result.scalar_one_or_none()
@@ -268,9 +268,7 @@ class ResponsesService:
             return None
 
     async def _load_agent_config(
-        self,
-        config_id: str,
-        user_id: int
+        self, config_id: str, user_id: int
     ) -> Optional[AgentConfig]:
         """Load agent configuration by ID or name.
 
@@ -283,16 +281,15 @@ class ResponsesService:
         """
         try:
             # Build access control condition
-            access_condition = (
-                (AgentConfig.created_by_user_id == user_id) |
-                (AgentConfig.is_public == True)
+            access_condition = (AgentConfig.created_by_user_id == user_id) | (
+                AgentConfig.is_public == True
             )
 
             # Try by name first
             stmt = select(AgentConfig).where(
                 AgentConfig.name == config_id,
                 AgentConfig.is_active == True,
-                access_condition
+                access_condition,
             )
             result = await self.db.execute(stmt)
             agent_config = result.scalar_one_or_none()
@@ -304,7 +301,7 @@ class ResponsesService:
                     stmt = select(AgentConfig).where(
                         AgentConfig.id == config_id_int,
                         AgentConfig.is_active == True,
-                        access_condition
+                        access_condition,
                     )
                     result = await self.db.execute(stmt)
                     agent_config = result.scalar_one_or_none()
@@ -322,9 +319,7 @@ class ResponsesService:
             return None
 
     def _merge_agent_config(
-        self,
-        request: ResponseCreateRequest,
-        agent_config: AgentConfig
+        self, request: ResponseCreateRequest, agent_config: AgentConfig
     ) -> ResponseCreateRequest:
         """Merge agent config into request.
 
@@ -365,7 +360,9 @@ class ResponsesService:
 
         return request
 
-    def _extract_tools_from_config(self, tools_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_tools_from_config(
+        self, tools_config: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Extract tool definitions from agent config.
 
         Args:
@@ -392,9 +389,7 @@ class ResponsesService:
         return tools
 
     async def _load_previous_response(
-        self,
-        response_id: str,
-        user_id: int
+        self, response_id: str, user_id: int
     ) -> List[Dict[str, Any]]:
         """Load items from previous response for chaining.
 
@@ -407,8 +402,7 @@ class ResponsesService:
         """
         try:
             stmt = select(Response).where(
-                Response.id == response_id,
-                Response.user_id == user_id
+                Response.id == response_id, Response.user_id == user_id
             )
             result = await self.db.execute(stmt)
             response = result.scalar_one_or_none()
@@ -431,9 +425,7 @@ class ResponsesService:
             return []
 
     async def _load_conversation(
-        self,
-        conversation_id: str,
-        user_id: int
+        self, conversation_id: str, user_id: int
     ) -> List[Dict[str, Any]]:
         """Load items from conversation.
 
@@ -446,8 +438,7 @@ class ResponsesService:
         """
         try:
             stmt = select(Conversation).where(
-                Conversation.id == conversation_id,
-                Conversation.user_id == user_id
+                Conversation.id == conversation_id, Conversation.user_id == user_id
             )
             result = await self.db.execute(stmt)
             conversation = result.scalar_one_or_none()
@@ -467,7 +458,7 @@ class ResponsesService:
         response_obj: ResponseObject,
         input_items: List[Dict[str, Any]],
         user_id: int,
-        api_key_id: int
+        api_key_id: int,
     ):
         """Store response in database.
 
@@ -488,19 +479,21 @@ class ResponsesService:
                 api_key_id=api_key_id,
                 model=response_obj.model,
                 instructions=None,  # Not stored to save space
-                input_items=input_items,
-                output_items=response_obj.output,
+                input_items=self._to_json_value(input_items),
+                output_items=self._to_json_value(response_obj.output),
                 status=response_obj.status,
                 error=response_obj.error,
                 previous_response_id=response_obj.previous_response_id,
-                conversation_id=response_obj.conversation.get("id") if response_obj.conversation else None,
+                conversation_id=(
+                    response_obj.conversation.id if response_obj.conversation else None
+                ),
                 input_tokens=response_obj.usage.input_tokens,
                 output_tokens=response_obj.usage.output_tokens,
                 total_tokens=response_obj.usage.total_tokens,
                 store=True,
                 response_metadata=response_obj.metadata,
                 created_at=utc_now(),
-                expires_at=expires_at
+                expires_at=expires_at,
             )
 
             self.db.add(response)
@@ -512,11 +505,20 @@ class ResponsesService:
             logger.error(f"Error storing response: {e}")
             await self.db.rollback()
 
+    def _to_json_value(self, value: Any) -> Any:
+        """Convert nested Pydantic objects into JSON-serializable values."""
+        if hasattr(value, "model_dump"):
+            return value.model_dump(mode="json")
+        if hasattr(value, "dict"):
+            return value.dict()
+        if isinstance(value, list):
+            return [self._to_json_value(item) for item in value]
+        if isinstance(value, dict):
+            return {key: self._to_json_value(item) for key, item in value.items()}
+        return value
+
     async def _update_conversation(
-        self,
-        conversation_id: str,
-        new_items: List[Dict[str, Any]],
-        user_id: int
+        self, conversation_id: str, new_items: List[Dict[str, Any]], user_id: int
     ):
         """Update conversation with new items.
 
@@ -527,8 +529,7 @@ class ResponsesService:
         """
         try:
             stmt = select(Conversation).where(
-                Conversation.id == conversation_id,
-                Conversation.user_id == user_id
+                Conversation.id == conversation_id, Conversation.user_id == user_id
             )
             result = await self.db.execute(stmt)
             conversation = result.scalar_one_or_none()
@@ -543,9 +544,7 @@ class ResponsesService:
             await self.db.rollback()
 
     def _estimate_tokens(
-        self,
-        items: List[Dict[str, Any]],
-        instructions: Optional[str]
+        self, items: List[Dict[str, Any]], instructions: Optional[str]
     ) -> int:
         """Estimate token count for budget check.
 
@@ -571,6 +570,12 @@ class ResponsesService:
         # Convert to tokens (rough estimate)
         return total_chars // 4
 
+    def _llm_max_tokens(self, max_tokens: Optional[int]) -> Optional[int]:
+        """Clamp Responses max_tokens to the internal chat model contract."""
+        if max_tokens is None:
+            return None
+        return min(max_tokens, 32000)
+
     def _generate_response_id(self) -> str:
         """Generate unique response ID.
 
@@ -578,16 +583,13 @@ class ResponsesService:
             Response ID in format: resp_<timestamp>_<random>
         """
         import secrets
+
         timestamp = int(time.time() * 1000)
         random_suffix = secrets.token_hex(4)
         return f"resp_{timestamp}_{random_suffix}"
 
     def _create_error_response(
-        self,
-        response_id: str,
-        model: str,
-        error_type: str,
-        error_message: str
+        self, response_id: str, model: str, error_type: str, error_message: str
     ) -> ResponseObject:
         """Create error response object.
 
@@ -608,22 +610,12 @@ class ResponsesService:
             output=[],
             output_text=None,
             status="failed",
-            error={
-                "type": error_type,
-                "code": error_type,
-                "message": error_message
-            },
-            usage=TokenUsage(
-                input_tokens=0,
-                output_tokens=0,
-                total_tokens=0
-            )
+            error={"type": error_type, "code": error_type, "message": error_message},
+            usage=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0),
         )
 
     async def create_response_stream(
-        self,
-        request: ResponseCreateRequest,
-        api_key_context: Dict[str, Any]
+        self, request: ResponseCreateRequest, api_key_context: Dict[str, Any]
     ):
         """Create streaming response with automatic tool execution.
 
@@ -638,9 +630,9 @@ class ResponsesService:
             SSE formatted event strings
         """
         from app.services.responses.streaming import (
-            stream_response_events_with_tracking,
             ResponseStreamEvent,
-            ResponseStreamEventType
+            ResponseStreamEventType,
+            stream_response_events_with_tracking,
         )
 
         response_id = self._generate_response_id()
@@ -664,15 +656,16 @@ class ResponsesService:
             # 3. Load previous context if chained
             if request.previous_response_id:
                 previous_items = await self._load_previous_response(
-                    request.previous_response_id,
-                    user.id
+                    request.previous_response_id, user.id
                 )
                 if previous_items:
                     input_items = previous_items + input_items
 
             # 4. Load conversation context if specified
             if request.conversation:
-                conv_items = await self._load_conversation(request.conversation, user.id)
+                conv_items = await self._load_conversation(
+                    request.conversation, user.id
+                )
                 if conv_items:
                     input_items = conv_items + input_items
 
@@ -680,10 +673,8 @@ class ResponsesService:
             estimated_tokens = self._estimate_tokens(input_items, request.instructions)
 
             # 6. Budget check (simple - just check if already exceeded)
-            is_allowed, error_msg, warnings = self.budget_service.check_budget_compliance(
-                api_key,
-                request.model,
-                estimated_tokens
+            is_allowed, error_msg, warnings = await async_check_budget_for_request(
+                self.db, api_key, request.model, estimated_tokens
             )
 
             if not is_allowed:
@@ -696,9 +687,9 @@ class ResponsesService:
                         "error": {
                             "type": "budget_exceeded",
                             "code": "budget_exceeded",
-                            "message": error_msg
-                        }
-                    }
+                            "message": error_msg,
+                        },
+                    },
                 )
                 yield error_event.to_sse()
                 return
@@ -708,7 +699,9 @@ class ResponsesService:
 
             # 8. Add instructions as system message if provided
             if request.instructions:
-                messages.insert(0, ChatMessage(role="system", content=request.instructions))
+                messages.insert(
+                    0, ChatMessage(role="system", content=request.instructions)
+                )
 
             # 9. Determine which provider will handle this model BEFORE making the request
             expected_provider = await llm_service.get_provider_for_model(request.model)
@@ -718,10 +711,12 @@ class ResponsesService:
                 model=request.model,
                 messages=messages,
                 temperature=request.temperature,
-                max_tokens=request.max_tokens,
+                max_tokens=self._llm_max_tokens(request.max_tokens),
                 top_p=request.top_p,
                 tools=None,  # Will be set by tool calling service
-                stream=True  # Enable streaming
+                stream=True,  # Enable streaming
+                user_id=str(user.id),
+                api_key_id=api_key.id if api_key else None,
             )
 
             # 11. Create usage recording callback
@@ -729,7 +724,10 @@ class ResponsesService:
             usage_service = UsageRecordingService(self.db)
 
             async def record_streaming_usage(
-                usage: StreamingUsage, status: str, had_error: bool, provider: str = None
+                usage: StreamingUsage,
+                status: str,
+                had_error: bool,
+                provider: str = None,
             ) -> None:
                 """Callback to record usage when streaming completes."""
                 # Use provided provider or fall back to expected_provider
@@ -755,11 +753,12 @@ class ResponsesService:
 
                     # Record actual budget usage (simple increment)
                     if api_key:
-                        self.budget_service.record_usage(
+                        await async_record_request_usage(
+                            self.db,
                             api_key,
                             request.model,
                             usage.input_tokens,
-                            usage.output_tokens
+                            usage.output_tokens,
                         )
 
                     await self.db.commit()
@@ -794,8 +793,8 @@ class ResponsesService:
                     "error": {
                         "type": "internal_error",
                         "code": "internal_error",
-                        "message": str(e)
-                    }
-                }
+                        "message": str(e),
+                    },
+                },
             )
             yield error_event.to_sse()

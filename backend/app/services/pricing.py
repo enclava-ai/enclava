@@ -14,13 +14,12 @@ Example: $2 per 1M tokens = 200 cents per 1M tokens
 Phase 2 Update: Added database pricing lookup with automatic fallback to static pricing.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Dict, Optional
 
-import re
-
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
@@ -298,7 +297,17 @@ class PricingService:
 
         # Try fuzzy matching by checking if model_id contains any known model
         for known_model, pricing in provider_pricing.items():
-            if known_model in model_id.lower() or model_id.lower() in known_model:
+            known_normalized = self.normalize_model(known_model)
+            model_normalized = normalized_model
+            known_basename = known_normalized.split("/")[-1]
+            model_basename = model_normalized.split("/")[-1]
+
+            if (
+                known_normalized in model_normalized
+                or model_normalized in known_normalized
+                or known_basename in model_basename
+                or model_basename in known_basename
+            ):
                 logger.debug(
                     f"Fuzzy matched model '{model_id}' to '{known_model}' for provider '{provider_id}'"
                 )
@@ -367,18 +376,18 @@ class PricingService:
         # Ceiling division: (a + b - 1) // b is equivalent to ceil(a / b)
         # This ensures we round up to avoid under-charging
         input_cost_cents = (
-            (input_tokens * pricing.input_price_per_million_cents + 999_999)
-            // 1_000_000
-        )
+            input_tokens * pricing.input_price_per_million_cents + 999_999
+        ) // 1_000_000
         output_cost_cents = (
-            (output_tokens * pricing.output_price_per_million_cents + 999_999)
-            // 1_000_000
-        )
+            output_tokens * pricing.output_price_per_million_cents + 999_999
+        ) // 1_000_000
         total_cost_cents = input_cost_cents + output_cost_cents
 
         return input_cost_cents, output_cost_cents, total_cost_cents
 
-    def get_all_supported_models(self, provider_id: Optional[str] = None) -> Dict[str, list]:
+    def get_all_supported_models(
+        self, provider_id: Optional[str] = None
+    ) -> Dict[str, list]:
         """
         Get all models with static pricing defined.
 
@@ -389,7 +398,11 @@ class PricingService:
             Dict of provider -> list of model IDs
         """
         if provider_id:
-            return {provider_id: list(self._static_pricing.get(provider_id.lower(), {}).keys())}
+            return {
+                provider_id: list(
+                    self._static_pricing.get(provider_id.lower(), {}).keys()
+                )
+            }
 
         return {
             provider: list(models.keys())
@@ -436,7 +449,10 @@ def calculate_cost_cents_simple(
         else:
             # Fuzzy match
             for known_model, p in provider_pricing.items():
-                if known_model in model_name.lower() or model_name.lower() in known_model:
+                if (
+                    known_model in model_name.lower()
+                    or model_name.lower() in known_model
+                ):
                     pricing = p
                     break
 

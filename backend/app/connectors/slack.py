@@ -78,9 +78,12 @@ class SlackConnector(BaseConnector):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config)
         self._token: Optional[str] = None
+        self._bot_token: Optional[str] = None
         self._client: Optional[WebClient] = None
         self._workspace_id: Optional[str] = None
         self._user_cache: dict[str, str] = {}
+        self._last_message_ts: Optional[str] = None
+        self._processed_channels: list[str] = []
 
     # ------------------------------------------------------------------
     # Credential loading
@@ -94,6 +97,7 @@ class SlackConnector(BaseConnector):
                 "Slack credentials must contain 'bot_token' or 'access_token'."
             )
         self._token = token
+        self._bot_token = token
         self._client = WebClient(token=token)
 
     # ------------------------------------------------------------------
@@ -106,6 +110,8 @@ class SlackConnector(BaseConnector):
             raise RuntimeError("call load_credentials() before validate().")
         try:
             response = self._client.auth_test()
+            if not response.get("ok", True):
+                raise RuntimeError(response.get("error", "unknown_error"))
             self._workspace_id = response.get("team_id")
             logger.info(
                 "Slack connector validated. Team: %s (%s), Bot user: %s",
@@ -114,9 +120,10 @@ class SlackConnector(BaseConnector):
                 response.get("user"),
             )
         except SlackApiError as exc:
-            raise ValueError(
-                f"Slack credential validation failed: {exc.response['error']}"
-            ) from exc
+            error = exc.response.get("error", str(exc))
+            raise RuntimeError(f"Slack validation failed: {error}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Slack validation failed: {exc}") from exc
 
     # ------------------------------------------------------------------
     # Rate-limit helper
@@ -129,7 +136,16 @@ class SlackConnector(BaseConnector):
         The ``Retry-After`` header value (seconds) is respected when sleeping.
         """
         try:
-            return api_func(**kwargs)
+            response = api_func(**kwargs)
+            if self._is_rate_limited_response(response):
+                retry_after = self._retry_after_seconds(response)
+                logger.warning(
+                    "Slack rate limit hit. Sleeping %d seconds (Retry-After).",
+                    retry_after,
+                )
+                time.sleep(retry_after)
+                return api_func(**kwargs)
+            return response
         except SlackApiError as exc:
             if exc.response.get("error") == "ratelimited":
                 retry_after = int(exc.response.headers.get("Retry-After", 30))
@@ -140,6 +156,27 @@ class SlackConnector(BaseConnector):
                 time.sleep(retry_after)
                 return api_func(**kwargs)
             raise
+
+    def _is_rate_limited_response(self, response: Any) -> bool:
+        if isinstance(response, dict):
+            return (
+                response.get("ok") is False and response.get("error") == "ratelimited"
+            )
+        data = getattr(response, "data", None)
+        if isinstance(data, dict):
+            return data.get("error") == "ratelimited"
+        return (
+            getattr(response, "ok", True) is False
+            and getattr(response, "error", None) == "ratelimited"
+        )
+
+    def _retry_after_seconds(self, response: Any) -> int:
+        if isinstance(response, dict):
+            return int(response.get("retry_after") or response.get("Retry-After") or 1)
+        data = getattr(response, "data", None)
+        if isinstance(data, dict):
+            return int(data.get("retry_after") or data.get("Retry-After") or 1)
+        return int(getattr(response, "retry_after", 1) or 1)
 
     # ------------------------------------------------------------------
     # User display-name helper
@@ -160,9 +197,7 @@ class SlackConnector(BaseConnector):
             resp = self._call_with_retry(self._client.users_info, user=user_id)
             profile: dict[str, Any] = resp.get("user", {}).get("profile", {})
             name: str = (
-                profile.get("real_name")
-                or profile.get("display_name")
-                or user_id
+                profile.get("real_name") or profile.get("display_name") or user_id
             )
         except SlackApiError as exc:
             logger.debug("Could not fetch user info for %s: %s", user_id, exc)
@@ -185,6 +220,26 @@ class SlackConnector(BaseConnector):
         channels: list[dict[str, Any]] = []
         cursor: Optional[str] = None
 
+        allowed_ids: list[str] = _cfg(self.config, "channel_ids")
+        if allowed_ids:
+            for channel_id in allowed_ids:
+                try:
+                    resp = self._call_with_retry(
+                        self._client.conversations_info, channel=channel_id
+                    )
+                    if isinstance(resp, dict):
+                        channel = dict(resp.get("channel") or {})
+                    else:
+                        channel = {}
+                    channel.setdefault("id", channel_id)
+                    channel.setdefault("name", channel_id)
+                    channels.append(channel)
+                except Exception as exc:
+                    logger.warning(
+                        "Error fetching Slack channel %s: %s", channel_id, exc
+                    )
+            return channels
+
         while True:
             kwargs: dict[str, Any] = {
                 "types": channel_types,
@@ -195,11 +250,12 @@ class SlackConnector(BaseConnector):
                 kwargs["cursor"] = cursor
 
             try:
-                resp = self._call_with_retry(
-                    self._client.conversations_list, **kwargs
-                )
+                resp = self._call_with_retry(self._client.conversations_list, **kwargs)
             except SlackApiError as exc:
                 logger.warning("Error listing Slack channels: %s", exc)
+                break
+
+            if not isinstance(resp, dict):
                 break
 
             channels.extend(resp.get("channels", []))
@@ -209,12 +265,6 @@ class SlackConnector(BaseConnector):
             if not next_cursor:
                 break
             cursor = next_cursor
-
-        # Filter by explicit channel_ids if provided
-        allowed_ids: list[str] = _cfg(self.config, "channel_ids")
-        if allowed_ids:
-            channels = [ch for ch in channels if ch.get("id") in allowed_ids]
-
         return channels
 
     # ------------------------------------------------------------------
@@ -447,6 +497,8 @@ class SlackConnector(BaseConnector):
         for msg in messages:
             ts = msg.get("ts", "")
             if ts:
+                if self._last_message_ts is None or ts > self._last_message_ts:
+                    self._last_message_ts = ts
                 by_day[_ts_to_date_str(ts)].append(msg)
 
         batch: list[ConnectorDocument] = []
@@ -485,6 +537,9 @@ class SlackConnector(BaseConnector):
 
         for channel in channels:
             try:
+                channel_id = channel.get("id")
+                if channel_id and channel_id not in self._processed_channels:
+                    self._processed_channels.append(channel_id)
                 yield from self._sync_channel(channel, oldest=oldest)
             except Exception as exc:
                 channel_name = channel.get("name") or channel.get("id", "?")
@@ -524,4 +579,13 @@ class SlackConnector(BaseConnector):
 
     def build_checkpoint(self) -> Optional[dict[str, Any]]:
         """Record the current UTC time so the next incremental sync can use it."""
-        return {"last_sync_time": datetime.utcnow().isoformat()}
+        return {
+            "last_sync_time": datetime.utcnow().isoformat(),
+            "last_message_ts": self._last_message_ts,
+            "processed_channels": list(self._processed_channels),
+        }
+
+    def restore_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        """Restore sync progress from a saved checkpoint."""
+        self._last_message_ts = checkpoint.get("last_message_ts")
+        self._processed_channels = list(checkpoint.get("processed_channels") or [])

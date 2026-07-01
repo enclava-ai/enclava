@@ -7,17 +7,19 @@ for configured MCP servers.
 """
 
 from datetime import datetime, timezone
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    ForeignKey,
     Integer,
     String,
     Text,
-    Boolean,
-    DateTime,
-    JSON,
-    ForeignKey,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
 
 
@@ -45,20 +47,28 @@ class MCPServer(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # Identification
-    name = Column(String(100), nullable=False, index=True)  # Unique identifier like "order-api"
+    name = Column(
+        String(100), nullable=False, index=True
+    )  # Unique identifier like "order-api"
     display_name = Column(String(200), nullable=False)  # Human-readable name
     description = Column(Text, nullable=True)  # Optional description
 
     # Connection settings
     server_url = Column(String(500), nullable=False)  # Base URL for MCP server
     api_key = Column(Text, nullable=True)  # API key for authentication
-    api_key_header_name = Column(String(100), nullable=False, default="Authorization")  # Header name for API key
+    api_key_header_name = Column(
+        String(100), nullable=False, default="Authorization"
+    )  # Header name for API key
     timeout_seconds = Column(Integer, nullable=False, default=30)  # Request timeout
     max_retries = Column(Integer, nullable=False, default=3)  # Max retry attempts
 
     # Access control
-    is_global = Column(Boolean, default=False, index=True)  # Admin-created, available to all
-    is_active = Column(Boolean, default=True, index=True)  # Can be disabled without deletion
+    is_global = Column(
+        Boolean, default=False, index=True
+    )  # Admin-created, available to all
+    is_active = Column(
+        Boolean, default=True, index=True
+    )  # Can be disabled without deletion
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Cached tool discovery
@@ -77,13 +87,13 @@ class MCPServer(Base):
 
     # Relationships
     created_by = relationship(
-        "User",
-        back_populates="created_mcp_servers",
-        foreign_keys=[created_by_user_id]
+        "User", back_populates="created_mcp_servers", foreign_keys=[created_by_user_id]
     )
 
     def __repr__(self):
-        return f"<MCPServer(id={self.id}, name='{self.name}', is_global={self.is_global})>"
+        return (
+            f"<MCPServer(id={self.id}, name='{self.name}', is_global={self.is_global})>"
+        )
 
     def to_dict(self, include_tools: bool = True) -> dict:
         """
@@ -108,11 +118,15 @@ class MCPServer(Base):
             "is_global": self.is_global,
             "is_active": self.is_active,
             "created_by_user_id": self.created_by_user_id,
-            "last_connected_at": self.last_connected_at.isoformat() if self.last_connected_at else None,
+            "last_connected_at": (
+                self.last_connected_at.isoformat() if self.last_connected_at else None
+            ),
             "last_connection_status": self.last_connection_status,
             "last_connection_error": self.last_connection_error,
             "usage_count": self.usage_count,
-            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+            "last_used_at": (
+                self.last_used_at.isoformat() if self.last_used_at else None
+            ),
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

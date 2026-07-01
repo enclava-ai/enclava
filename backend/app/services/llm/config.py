@@ -5,11 +5,13 @@ Configuration management for LLM providers and service settings.
 """
 
 import os
-from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field, validator
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field, validator
 
 from app.core.config import settings
+
 from .models import ResilienceConfig
 
 
@@ -291,6 +293,16 @@ class ConfigurationManager:
 
         # Validate default provider is enabled
         default_provider = self._config.default_provider
+        if not enabled_providers:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "No LLM providers are enabled. Set PRIVATEMODE_API_KEY or "
+                "REDPILL_API_KEY to enable model inference."
+            )
+            return
+
         if default_provider not in enabled_providers:
             raise ValueError(f"Default provider '{default_provider}' is not enabled")
 

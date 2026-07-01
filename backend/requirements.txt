@@ -1,29 +1,28 @@
 # Core framework
-fastapi==0.115.14
-uvicorn[standard]==0.34.3
-pydantic==2.11.7
-pydantic-settings==2.10.1
+fastapi==0.138.2
+uvicorn[standard]==0.49.0
+pydantic==2.13.4
+pydantic-settings==2.14.2
 
 # Database
-sqlalchemy==2.0.41
-alembic==1.16.2
-psycopg2-binary==2.9.10
-asyncpg==0.30.0
+sqlalchemy==2.0.51
+alembic==1.18.5
+psycopg2-binary==2.9.12
+asyncpg==0.31.0
 
 # Redis (includes async support, no need for separate aioredis)
-redis==5.2.1
+redis==8.0.1
 
 # Authentication & Security
-python-jose[cryptography]==3.4.0
-passlib[bcrypt]==1.7.4
-bcrypt==4.3.0
-python-multipart==0.0.20
-cryptography==45.0.5
+python-jose[cryptography]==3.5.0
+bcrypt==5.0.0
+python-multipart==0.0.32
+cryptography==49.0.0
 itsdangerous==2.2.0
 
 # HTTP Client
 httpx==0.28.1
-aiohttp==3.12.13
+aiohttp==3.14.1
 
 # Docker integration (for tool execution)
 docker==7.1.0
@@ -32,34 +31,34 @@ docker==7.1.0
 jinja2==3.1.6
 
 # Background tasks
-celery==5.5.3
+celery==5.6.3
 flower==2.0.1
 
 # Validation & Serialization
-email-validator==2.2.0
+email-validator==2.3.0
 python-dateutil==2.9.0.post0
-jsonschema==4.24.0
+jsonschema==4.26.0
 
 # Logging & Monitoring
-structlog==25.4.0
-prometheus-client==0.22.1
-opentelemetry-api==1.34.1
-opentelemetry-sdk==1.34.1
-psutil==7.0.0
+structlog==26.1.0
+prometheus-client==0.25.0
+opentelemetry-api==1.43.0
+opentelemetry-sdk==1.43.0
+psutil==7.2.2
 
 # Vector Database
-qdrant-client==1.14.2
+qdrant-client==1.18.0
 
 # Text Processing
-tiktoken==0.9.0
+tiktoken==0.13.0
 numpy>=1.26.0
 
 # Basic document processing (lightweight)
-markitdown==0.1.2
+markitdown==0.1.6
 python-docx==1.2.0
 
 # Image processing for Extract module
-Pillow==11.3.0
+Pillow==12.2.0
 pdf2image==1.17.0
 
 # Advanced NLP processing (OPTIONAL - only for entity extraction)
@@ -69,30 +68,30 @@ pdf2image==1.17.0
 
 # Heavy ML dependencies (sentence-transformers will be installed separately)
 # Note: PyTorch is already installed in the base Docker image
-sentence-transformers==4.1.0
+sentence-transformers==5.6.0
 # transformers==4.35.2  # REMOVED - already commented out
 
 # Configuration
 pyyaml==6.0.3
-python-dotenv==1.1.0
+python-dotenv==1.2.2
 
 # Module System
 watchdog==6.0.0
-click==8.2.1
+click==8.4.2
 
 # Development
-pytest==8.4.1
-pytest-asyncio==0.24.0
-pytest-cov==6.2.1
-black==25.1.0
-isort==6.0.1
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+black==26.5.1
+isort==8.0.1
 flake8==7.3.0
-mypy==1.16.1
+mypy==2.1.0
 
 # API Documentation
 swagger-ui-bundle==1.1.0
 
 # Connector SDKs
-notion-client==2.3.0
-PyGithub==2.6.1
-slack-sdk==3.35.0
+notion-client==3.1.0
+PyGithub==2.9.1
+slack-sdk==3.43.0

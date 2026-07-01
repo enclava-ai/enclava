@@ -5,17 +5,19 @@ Full TEE attestation verification for RedPill.ai confidential models.
 Verifies Intel TDX, NVIDIA GPU attestation, and nonce binding.
 """
 
-import secrets
-import json
 import base64
-import aiohttp
+import json
 import logging
-from typing import Dict, Any, Tuple
+import secrets
 from datetime import datetime, timezone
+from typing import Any, Dict, Tuple
+
+import aiohttp
+
+from app.core.config import settings
 
 from .base import BaseAttestationVerifier
 from .models import AttestationResult
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,9 @@ logger = logging.getLogger(__name__)
 def get_confidential_model_prefixes() -> Tuple[str, ...]:
     """Get confidential model prefixes from settings."""
     return tuple(
-        p.strip() for p in settings.REDPILL_CONFIDENTIAL_MODEL_PREFIXES.split(",") if p.strip()
+        p.strip()
+        for p in settings.REDPILL_CONFIDENTIAL_MODEL_PREFIXES.split(",")
+        if p.strip()
     )
 
 
@@ -45,7 +49,7 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
             api_base: Base URL for RedPill API
             api_key: API key for authentication
         """
-        self.api_base = api_base.rstrip('/')
+        self.api_base = api_base.rstrip("/")
         self.api_key = api_key
         logger.debug(f"Initialized RedPill verifier for {self.api_base}")
 
@@ -83,7 +87,7 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
                 provider_id="redpill",
                 model=model,
                 timestamp=datetime.now(timezone.utc),
-                errors=[error_msg]
+                errors=[error_msg],
             )
 
         # 2. Generate fresh nonce
@@ -102,12 +106,15 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
                 provider_id="redpill",
                 model=model,
                 timestamp=datetime.now(timezone.utc),
-                errors=[error_msg]
+                errors=[error_msg],
             )
 
         # Handle multi-node response
-        attestation = report.get("all_attestations", [report])[0] \
-            if report.get("all_attestations") else report
+        attestation = (
+            report.get("all_attestations", [report])[0]
+            if report.get("all_attestations")
+            else report
+        )
 
         signing_address = attestation.get("signing_address")
         logger.debug(f"Attestation signing address: {signing_address}")
@@ -148,7 +155,9 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
         if all_verified:
             logger.info(f"RedPill attestation verified successfully for {model}")
         else:
-            logger.warning(f"RedPill attestation failed for {model}: {', '.join(errors)}")
+            logger.warning(
+                f"RedPill attestation failed for {model}: {', '.join(errors)}"
+            )
 
         return AttestationResult(
             verified=all_verified,
@@ -159,7 +168,7 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
             intel_tdx_verified=intel_verified,
             gpu_attestation_verified=gpu_verified,
             nonce_binding_verified=nonce_verified,
-            errors=errors
+            errors=errors,
         )
 
     async def _fetch_attestation(self, model: str, nonce: str) -> Dict[str, Any]:
@@ -185,7 +194,7 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
                 url,
                 params=params,
                 headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
                     text = await response.text()
@@ -213,14 +222,14 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
                 async with session.post(
                     settings.PHALA_TDX_VERIFIER_URL,
                     json={"hex": intel_quote},
-                    timeout=aiohttp.ClientTimeout(total=30)
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     result = await response.json()
                     quote = result.get("quote", {})
                     return {
                         "verified": quote.get("verified", False),
                         "message": quote.get("message"),
-                        "quote": quote
+                        "quote": quote,
                     }
         except Exception as e:
             logger.error(f"Intel TDX verification error: {e}")
@@ -259,7 +268,7 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
                 async with session.post(
                     settings.NVIDIA_NRAS_API_URL,
                     json=payload,
-                    timeout=aiohttp.ClientTimeout(total=30)
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     result = await response.json()
 
@@ -272,11 +281,10 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
                         verdict = jwt_payload.get("x-nvidia-overall-att-result")
                         logger.debug(f"NVIDIA verdict: {verdict}")
                         # Verdict should be boolean True, but also accept "PASS" for compatibility
-                        is_verified = verdict is True or verdict == "PASS" or verdict == True
-                        return {
-                            "verified": is_verified,
-                            "verdict": verdict
-                        }
+                        is_verified = (
+                            verdict is True or verdict == "PASS" or verdict == True
+                        )
+                        return {"verified": is_verified, "verdict": verdict}
 
                     logger.warning("Invalid NVIDIA response format")
                     return {"verified": False, "message": "Invalid NVIDIA response"}
@@ -285,10 +293,7 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
             return {"verified": False, "message": f"Verification error: {str(e)}"}
 
     def _verify_nonce_binding(
-        self,
-        attestation: Dict,
-        nonce: str,
-        intel_quote: Dict
+        self, attestation: Dict, nonce: str, intel_quote: Dict
     ) -> bool:
         """
         Verify signing address and nonce are bound in TDX report data.
@@ -369,7 +374,9 @@ class RedPillAttestationVerifier(BaseAttestationVerifier):
                 )
                 return False
 
-            logger.debug("Report data binding verified: signing address and nonce match")
+            logger.debug(
+                "Report data binding verified: signing address and nonce match"
+            )
             return True
 
         except Exception as e:

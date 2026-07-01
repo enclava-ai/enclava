@@ -3,18 +3,20 @@ Agent Configuration model for pre-configured agents with tool sets
 """
 
 from datetime import datetime, timezone
+
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
-    Integer,
+    DateTime,
     Float,
+    ForeignKey,
+    Integer,
     String,
     Text,
-    Boolean,
-    DateTime,
-    JSON,
-    ForeignKey,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
 
 
@@ -68,13 +70,17 @@ class AgentConfig(Base):
     # }
 
     # Categories and tags for organization
-    category = Column(String(50), nullable=True, index=True)  # "support", "development", "research"
+    category = Column(
+        String(50), nullable=True, index=True
+    )  # "support", "development", "research"
     tags = Column(JSON, default=list)  # ["coding", "debugging", "analysis"]
 
     # Access control
     is_public = Column(Boolean, default=False)  # Public agents available to all users
     is_template = Column(Boolean, default=False)  # Official templates from platform
-    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL for templates
+    created_by_user_id = Column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )  # NULL for templates
 
     # Usage tracking
     usage_count = Column(Integer, default=0)
@@ -88,7 +94,29 @@ class AgentConfig(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     # Relationships
-    created_by = relationship("User", back_populates="created_agent_configs", foreign_keys=[created_by_user_id])
+    created_by = relationship(
+        "User",
+        back_populates="created_agent_configs",
+        foreign_keys=[created_by_user_id],
+    )
+
+    _DISPLAY_NAME_CONFIG_KEY = "_display_name"
+
+    @property
+    def display_name(self) -> str:
+        """Compatibility display name stored in tools_config."""
+        if isinstance(self.tools_config, dict):
+            return self.tools_config.get(self._DISPLAY_NAME_CONFIG_KEY) or self.name
+        return self.name
+
+    @display_name.setter
+    def display_name(self, value: str) -> None:
+        tools_config = dict(self.tools_config or {})
+        if value:
+            tools_config[self._DISPLAY_NAME_CONFIG_KEY] = value
+        else:
+            tools_config.pop(self._DISPLAY_NAME_CONFIG_KEY, None)
+        self.tools_config = tools_config
 
     def __repr__(self):
         return f"<AgentConfig(id={self.id}, name='{self.name}', category='{self.category}')>"
@@ -98,6 +126,7 @@ class AgentConfig(Base):
         return {
             "id": self.id,
             "name": self.name,
+            "display_name": self.display_name,
             "description": self.description,
             "system_prompt": self.system_prompt,
             "model": self.model,
@@ -111,7 +140,9 @@ class AgentConfig(Base):
             "is_template": self.is_template,
             "created_by_user_id": self.created_by_user_id,
             "usage_count": self.usage_count,
-            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+            "last_used_at": (
+                self.last_used_at.isoformat() if self.last_used_at else None
+            ),
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

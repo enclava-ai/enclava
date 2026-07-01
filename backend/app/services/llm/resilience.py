@@ -7,12 +7,12 @@ Implements retry logic, circuit breaker, and timeout management.
 import asyncio
 import logging
 import time
-from typing import Callable, Any, Optional, Dict, Type, AsyncGenerator
-from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import Any, AsyncGenerator, Callable, Dict, Optional, Type
 
-from .exceptions import LLMError, TimeoutError, RateLimitError
+from .exceptions import LLMError, RateLimitError, TimeoutError
 from .models import ResilienceConfig
 
 logger = logging.getLogger(__name__)
@@ -127,12 +127,16 @@ class CircuitBreaker:
             "state": self.state.value,
             "failure_count": self.stats.failure_count,
             "success_count": self.stats.success_count,
-            "last_failure_time": self.stats.last_failure_time.isoformat()
-            if self.stats.last_failure_time
-            else None,
-            "last_success_time": self.stats.last_success_time.isoformat()
-            if self.stats.last_success_time
-            else None,
+            "last_failure_time": (
+                self.stats.last_failure_time.isoformat()
+                if self.stats.last_failure_time
+                else None
+            ),
+            "last_success_time": (
+                self.stats.last_success_time.isoformat()
+                if self.stats.last_success_time
+                else None
+            ),
             "state_change_time": self.stats.state_change_time.isoformat(),
             "time_in_current_state_ms": (
                 datetime.now(timezone.utc) - self.stats.state_change_time

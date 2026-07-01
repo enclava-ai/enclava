@@ -2,26 +2,27 @@
 Tool Execution Service with Docker Sandboxing
 Secure execution environment for user-defined tools
 """
+
 import asyncio
 import json
 import logging
 import os
 import tempfile
 import time
-from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone
-import docker
-from docker.errors import DockerException, ContainerError, ImageNotFound
-import psutil
+from typing import Any, Dict, List, Optional
 
+import docker
+import psutil
+from docker.errors import ContainerError, DockerException, ImageNotFound
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from fastapi import HTTPException, status
 
-from app.models.tool import Tool, ToolExecution, ToolStatus, ToolType
-from app.models.user import User
 from app.core.config import settings
 from app.db.database import utc_now
+from app.models.tool import Tool, ToolExecution, ToolStatus, ToolType
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 

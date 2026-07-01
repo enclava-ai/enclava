@@ -6,7 +6,7 @@ Analyzes sample documents and generates appropriate extraction templates.
 
 import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -160,7 +160,9 @@ class TemplateWizardService:
 
         return True
 
-    def format_template_for_creation(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
+    def format_template_for_creation(
+        self, template_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Format wizard output into template creation schema.
 

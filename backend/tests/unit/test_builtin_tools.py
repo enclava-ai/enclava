@@ -2,13 +2,15 @@
 Unit tests for built-in tools (RAG search, web search).
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from app.services.builtin_tools import (
     BuiltinToolRegistry,
     RAGSearchTool,
-    WebSearchTool,
     ToolExecutionContext,
+    WebSearchTool,
     register_builtin_tools,
 )
 
@@ -17,11 +19,7 @@ from app.services.builtin_tools import (
 def execution_context():
     """Create a mock execution context for testing."""
     mock_db = AsyncMock()
-    return ToolExecutionContext(
-        user_id=1,
-        db=mock_db,
-        config={}
-    )
+    return ToolExecutionContext(user_id=1, db=mock_db, config={})
 
 
 class TestBuiltinToolRegistry:
@@ -48,10 +46,10 @@ class TestBuiltinToolRegistry:
         assert len(all_tools) == 2
         for tool in all_tools:
             # Should be instances of BuiltinTool subclasses
-            assert hasattr(tool, 'name')
-            assert hasattr(tool, 'display_name')
-            assert hasattr(tool, 'description')
-            assert hasattr(tool, 'parameters_schema')
+            assert hasattr(tool, "name")
+            assert hasattr(tool, "display_name")
+            assert hasattr(tool, "description")
+            assert hasattr(tool, "parameters_schema")
             # Should NOT be OpenAI format dictionaries
             assert not isinstance(tool, dict)
 
@@ -60,7 +58,7 @@ class TestBuiltinToolRegistry:
         tools = [RAGSearchTool(), WebSearchTool()]
 
         for tool in tools:
-            assert hasattr(tool, 'display_name')
+            assert hasattr(tool, "display_name")
             assert isinstance(tool.display_name, str)
             assert len(tool.display_name) > 0
 
@@ -70,10 +68,10 @@ class TestBuiltinToolRegistry:
 
         for tool in tools:
             # These attributes are accessed by _convert_tools_to_openai_format
-            assert hasattr(tool, 'name')
-            assert hasattr(tool, 'description')
-            assert hasattr(tool, 'display_name')
-            assert hasattr(tool, 'parameters_schema')
+            assert hasattr(tool, "name")
+            assert hasattr(tool, "description")
+            assert hasattr(tool, "display_name")
+            assert hasattr(tool, "parameters_schema")
 
             # Verify types
             assert isinstance(tool.name, str)
@@ -109,7 +107,7 @@ class TestRAGSearchTool:
         tool = RAGSearchTool()
 
         # Mock RAG module
-        with patch('app.services.builtin_tools.rag_search.RAGModule') as MockRAG:
+        with patch("app.services.builtin_tools.rag_search.RAGModule") as MockRAG:
             mock_rag = MockRAG.return_value
             mock_rag.enabled = True
 
@@ -129,8 +127,7 @@ class TestRAGSearchTool:
 
             # Execute search
             result = await tool.execute(
-                {"query": "test query", "max_results": 5},
-                execution_context
+                {"query": "test query", "max_results": 5}, execution_context
             )
 
             assert result.success is True
@@ -144,14 +141,11 @@ class TestRAGSearchTool:
         """Test RAG search when RAG module is disabled."""
         tool = RAGSearchTool()
 
-        with patch('app.services.builtin_tools.rag_search.RAGModule') as MockRAG:
+        with patch("app.services.builtin_tools.rag_search.RAGModule") as MockRAG:
             mock_rag = MockRAG.return_value
             mock_rag.enabled = False
 
-            result = await tool.execute(
-                {"query": "test query"},
-                execution_context
-            )
+            result = await tool.execute({"query": "test query"}, execution_context)
 
             assert result.success is False
             assert "not initialized" in result.error.lower()
@@ -175,30 +169,31 @@ class TestWebSearchTool:
         """Test basic web search functionality."""
         tool = WebSearchTool()
 
-        with patch.dict('os.environ', {'BRAVE_SEARCH_API_KEY': 'test_key'}):
-            with patch('aiohttp.ClientSession') as MockSession:
+        with patch.dict("os.environ", {"BRAVE_SEARCH_API_KEY": "test_key"}):
+            with patch("aiohttp.ClientSession") as MockSession:
                 # Mock HTTP response
                 mock_resp = AsyncMock()
                 mock_resp.status = 200
-                mock_resp.json = AsyncMock(return_value={
-                    "web": {
-                        "results": [
-                            {
-                                "title": "Test Result",
-                                "url": "https://example.com",
-                                "description": "Test description",
-                                "age": "2024-01-01"
-                            }
-                        ]
+                mock_resp.json = AsyncMock(
+                    return_value={
+                        "web": {
+                            "results": [
+                                {
+                                    "title": "Test Result",
+                                    "url": "https://example.com",
+                                    "description": "Test description",
+                                    "age": "2024-01-01",
+                                }
+                            ]
+                        }
                     }
-                })
+                )
 
                 mock_session = MockSession.return_value.__aenter__.return_value
                 mock_session.get.return_value.__aenter__.return_value = mock_resp
 
                 result = await tool.execute(
-                    {"query": "test query", "num_results": 5},
-                    execution_context
+                    {"query": "test query", "num_results": 5}, execution_context
                 )
 
                 assert result.success is True
@@ -212,11 +207,8 @@ class TestWebSearchTool:
         """Test web search when API key is not configured."""
         tool = WebSearchTool()
 
-        with patch.dict('os.environ', {}, clear=True):
-            result = await tool.execute(
-                {"query": "test query"},
-                execution_context
-            )
+        with patch.dict("os.environ", {}, clear=True):
+            result = await tool.execute({"query": "test query"}, execution_context)
 
             assert result.success is False
             assert "api key not configured" in result.error.lower()
@@ -226,8 +218,8 @@ class TestWebSearchTool:
         """Test web search when API returns error."""
         tool = WebSearchTool()
 
-        with patch.dict('os.environ', {'BRAVE_SEARCH_API_KEY': 'test_key'}):
-            with patch('aiohttp.ClientSession') as MockSession:
+        with patch.dict("os.environ", {"BRAVE_SEARCH_API_KEY": "test_key"}):
+            with patch("aiohttp.ClientSession") as MockSession:
                 mock_resp = AsyncMock()
                 mock_resp.status = 401
                 mock_resp.text = AsyncMock(return_value="Invalid API key")
@@ -235,10 +227,7 @@ class TestWebSearchTool:
                 mock_session = MockSession.return_value.__aenter__.return_value
                 mock_session.get.return_value.__aenter__.return_value = mock_resp
 
-                result = await tool.execute(
-                    {"query": "test query"},
-                    execution_context
-                )
+                result = await tool.execute({"query": "test query"}, execution_context)
 
                 assert result.success is False
                 assert "401" in result.error

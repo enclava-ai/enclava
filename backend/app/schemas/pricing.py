@@ -2,44 +2,43 @@
 Pricing Management Schemas
 Pydantic models for provider pricing API
 """
-from typing import Optional, List, Dict, Any
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 from uuid import UUID
+
 from pydantic import BaseModel, Field, validator
 
 
 class SetPricingRequest(BaseModel):
     """Request schema for setting manual pricing"""
 
-    provider_id: str = Field(..., min_length=1, max_length=50, description="Provider identifier")
-    model_id: str = Field(..., min_length=1, max_length=255, description="Model identifier")
+    provider_id: str = Field(
+        ..., min_length=1, max_length=50, description="Provider identifier"
+    )
+    model_id: str = Field(
+        ..., min_length=1, max_length=255, description="Model identifier"
+    )
     input_price_per_million_cents: int = Field(
-        ...,
-        ge=0,
-        description="Input price in cents per million tokens"
+        ..., ge=0, description="Input price in cents per million tokens"
     )
     output_price_per_million_cents: int = Field(
-        ...,
-        ge=0,
-        description="Output price in cents per million tokens"
+        ..., ge=0, description="Output price in cents per million tokens"
     )
     reason: str = Field(
-        ...,
-        min_length=1,
-        max_length=500,
-        description="Reason for the pricing change"
+        ..., min_length=1, max_length=500, description="Reason for the pricing change"
     )
     model_name: Optional[str] = Field(
-        None,
-        max_length=255,
-        description="Human-readable model name"
+        None, max_length=255, description="Human-readable model name"
     )
 
     @validator("provider_id")
     def validate_provider_id(cls, v):
         """Validate provider_id is lowercase and alphanumeric with underscores"""
         if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Provider ID must be alphanumeric with underscores/hyphens")
+            raise ValueError(
+                "Provider ID must be alphanumeric with underscores/hyphens"
+            )
         return v.lower()
 
     class Config:
@@ -50,7 +49,7 @@ class SetPricingRequest(BaseModel):
                 "input_price_per_million_cents": 40,
                 "output_price_per_million_cents": 40,
                 "reason": "Initial pricing for PrivateMode TEE-protected inference",
-                "model_name": "Llama 3.1 70B Instruct"
+                "model_name": "Llama 3.1 70B Instruct",
             }
         }
 
@@ -66,7 +65,9 @@ class PricingResponse(BaseModel):
     output_price_per_million_cents: int
     input_price_per_million_dollars: float
     output_price_per_million_dollars: float
-    currency: str = Field(default="USD", description="ISO 4217 currency code (USD, EUR)")
+    currency: str = Field(
+        default="USD", description="ISO 4217 currency code (USD, EUR)"
+    )
     price_source: str
     is_override: bool
     override_reason: Optional[str]
@@ -93,7 +94,9 @@ class PricingHistoryResponse(BaseModel):
     model_name: Optional[str]
     input_price_per_million_cents: int
     output_price_per_million_cents: int
-    currency: str = Field(default="USD", description="ISO 4217 currency code (USD, EUR)")
+    currency: str = Field(
+        default="USD", description="ISO 4217 currency code (USD, EUR)"
+    )
     price_source: str
     is_override: bool
     override_reason: Optional[str]
@@ -175,10 +178,10 @@ class SyncResultResponse(BaseModel):
                         "old_input_price": 50,
                         "old_output_price": 200,
                         "new_input_price": 55,
-                        "new_output_price": 219
+                        "new_output_price": 219,
                     }
                 ],
-                "errors": []
+                "errors": [],
             }
         }
 
@@ -241,7 +244,9 @@ class ProviderMetadataResponse(BaseModel):
     display_name: str = Field(..., description="Human-readable provider name")
     currency: str = Field(..., description="Native currency code (ISO 4217: USD, EUR)")
     currency_symbol: str = Field(..., description="Currency symbol ($, €)")
-    supports_api_sync: bool = Field(..., description="Whether pricing can be synced from API")
+    supports_api_sync: bool = Field(
+        ..., description="Whether pricing can be synced from API"
+    )
     description: str = Field(..., description="Brief description of the provider")
     website: Optional[str] = Field(None, description="Provider website URL")
 
@@ -254,7 +259,7 @@ class ProviderMetadataResponse(BaseModel):
                 "currency_symbol": "€",
                 "supports_api_sync": False,
                 "description": "Confidential AI inference with TEE protection",
-                "website": "https://privatemode.ai"
+                "website": "https://privatemode.ai",
             }
         }
 

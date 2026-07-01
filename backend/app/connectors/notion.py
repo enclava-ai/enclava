@@ -17,9 +17,7 @@ from app.connectors.base import BaseConnector, ConnectorDocument
 try:
     from notion_client import Client
 except ImportError as exc:
-    raise RuntimeError(
-        "Install notion-client: pip install notion-client"
-    ) from exc
+    raise RuntimeError("Install notion-client: pip install notion-client") from exc
 
 logger = logging.getLogger(__name__)
 
@@ -131,11 +129,15 @@ class NotionConnector(BaseConnector):
         """Initialize and return the Notion client."""
         if self._client is None:
             if not self._api_token:
-                raise RuntimeError("Credentials not loaded. Call load_credentials() first.")
+                raise RuntimeError(
+                    "Credentials not loaded. Call load_credentials() first."
+                )
             self._client = Client(auth=self._api_token)
         return self._client
 
-    def _make_request_with_retry(self, operation: str, func: Any, *args: Any, **kwargs: Any) -> Any:
+    def _make_request_with_retry(
+        self, operation: str, func: Any, *args: Any, **kwargs: Any
+    ) -> Any:
         """Execute an API call with retry logic for rate limiting."""
         client = self._init_client()
         last_exception: Optional[Exception] = None
@@ -148,13 +150,17 @@ class NotionConnector(BaseConnector):
                 # Check for rate limit (HTTP 429) or connection errors
                 error_str = str(exc).lower()
                 if "rate" in error_str or "429" in error_str or "too many" in error_str:
-                    sleep_time = _RETRY_DELAY * (2 ** attempt)
+                    sleep_time = _RETRY_DELAY * (2**attempt)
                     logger.warning(
                         "Rate limited on %s (attempt %d/%d), sleeping %.1fs",
-                        operation, attempt + 1, _MAX_RETRIES, sleep_time
+                        operation,
+                        attempt + 1,
+                        _MAX_RETRIES,
+                        sleep_time,
                     )
                     # Use asyncio.sleep since we may be in async context
                     import time
+
                     time.sleep(sleep_time)
                 else:
                     # Non-retryable error
@@ -175,8 +181,7 @@ class NotionConnector(BaseConnector):
         try:
             user = client.users.me()
             logger.info(
-                "Notion connector validated for user: %s",
-                user.get("name", "unknown")
+                "Notion connector validated for user: %s", user.get("name", "unknown")
             )
         except Exception as exc:
             raise RuntimeError(f"Notion validation failed: {exc}") from exc
@@ -194,9 +199,7 @@ class NotionConnector(BaseConnector):
         while True:
             try:
                 response = client.blocks.children.list(
-                    block_id=page_id,
-                    start_cursor=cursor,
-                    page_size=100
+                    block_id=page_id, start_cursor=cursor, page_size=100
                 )
             except Exception as exc:
                 logger.error("Failed to fetch blocks for page %s: %s", page_id, exc)
@@ -210,6 +213,7 @@ class NotionConnector(BaseConnector):
 
             # Rate limiting
             import time
+
             time.sleep(_RATE_LIMIT_SLEEP)
 
             if not response.get("has_more"):
@@ -238,9 +242,7 @@ class NotionConnector(BaseConnector):
         return "Untitled"
 
     def _search_pages(
-        self,
-        filter_type: Optional[str] = None,
-        since: Optional[datetime] = None
+        self, filter_type: Optional[str] = None, since: Optional[datetime] = None
     ) -> list[dict[str, Any]]:
         """
         Search for pages/databases in Notion.
@@ -295,6 +297,7 @@ class NotionConnector(BaseConnector):
 
             # Rate limiting
             import time
+
             time.sleep(_RATE_LIMIT_SLEEP)
 
             if not response.get("has_more"):
@@ -362,9 +365,7 @@ class NotionConnector(BaseConnector):
         return True
 
     def _fetch_children_recursive(
-        self,
-        parent_id: str,
-        since: Optional[datetime] = None
+        self, parent_id: str, since: Optional[datetime] = None
     ) -> Iterator[ConnectorDocument]:
         """
         Recursively fetch all children of a page/block.
@@ -383,6 +384,7 @@ class NotionConnector(BaseConnector):
 
         # Rate limit after page fetch
         import time
+
         time.sleep(_RATE_LIMIT_SLEEP)
 
         # Fetch children
@@ -392,9 +394,7 @@ class NotionConnector(BaseConnector):
         while True:
             try:
                 response = client.blocks.children.list(
-                    block_id=parent_id,
-                    start_cursor=cursor,
-                    page_size=100
+                    block_id=parent_id, start_cursor=cursor, page_size=100
                 )
             except Exception as exc:
                 logger.error("Failed to fetch children of %s: %s", parent_id, exc)
@@ -420,7 +420,9 @@ class NotionConnector(BaseConnector):
                             yield self._get_page_content(db)
                         time.sleep(_RATE_LIMIT_SLEEP)
                     except Exception as exc:
-                        logger.warning("Failed to retrieve database %s: %s", block_id, exc)
+                        logger.warning(
+                            "Failed to retrieve database %s: %s", block_id, exc
+                        )
 
             time.sleep(_RATE_LIMIT_SLEEP)
 
@@ -434,7 +436,9 @@ class NotionConnector(BaseConnector):
         for child_page_id in child_pages:
             yield from self._fetch_children_recursive(child_page_id, since)
 
-    def _yield_batches(self, documents: Iterator[ConnectorDocument]) -> Iterator[list[ConnectorDocument]]:
+    def _yield_batches(
+        self, documents: Iterator[ConnectorDocument]
+    ) -> Iterator[list[ConnectorDocument]]:
         """Batch documents into groups of _BATCH_SIZE."""
         batch: list[ConnectorDocument] = []
 
@@ -457,6 +461,18 @@ class NotionConnector(BaseConnector):
         root_page_id = self.config.get("root_page_id")
 
         def document_generator() -> Iterator[ConnectorDocument]:
+            seen_ids: set[str] = set()
+
+            def emit_once(item: dict[str, Any]) -> Optional[ConnectorDocument]:
+                item_id = item.get("id", "")
+                if item_id and item_id in seen_ids:
+                    return None
+                if item_id:
+                    seen_ids.add(item_id)
+                if self._should_include_item(item):
+                    return self._get_page_content(item)
+                return None
+
             if root_page_id:
                 # Sync specific subtree
                 yield from self._fetch_children_recursive(root_page_id)
@@ -469,15 +485,17 @@ class NotionConnector(BaseConnector):
                 if include_databases:
                     databases = self._search_pages(filter_type="database")
                     for db in databases:
-                        if self._should_include_item(db):
-                            yield self._get_page_content(db)
+                        doc = emit_once(db)
+                        if doc:
+                            yield doc
 
                 # Then fetch pages
                 if include_pages:
                     pages = self._search_pages(filter_type="page")
                     for page in pages:
-                        if self._should_include_item(page):
-                            yield self._get_page_content(page)
+                        doc = emit_once(page)
+                        if doc:
+                            yield doc
 
         return self._yield_batches(document_generator())
 
@@ -498,6 +516,19 @@ class NotionConnector(BaseConnector):
         root_page_id = self.config.get("root_page_id")
 
         def document_generator() -> Iterator[ConnectorDocument]:
+            seen_ids: set[str] = set()
+
+            def emit_updated_once(item: dict[str, Any]) -> Optional[ConnectorDocument]:
+                item_id = item.get("id", "")
+                if item_id and item_id in seen_ids:
+                    return None
+                if item_id:
+                    seen_ids.add(item_id)
+                if not self._should_include_item(item):
+                    return None
+                doc = self._get_page_content(item)
+                return doc if doc.updated_at >= since else None
+
             if root_page_id:
                 # For subtree sync with incremental, we still need to walk
                 # the tree but filter by updated time
@@ -513,19 +544,17 @@ class NotionConnector(BaseConnector):
                 if include_databases:
                     databases = self._search_pages(filter_type="database", since=since)
                     for db in databases:
-                        if self._should_include_item(db):
-                            doc = self._get_page_content(db)
-                            if doc.updated_at >= since:
-                                yield doc
+                        doc = emit_updated_once(db)
+                        if doc:
+                            yield doc
 
                 # Fetch updated pages
                 if include_pages:
                     pages = self._search_pages(filter_type="page", since=since)
                     for page in pages:
-                        if self._should_include_item(page):
-                            doc = self._get_page_content(page)
-                            if doc.updated_at >= since:
-                                yield doc
+                        doc = emit_updated_once(page)
+                        if doc:
+                            yield doc
 
         return self._yield_batches(document_generator())
 

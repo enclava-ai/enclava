@@ -4,19 +4,21 @@ Usage Tracking model for API key usage statistics
 
 from datetime import datetime, timezone
 from typing import Optional
+
 from sqlalchemy import (
-    Column,
-    Integer,
-    BigInteger,
-    String,
-    DateTime,
-    Boolean,
-    Text,
     JSON,
-    ForeignKey,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
     Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base, utc_now
 
 
@@ -69,6 +71,89 @@ class UsageTracking(Base):
 
     # Timestamps
     created_at = Column(DateTime, default=utc_now)
+
+    def __init__(self, **kwargs):
+        amount = kwargs.pop("amount", None)
+        cost_amount = kwargs.pop("cost_amount", None)
+        timestamp = kwargs.pop("timestamp", None)
+        request_type = kwargs.pop("request_type", None)
+        usage_type = kwargs.pop("usage_type", None)
+        legacy_metadata = kwargs.pop("metadata", None)
+        legacy_ctor = any(
+            value is not None
+            for value in (
+                amount,
+                cost_amount,
+                timestamp,
+                request_type,
+                usage_type,
+                legacy_metadata,
+            )
+        )
+
+        amount_value = cost_amount if cost_amount is not None else amount
+        if amount_value is not None:
+            kwargs.setdefault("cost_cents", int(float(amount_value) * 100))
+        if timestamp is not None:
+            kwargs.setdefault("created_at", timestamp)
+        endpoint_value = usage_type if usage_type is not None else request_type
+        if endpoint_value is not None:
+            kwargs.setdefault("endpoint", endpoint_value)
+        if legacy_metadata is not None:
+            kwargs.setdefault("request_metadata", legacy_metadata)
+
+        if legacy_ctor:
+            kwargs.setdefault("api_key_id", 0)
+            kwargs.setdefault("user_id", 0)
+            kwargs.setdefault("endpoint", "unknown")
+            kwargs.setdefault("method", "POST")
+            kwargs.setdefault(
+                "total_tokens",
+                (kwargs.get("request_tokens") or 0)
+                + (kwargs.get("response_tokens") or 0),
+            )
+
+        super().__init__(**kwargs)
+
+    @property
+    def amount(self) -> float:
+        return (self.cost_cents or 0) / 100
+
+    @amount.setter
+    def amount(self, value: float) -> None:
+        self.cost_cents = int(float(value) * 100)
+
+    @property
+    def cost_amount(self) -> float:
+        return self.amount
+
+    @cost_amount.setter
+    def cost_amount(self, value: float) -> None:
+        self.amount = value
+
+    @property
+    def timestamp(self) -> datetime:
+        return self.created_at
+
+    @timestamp.setter
+    def timestamp(self, value: datetime) -> None:
+        self.created_at = value
+
+    @property
+    def request_type(self) -> str:
+        return self.endpoint
+
+    @request_type.setter
+    def request_type(self, value: str) -> None:
+        self.endpoint = value
+
+    @property
+    def usage_type(self) -> str:
+        return self.endpoint
+
+    @usage_type.setter
+    def usage_type(self, value: str) -> None:
+        self.endpoint = value
 
     def __repr__(self):
         return f"<UsageTracking(id={self.id}, api_key_id={self.api_key_id}, endpoint='{self.endpoint}')>"
@@ -135,3 +220,14 @@ class UsageTracking(Base):
             user_agent=user_agent,
             request_metadata=request_metadata or {},
         )
+
+
+def _get_legacy_metadata(self) -> dict:
+    return self.request_metadata or {}
+
+
+def _set_legacy_metadata(self, value: dict) -> None:
+    self.request_metadata = value
+
+
+UsageTracking.metadata = property(_get_legacy_metadata, _set_legacy_metadata)

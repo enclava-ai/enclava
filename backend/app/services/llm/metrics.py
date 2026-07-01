@@ -4,13 +4,13 @@ LLM Service Metrics Collection
 Collects and manages metrics for LLM operations.
 """
 
-import time
 import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta, timezone
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from .models import LLMMetrics
 
@@ -214,9 +214,9 @@ class MetricsCollector:
                 "total_completion_tokens": total_completion_tokens,
                 "total_tokens": total_tokens,
                 "avg_prompt_tokens": total_prompt_tokens / total if total > 0 else 0,
-                "avg_completion_tokens": total_completion_tokens / successful
-                if successful > 0
-                else 0,
+                "avg_completion_tokens": (
+                    total_completion_tokens / successful if successful > 0 else 0
+                ),
             },
             "model_distribution": dict(model_counts),
             "request_type_distribution": dict(request_type_counts),

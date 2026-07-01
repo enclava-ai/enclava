@@ -9,13 +9,18 @@ Tests cover:
 - request_id is generated if not provided
 - Validation error when neither user_id nor api_key_id provided
 """
-import pytest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import UUID, uuid4
 
-from app.services.usage_recording import UsageRecordingService, get_usage_recording_service
+import pytest
+
 from app.models.usage_record import UsageRecord
+from app.services.usage_recording import (
+    UsageRecordingService,
+    get_usage_recording_service,
+)
 
 
 class TestUsageRecordingService:
@@ -102,7 +107,9 @@ class TestUsageRecordingService:
 
     @pytest.mark.asyncio
     @pytest.mark.unit
-    async def test_record_request_uses_provided_request_id(self, usage_service, mock_db):
+    async def test_record_request_uses_provided_request_id(
+        self, usage_service, mock_db
+    ):
         """Test that provided request_id is used."""
         custom_request_id = uuid4()
 
@@ -136,7 +143,9 @@ class TestUsageRecordingService:
 
     @pytest.mark.asyncio
     @pytest.mark.unit
-    async def test_record_request_calculates_cost_correctly(self, usage_service, mock_db):
+    async def test_record_request_calculates_cost_correctly(
+        self, usage_service, mock_db
+    ):
         """Test that cost is calculated correctly for known models."""
         record = await usage_service.record_request(
             user_id=1,
@@ -191,7 +200,9 @@ class TestUsageRecordingService:
 
     @pytest.mark.asyncio
     @pytest.mark.unit
-    async def test_record_request_uses_default_pricing_for_unknown_model(self, usage_service, mock_db):
+    async def test_record_request_uses_default_pricing_for_unknown_model(
+        self, usage_service, mock_db
+    ):
         """Test that default pricing is used for unknown models."""
         record = await usage_service.record_request(
             user_id=1,
@@ -223,7 +234,6 @@ class TestUsageRecordingService:
             output_tokens=50,
             endpoint="/api/v1/chat/completions",
             method="POST",
-            chatbot_id="chatbot-123",
             agent_config_id=5,
             session_id="session-abc",
             is_streaming=True,
@@ -235,7 +245,6 @@ class TestUsageRecordingService:
             user_agent="Mozilla/5.0 Test Client",
         )
 
-        assert record.chatbot_id == "chatbot-123"
         assert record.agent_config_id == 5
         assert record.session_id == "session-abc"
         assert record.is_streaming is True
@@ -248,7 +257,9 @@ class TestUsageRecordingService:
 
     @pytest.mark.asyncio
     @pytest.mark.unit
-    async def test_record_request_truncates_long_error_message(self, usage_service, mock_db):
+    async def test_record_request_truncates_long_error_message(
+        self, usage_service, mock_db
+    ):
         """Test that long error messages are truncated."""
         long_error = "x" * 2000  # 2000 characters
 
@@ -265,7 +276,9 @@ class TestUsageRecordingService:
 
     @pytest.mark.asyncio
     @pytest.mark.unit
-    async def test_record_request_truncates_long_user_agent(self, usage_service, mock_db):
+    async def test_record_request_truncates_long_user_agent(
+        self, usage_service, mock_db
+    ):
         """Test that long user agents are truncated."""
         long_ua = "x" * 1000  # 1000 characters
 
@@ -544,8 +557,7 @@ class TestUsageRecordModel:
         record.pricing_effective_from = now
         record.endpoint = "/api/v1/chat/completions"
         record.method = "POST"
-        record.chatbot_id = "cb-123"
-        record.agent_config_id = None
+        record.agent_config_id = 5
         record.session_id = "sess-abc"
         record.is_streaming = True
         record.is_tool_calling = False
@@ -572,5 +584,5 @@ class TestUsageRecordModel:
         assert data["total_cost_cents"] == 7
         assert data["status"] == "success"
         assert data["is_streaming"] is True
-        assert data["chatbot_id"] == "cb-123"
+        assert data["agent_config_id"] == 5
         assert data["created_at"] == now.isoformat()

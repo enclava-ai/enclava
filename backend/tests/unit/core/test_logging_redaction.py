@@ -3,11 +3,13 @@ Tests for the logging redaction functionality.
 
 SECURITY FIX P3-24: Verify that sensitive data is properly redacted from logs.
 """
+
 import pytest
+
 from app.core.logging import (
     SensitiveDataRedactor,
-    redact_sensitive_data,
     get_redactor,
+    redact_sensitive_data,
 )
 
 
@@ -20,22 +22,25 @@ class TestSensitiveDataRedactor:
         return SensitiveDataRedactor()
 
     # Test fully redacted keys
-    @pytest.mark.parametrize("key", [
-        "password",
-        "PASSWORD",
-        "Password",
-        "secret",
-        "jwt_secret",
-        "access_token",
-        "refresh_token",
-        "authorization",
-        "cookie",
-        "credit_card",
-        "ssn",
-        "pgpassword",
-        "db_password",
-        "aws_secret_access_key",
-    ])
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "password",
+            "PASSWORD",
+            "Password",
+            "secret",
+            "jwt_secret",
+            "access_token",
+            "refresh_token",
+            "authorization",
+            "cookie",
+            "credit_card",
+            "ssn",
+            "pgpassword",
+            "db_password",
+            "aws_secret_access_key",
+        ],
+    )
     def test_fully_redacted_keys(self, redactor, key):
         """Test that sensitive keys are fully redacted."""
         data = {key: "sensitive_value_123"}
@@ -43,15 +48,18 @@ class TestSensitiveDataRedactor:
         assert result[key] == "[REDACTED]"
 
     # Test pattern-based redaction
-    @pytest.mark.parametrize("key", [
-        "user_password",
-        "admin_password",
-        "my_secret_key",
-        "api_token",
-        "bearer_token",
-        "auth_credentials",
-        "db_credentials",
-    ])
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "user_password",
+            "admin_password",
+            "my_secret_key",
+            "api_token",
+            "bearer_token",
+            "auth_credentials",
+            "db_credentials",
+        ],
+    )
     def test_pattern_based_redaction(self, redactor, key):
         """Test that keys matching patterns are redacted."""
         data = {key: "sensitive_value_123"}
@@ -110,7 +118,7 @@ class TestSensitiveDataRedactor:
                 "password": "secret123",
                 "profile": {
                     "phone": "555-1234",
-                }
+                },
             }
         }
         result = redactor.redact(data)

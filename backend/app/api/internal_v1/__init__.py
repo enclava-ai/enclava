@@ -3,31 +3,31 @@ Internal API v1 package - for frontend use only
 """
 
 from fastapi import APIRouter
-from ..v1.auth import router as auth_router
-from ..v1.modules import router as modules_router
-from ..v1.users import router as users_router
-from ..v1.api_keys import router as api_keys_router
-from ..v1.budgets import router as budgets_router
-from ..v1.audit import router as audit_router
-from ..v1.settings import router as settings_router
-from ..v1.analytics import router as analytics_router
-from ..v1.rag import router as rag_router
+
 from ..rag_debug import router as rag_debug_router
-from ..v1.prompt_templates import router as prompt_templates_router
-from ..v1.plugin_registry import router as plugin_registry_router
-from ..v1.platform import router as platform_router
-from ..v1.llm_internal import router as llm_internal_router
-from ..v1.chatbot import router as chatbot_router
-from ..v1.extract import router as extract_router
-from .debugging import router as debugging_router
-from ..v1.endpoints.user_management import router as user_management_router
+from ..v1.analytics import router as analytics_router
+from ..v1.api_keys import router as api_keys_router
+from ..v1.audit import router as audit_router
+from ..v1.auth import router as auth_router
+from ..v1.budgets import router as budgets_router
+from ..v1.connectors import router as connectors_router
 from ..v1.endpoints.tool_calling import router as tool_calling_router
-from .admin_pricing import router as admin_pricing_router
+from ..v1.endpoints.user_management import router as user_management_router
+from ..v1.extract import router as extract_router
+from ..v1.llm_internal import router as llm_internal_router
+from ..v1.modules import router as modules_router
+from ..v1.platform import router as platform_router
+from ..v1.plugin_registry import router as plugin_registry_router
+from ..v1.prompt_templates import router as prompt_templates_router
+from ..v1.rag import router as rag_router
+from ..v1.settings import router as settings_router
+from ..v1.users import router as users_router
 from .admin_audit import router as admin_audit_router
-from .usage_stats import router as usage_stats_router
+from .admin_pricing import router as admin_pricing_router
+from .debugging import router as debugging_router
 from .metrics import router as metrics_router
 from .providers import router as providers_router
-from ..v1.connectors import router as connectors_router
+from .usage_stats import router as usage_stats_router
 
 # Create internal API router
 internal_api_router = APIRouter()
@@ -101,11 +101,6 @@ internal_api_router.include_router(
     llm_internal_router, prefix="/llm", tags=["internal-llm"]
 )
 
-# Include chatbot routes (frontend chatbot management)
-internal_api_router.include_router(
-    chatbot_router, prefix="/chatbot", tags=["internal-chatbot"]
-)
-
 # Include extract routes (frontend extract document processing)
 internal_api_router.include_router(
     extract_router, prefix="/extract", tags=["internal-extract"]
@@ -137,14 +132,10 @@ internal_api_router.include_router(
 )
 
 # Include usage statistics routes (usage stats and records)
-internal_api_router.include_router(
-    usage_stats_router, tags=["internal-usage-stats"]
-)
+internal_api_router.include_router(usage_stats_router, tags=["internal-usage-stats"])
 
 # Include metrics endpoint (Prometheus metrics)
-internal_api_router.include_router(
-    metrics_router, tags=["internal-metrics"]
-)
+internal_api_router.include_router(metrics_router, tags=["internal-metrics"])
 
 # Include provider health routes (provider monitoring - admin only)
 internal_api_router.include_router(
@@ -153,5 +144,5 @@ internal_api_router.include_router(
 
 # Include connector management routes (knowledge base connectors - admin only)
 internal_api_router.include_router(
-    connectors_router, prefix="/connectors", tags=["internal-connectors"]
+    connectors_router, tags=["internal-connectors"]
 )

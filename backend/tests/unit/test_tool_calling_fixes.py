@@ -4,10 +4,12 @@ Unit tests for tool calling service - validate_tool_availability.
 Tests built-in tools, MCP tools, and custom tools validation.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.services.tool_calling_service import ToolCallingService
+
+import pytest
+
 from app.services.builtin_tools import BuiltinToolRegistry, register_builtin_tools
+from app.services.tool_calling_service import ToolCallingService
 
 
 @pytest.fixture
@@ -37,8 +39,7 @@ class TestValidateToolAvailability:
 
         # Test validation
         result = await service.validate_tool_availability(
-            ["rag_search", "web_search", "code_execution"],
-            mock_user
+            ["rag_search", "web_search", "code_execution"], mock_user
         )
 
         # All built-in tools should be available
@@ -52,14 +53,16 @@ class TestValidateToolAvailability:
         service = ToolCallingService(mock_db)
 
         # Mock environment variable for MCP server configuration
-        with patch.dict('os.environ', {
-            'MCP_ORDER_API_URL': 'http://localhost:3000',
-            'MCP_ORDER_API_KEY': 'test-key'
-        }):
+        with patch.dict(
+            "os.environ",
+            {
+                "MCP_ORDER_API_URL": "http://localhost:3000",
+                "MCP_ORDER_API_KEY": "test-key",
+            },
+        ):
             # Test validation for MCP tools
             result = await service.validate_tool_availability(
-                ["order-api.get_order", "order-api.create_order"],
-                mock_user
+                ["order-api.get_order", "order-api.create_order"], mock_user
             )
 
             # MCP tools should be available when server is configured
@@ -72,7 +75,7 @@ class TestValidateToolAvailability:
         service = ToolCallingService(mock_db)
 
         # Ensure no MCP server configuration
-        with patch.dict('os.environ', {}, clear=False):
+        with patch.dict("os.environ", {}, clear=False):
             # Mock database query to return no tools
             mock_tool_mgmt = MagicMock()
             mock_tool_mgmt.get_tool_by_name_and_user = AsyncMock(return_value=None)
@@ -81,8 +84,7 @@ class TestValidateToolAvailability:
 
             # Test validation for MCP tools
             result = await service.validate_tool_availability(
-                ["nonexistent-server.tool"],
-                mock_user
+                ["nonexistent-server.tool"], mock_user
             )
 
             # MCP tools should not be available when server is not configured
@@ -101,19 +103,26 @@ class TestValidateToolAvailability:
         mock_custom_tool.can_be_used_by.return_value = True
 
         mock_tool_mgmt = MagicMock()
+
         async def mock_get_tool(name, user_id):
             if name == "custom_tool":
                 return mock_custom_tool
             return None
+
         mock_tool_mgmt.get_tool_by_name_and_user = mock_get_tool
         mock_tool_mgmt.get_tools = AsyncMock(return_value=[])
         service.tool_mgmt = mock_tool_mgmt
 
         # Mock MCP server configuration
-        with patch.dict('os.environ', {'MCP_TEST_SERVER_URL': 'http://localhost:3000'}):
+        with patch.dict("os.environ", {"MCP_TEST_SERVER_URL": "http://localhost:3000"}):
             result = await service.validate_tool_availability(
-                ["rag_search", "test-server.some_tool", "custom_tool", "nonexistent_tool"],
-                mock_user
+                [
+                    "rag_search",
+                    "test-server.some_tool",
+                    "custom_tool",
+                    "nonexistent_tool",
+                ],
+                mock_user,
             )
 
             # Check results
@@ -133,14 +142,13 @@ class TestValidateToolAvailability:
         # Mock database to have a tool with same name as built-in
         # This should not be called for built-in tools
         mock_tool_mgmt = MagicMock()
-        mock_tool_mgmt.get_tool_by_name_and_user = AsyncMock(side_effect=Exception("Should not be called"))
+        mock_tool_mgmt.get_tool_by_name_and_user = AsyncMock(
+            side_effect=Exception("Should not be called")
+        )
         service.tool_mgmt = mock_tool_mgmt
 
         # Test validation - should check built-in first and not hit database
-        result = await service.validate_tool_availability(
-            ["rag_search"],
-            mock_user
-        )
+        result = await service.validate_tool_availability(["rag_search"], mock_user)
 
         # Built-in tool should be found without database query
         assert result["rag_search"] is True

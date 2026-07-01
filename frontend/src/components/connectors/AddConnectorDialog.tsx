@@ -281,8 +281,16 @@ export function AddConnectorDialog({
 
             <div className="space-y-2">
               <Label htmlFor="collection">Collection</Label>
+              {collections.length === 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Create a RAG collection before adding a connector.
+                  </AlertDescription>
+                </Alert>
+              )}
               <Select value={collectionId} onValueChange={setCollectionId}>
-                <SelectTrigger id="collection">
+                <SelectTrigger id="collection" disabled={collections.length === 0}>
                   <SelectValue placeholder="Select a collection" />
                 </SelectTrigger>
                 <SelectContent>
@@ -303,7 +311,7 @@ export function AddConnectorDialog({
                 </p>
                 <Button
                   onClick={handleOAuthAuthorize}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || collections.length === 0}
                   className="w-full"
                 >
                   {isSubmitting ? (
@@ -356,7 +364,7 @@ export function AddConnectorDialog({
 
                 <Button
                   onClick={handleTokenSubmit}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || collections.length === 0}
                   className="w-full mt-4"
                 >
                   {isSubmitting ? (

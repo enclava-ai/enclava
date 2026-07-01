@@ -5,8 +5,9 @@ Data models for tracking attestation verification results and provider health st
 """
 
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 
 
 class AttestationResult(BaseModel):
@@ -16,6 +17,7 @@ class AttestationResult(BaseModel):
     Contains all verification details including Intel TDX, GPU attestation,
     and nonce binding verification results.
     """
+
     verified: bool
     provider_id: str
     model: str
@@ -35,6 +37,7 @@ class ProviderHealth(BaseModel):
     Healthy = attestation works AND inference works
     Unhealthy = attestation fails OR inference fails OR unreachable
     """
+
     provider_id: str
     healthy: bool
     last_check: Optional[AttestationResult] = None

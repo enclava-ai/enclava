@@ -104,14 +104,14 @@ function LLMPageContent() {
   const [customTypeKey, setCustomTypeKey] = useState('')
   const [useCustomType, setUseCustomType] = useState(false)
 
-  // Available chatbot types
-  const CHATBOT_TYPES = [
+  // Available agent types
+  const AGENT_TYPES = [
     { value: "assistant", label: "General Assistant" },
     { value: "customer_support", label: "Customer Support" },
     { value: "teacher", label: "Educational Tutor" },
     { value: "researcher", label: "Research Assistant" },
     { value: "creative_writer", label: "Creative Writer" },
-    { value: "custom", label: "Custom Chatbot" },
+    { value: "custom", label: "Custom Agent" },
   ]
 
   useEffect(() => {
@@ -248,13 +248,13 @@ function LLMPageContent() {
     }
   }
 
-  const handleImproveWithAI = async (currentPrompt: string, chatbotType: string, isEditing: boolean = false) => {
+  const handleImproveWithAI = async (currentPrompt: string, agentType: string, isEditing: boolean = false) => {
     try {
       setImprovingWithAI(true)
 
       const result = await apiClient.post('/api-internal/v1/prompt-templates/improve', {
         current_prompt: currentPrompt,
-        chatbot_type: chatbotType,
+        agent_type: agentType,
         improvement_instructions: null
       })
 
@@ -280,7 +280,7 @@ function LLMPageContent() {
       'teacher': 'Educational Tutor',
       'researcher': 'Research Assistant',
       'creative_writer': 'Creative Writer',
-      'custom': 'Custom Chatbot'
+      'custom': 'Custom Agent'
     }
     return displayNames[typeKey] || typeKey
   }
@@ -357,7 +357,7 @@ function LLMPageContent() {
             <div className="flex justify-between items-center mb-4">
               <div>
                 <p className="text-muted-foreground">
-                  Customize the system prompts for different chatbot types. These prompts define how your chatbots behave and respond to users.
+                  Customize the system prompts for different agent types. These prompts define how your agents behave and respond to users.
                 </p>
               </div>
               <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -371,7 +371,7 @@ function LLMPageContent() {
                   <DialogHeader>
                     <DialogTitle>Create New Prompt Template</DialogTitle>
                     <DialogDescription>
-                      Create a new system prompt template for a specific chatbot type.
+                      Create a new system prompt template for a specific agent type.
                     </DialogDescription>
                   </DialogHeader>
 
@@ -387,7 +387,7 @@ function LLMPageContent() {
                     </div>
 
                     <div>
-                      <Label>Chatbot Type *</Label>
+                      <Label>Agent Type *</Label>
                       <div className="space-y-3">
                         <div className="flex items-center space-x-2">
                           <input
@@ -408,8 +408,8 @@ function LLMPageContent() {
                             className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                             disabled={useCustomType}
                           >
-                            <option value="">Select a chatbot type</option>
-                            {CHATBOT_TYPES.map((type) => (
+                            <option value="">Select an agent type</option>
+                            {AGENT_TYPES.map((type) => (
                               <option key={type.value} value={type.value}>
                                 {type.label}
                               </option>
@@ -476,7 +476,7 @@ function LLMPageContent() {
                         id="create-system-prompt"
                         value={createForm.system_prompt}
                         onChange={(e) => setCreateForm({ ...createForm, system_prompt: e.target.value })}
-                        placeholder="Enter the system prompt that defines the chatbot's behavior..."
+                        placeholder="Enter the system prompt that defines the agent's behavior..."
                         rows={12}
                         className="font-mono text-sm"
                       />
@@ -599,7 +599,7 @@ function LLMPageContent() {
                           <DialogHeader>
                             <DialogTitle>Edit Prompt Template</DialogTitle>
                             <DialogDescription>
-                              Customize the system prompt for {template.name}. This defines how the chatbot will behave and respond.
+                              Customize the system prompt for {template.name}. This defines how the agent will behave and respond.
                             </DialogDescription>
                           </DialogHeader>
 
@@ -647,7 +647,7 @@ function LLMPageContent() {
                                 id="system-prompt"
                                 value={editForm.system_prompt}
                                 onChange={(e) => setEditForm({ ...editForm, system_prompt: e.target.value })}
-                                placeholder="Enter the system prompt that defines the chatbot's behavior..."
+                                placeholder="Enter the system prompt that defines the agent's behavior..."
                                 rows={12}
                                 className="font-mono text-sm"
                               />

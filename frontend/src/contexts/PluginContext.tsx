@@ -459,53 +459,9 @@ export const PluginProvider: React.FC<PluginProviderProps> = ({ children }) => {
       const data = await apiRequest(`/${pluginId}/schema?t=${cacheBust}`);
       let schema = data.schema;
       
-      // For certain plugins, we need to populate dynamic options
-      // Find the plugin by ID to get its name
+      // For certain plugins, populate dynamic options from platform data.
       const plugin = installedPlugins.find(p => p.id === pluginId);
       const pluginName = plugin?.name?.toLowerCase();
-      
-      if (schema && pluginName === 'zammad') {
-        // Populate chatbot options for Zammad
-        try {
-          const chatbotsData = await apiClient.get('/api-internal/v1/chatbot/list');
-          const chatbots = chatbotsData.chatbots || [];
-          
-          if (schema.properties?.chatbot_id) {
-            schema.properties.chatbot_id.type = 'select';
-            schema.properties.chatbot_id.options = chatbots.map((chatbot: any) => ({
-              value: chatbot.id,
-              label: `${chatbot.name} (${chatbot.chatbot_type})`
-            }));
-          }
-        } catch (chatbotError) {
-          console.warn(`Failed to populate chatbot options for plugin ${pluginId}`, chatbotError);
-        }
-
-        // Populate model options for AI settings
-        try {
-          const modelsData = await apiClient.get('/api-internal/v1/llm/models');
-          const models = modelsData.data || [];
-          
-          const modelOptions = models.map((model: any) => ({
-            value: model.id,
-            label: model.id
-          }));
-
-          // Set model options for AI summarization
-          if (schema.properties?.ai_summarization?.properties?.model) {
-            schema.properties.ai_summarization.properties.model.type = 'select';
-            schema.properties.ai_summarization.properties.model.options = modelOptions;
-          }
-
-          // Set model options for draft settings
-          if (schema.properties?.draft_settings?.properties?.model) {
-            schema.properties.draft_settings.properties.model.type = 'select';
-            schema.properties.draft_settings.properties.model.options = modelOptions;
-          }
-        } catch (modelError) {
-          console.warn(`Failed to populate model options for plugin ${pluginId}`, modelError);
-        }
-      }
       
       if (schema && pluginName === 'signal') {
         // Populate model options for Signal bot

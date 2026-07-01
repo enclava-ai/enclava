@@ -1,15 +1,17 @@
 """
-Prompt Template Models for customizable chatbot prompts
+Prompt template models for customizable agent prompts.
 """
 
-from sqlalchemy import Column, String, Text, DateTime, Boolean, Integer
-from sqlalchemy.sql import func
-from app.db.database import Base
 from datetime import datetime, timezone
+
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy.sql import func
+
+from app.db.database import Base
 
 
 class PromptTemplate(Base):
-    """Editable prompt templates for different chatbot types"""
+    """Editable prompt templates for different agent types."""
 
     __tablename__ = "prompt_templates"
 
@@ -32,7 +34,7 @@ class PromptTemplate(Base):
         return f"<PromptTemplate(type_key='{self.type_key}', name='{self.name}')>"
 
 
-class ChatbotPromptVariable(Base):
+class PromptVariable(Base):
     """Available variables that can be used in prompts"""
 
     __tablename__ = "prompt_variables"

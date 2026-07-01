@@ -3,13 +3,14 @@ Audit logging service with async/non-blocking capabilities
 """
 
 import asyncio
-from typing import Optional, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-from app.models.audit_log import AuditLog
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.logging import get_logger
 from app.db.database import utc_now
+from app.models.audit_log import AuditLog
 
 logger = get_logger(__name__)
 
@@ -218,7 +219,7 @@ async def get_audit_logs(
         List of audit log entries
     """
 
-    from sqlalchemy import select, and_
+    from sqlalchemy import and_, select
 
     query = select(AuditLog)
     conditions = []
@@ -263,7 +264,7 @@ async def get_audit_stats(
         Dictionary with audit statistics
     """
 
-    from sqlalchemy import select, func, and_
+    from sqlalchemy import and_, func, select
 
     conditions = []
     if start_date:
@@ -319,10 +320,10 @@ async def get_audit_stats(
         "events_by_action": events_by_action,
         "events_by_resource_type": events_by_resource,
         "events_by_severity": events_by_severity,
-        "success_rate": success_stats.get(True, 0) / total_events
-        if total_events > 0
-        else 0,
-        "failure_rate": success_stats.get(False, 0) / total_events
-        if total_events > 0
-        else 0,
+        "success_rate": (
+            success_stats.get(True, 0) / total_events if total_events > 0 else 0
+        ),
+        "failure_rate": (
+            success_stats.get(False, 0) / total_events if total_events > 0 else 0
+        ),
     }

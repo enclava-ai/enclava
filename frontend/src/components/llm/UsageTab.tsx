@@ -33,7 +33,7 @@ import {
   BarChart3,
   Loader2,
   Zap,
-  MessageSquare,
+  Bot,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { apiClient } from '@/lib/api-client'
@@ -109,7 +109,7 @@ type Period = '7d' | '30d' | '90d'
 const sourceIcons: Record<string, React.ReactNode> = {
   api_key: <Key className="h-4 w-4" />,
   playground: <Zap className="h-4 w-4" />,
-  chatbot: <MessageSquare className="h-4 w-4" />,
+  agent: <Bot className="h-4 w-4" />,
 }
 
 export default function UsageTab() {
@@ -328,9 +328,9 @@ export default function UsageTab() {
         </div>
       )}
 
-      {/* Platform Usage - Playground & Chatbot (usage without API keys) */}
+      {/* Platform Usage - Playground & Agents (usage without API keys) */}
       {hasUsageData && userStats?.by_source && (() => {
-        const platformSources = userStats.by_source.filter(s => s.source === 'playground' || s.source === 'chatbot')
+        const platformSources = userStats.by_source.filter(s => s.source === 'playground' || s.source === 'agent')
         const platformTotal = {
           requests: platformSources.reduce((sum, s) => sum + s.total_requests, 0),
           tokens: platformSources.reduce((sum, s) => sum + s.total_tokens, 0),
@@ -352,7 +352,7 @@ export default function UsageTab() {
                   Platform Usage
                 </CardTitle>
                 <CardDescription>
-                  Usage from Playground and Chatbot testing (no API key required)
+                  Usage from Playground and agent testing (no API key required)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -394,7 +394,7 @@ export default function UsageTab() {
                   <div className="text-center py-8 text-muted-foreground">
                     <Zap className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>No platform usage yet</p>
-                    <p className="text-xs mt-1">Use the Playground or test Chatbots to see usage here</p>
+                    <p className="text-xs mt-1">Use the Playground or test agents to see usage here</p>
                   </div>
                 )}
               </CardContent>
@@ -615,7 +615,7 @@ export default function UsageTab() {
             <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No Usage Data</h3>
             <p className="text-muted-foreground text-center mb-4 max-w-md">
-              Start using the Playground, Chatbot testing, or make API requests to see your usage statistics here.
+              Start using the Playground, agent testing, or make API requests to see your usage statistics here.
             </p>
             {!hasApiKeys && (
               <Button onClick={() => router.push('/admin/api-keys')}>

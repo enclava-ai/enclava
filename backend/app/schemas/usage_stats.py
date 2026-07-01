@@ -6,6 +6,7 @@ Pydantic models for usage statistics API responses.
 
 from datetime import datetime
 from typing import List, Optional
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -41,7 +42,9 @@ class DailyTrend(BaseModel):
 class SourceBreakdown(BaseModel):
     """Breakdown by usage source"""
 
-    source: str = Field(..., description="Source identifier (api_key, playground, chatbot)")
+    source: str = Field(
+        ..., description="Source identifier (agent, api_key, playground)"
+    )
     source_name: str = Field(..., description="Source display name")
     total_requests: int = Field(..., description="Total requests from this source")
     total_tokens: int = Field(..., description="Total tokens from this source")
@@ -92,6 +95,7 @@ class UsageRecordResponse(BaseModel):
     total_cost_dollars: float
     endpoint: str
     method: str
+    agent_config_id: Optional[int] = None
     status: str
     error_type: Optional[str] = None
     is_streaming: bool

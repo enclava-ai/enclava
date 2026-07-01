@@ -2,20 +2,21 @@
 Audit log query endpoints
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
 from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.logging import get_logger
+from app.core.security import get_current_user
 from app.db.database import get_db, utc_now
 from app.models.audit_log import AuditLog
 from app.models.user import User
-from app.core.security import get_current_user
+from app.services.audit_service import get_audit_logs, get_audit_stats, log_audit_event
 from app.services.permission_manager import require_permission
-from app.services.audit_service import log_audit_event, get_audit_logs, get_audit_stats
-from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -600,6 +601,7 @@ async def export_audit_logs(
     else:  # CSV format
         import csv
         import io
+
         from fastapi.responses import StreamingResponse
 
         output = io.StringIO()

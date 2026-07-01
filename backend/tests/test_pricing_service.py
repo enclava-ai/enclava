@@ -9,15 +9,17 @@ Tests cover:
 - Cost calculation with ceiling division
 - Small token counts producing non-zero costs
 """
-import pytest
+
 from datetime import datetime, timezone
 
+import pytest
+
 from app.services.pricing import (
-    PricingService,
-    ModelPricing,
-    calculate_cost_cents_simple,
-    STATIC_PRICING,
     DEFAULT_PRICING,
+    STATIC_PRICING,
+    ModelPricing,
+    PricingService,
+    calculate_cost_cents_simple,
 )
 
 
@@ -36,8 +38,7 @@ class TestPricingService:
     async def test_static_pricing_lookup_known_model(self, pricing_service):
         """Test pricing lookup for a known model returns correct pricing."""
         pricing = await pricing_service.get_pricing(
-            provider_id="privatemode",
-            model_id="meta-llama/llama-3.1-70b-instruct"
+            provider_id="privatemode", model_id="meta-llama/llama-3.1-70b-instruct"
         )
 
         assert pricing.provider_id == "privatemode"
@@ -52,8 +53,7 @@ class TestPricingService:
     async def test_static_pricing_lookup_privatemode_llama_8b(self, pricing_service):
         """Test pricing for smaller Llama model."""
         pricing = await pricing_service.get_pricing(
-            provider_id="privatemode",
-            model_id="meta-llama/llama-3.1-8b-instruct"
+            provider_id="privatemode", model_id="meta-llama/llama-3.1-8b-instruct"
         )
 
         assert pricing.input_price_per_million_cents == 10
@@ -64,8 +64,7 @@ class TestPricingService:
     async def test_static_pricing_lookup_redpill_provider(self, pricing_service):
         """Test pricing lookup for redpill provider."""
         pricing = await pricing_service.get_pricing(
-            provider_id="redpill",
-            model_id="phala/deepseek-chat-v3-0324"
+            provider_id="redpill", model_id="phala/deepseek-chat-v3-0324"
         )
 
         assert pricing.provider_id == "redpill"
@@ -77,8 +76,7 @@ class TestPricingService:
     async def test_static_pricing_lookup_openai_provider(self, pricing_service):
         """Test pricing lookup for OpenAI models."""
         pricing = await pricing_service.get_pricing(
-            provider_id="openai",
-            model_id="gpt-4o"
+            provider_id="openai", model_id="gpt-4o"
         )
 
         assert pricing.input_price_per_million_cents == 250
@@ -89,8 +87,7 @@ class TestPricingService:
     async def test_static_pricing_lookup_anthropic_provider(self, pricing_service):
         """Test pricing lookup for Anthropic models."""
         pricing = await pricing_service.get_pricing(
-            provider_id="anthropic",
-            model_id="claude-3.5-sonnet"
+            provider_id="anthropic", model_id="claude-3.5-sonnet"
         )
 
         assert pricing.input_price_per_million_cents == 300
@@ -101,12 +98,13 @@ class TestPricingService:
     async def test_static_pricing_lookup_embedding_model(self, pricing_service):
         """Test pricing lookup for embedding models (output is 0)."""
         pricing = await pricing_service.get_pricing(
-            provider_id="privatemode",
-            model_id="baai/bge-large-en-v1.5"
+            provider_id="privatemode", model_id="baai/bge-large-en-v1.5"
         )
 
         assert pricing.input_price_per_million_cents == 2
-        assert pricing.output_price_per_million_cents == 0  # Embeddings have no output cost
+        assert (
+            pricing.output_price_per_million_cents == 0
+        )  # Embeddings have no output cost
 
     # --- Fuzzy Matching / Prefix-based Pricing Tests ---
 
@@ -117,7 +115,7 @@ class TestPricingService:
         # Using a model name that contains a known model substring
         pricing = await pricing_service.get_pricing(
             provider_id="privatemode",
-            model_id="llama-3.1-70b-instruct-latest"  # Contains "llama-3.1-70b-instruct"
+            model_id="llama-3.1-70b-instruct-latest",  # Contains "llama-3.1-70b-instruct"
         )
 
         # Should fuzzy match to meta-llama/llama-3.1-70b-instruct
@@ -131,7 +129,7 @@ class TestPricingService:
         """Test that provider lookup is case-insensitive."""
         pricing = await pricing_service.get_pricing(
             provider_id="PRIVATEMODE",  # Uppercase
-            model_id="meta-llama/llama-3.1-70b-instruct"
+            model_id="meta-llama/llama-3.1-70b-instruct",
         )
 
         assert pricing.input_price_per_million_cents == 40
@@ -143,8 +141,7 @@ class TestPricingService:
     async def test_default_pricing_unknown_model(self, pricing_service):
         """Test that unknown models get default pricing."""
         pricing = await pricing_service.get_pricing(
-            provider_id="privatemode",
-            model_id="unknown-model-xyz-123"
+            provider_id="privatemode", model_id="unknown-model-xyz-123"
         )
 
         assert pricing.input_price_per_million_cents == DEFAULT_PRICING["input"]
@@ -156,8 +153,7 @@ class TestPricingService:
     async def test_default_pricing_unknown_provider(self, pricing_service):
         """Test that unknown providers get default pricing."""
         pricing = await pricing_service.get_pricing(
-            provider_id="unknown-provider",
-            model_id="some-model"
+            provider_id="unknown-provider", model_id="some-model"
         )
 
         assert pricing.input_price_per_million_cents == DEFAULT_PRICING["input"]
@@ -220,13 +216,11 @@ class TestPricingService:
             input_price_per_million_cents=100,  # $1 per 1M
             output_price_per_million_cents=200,  # $2 per 1M
             price_source="manual",
-            effective_from=datetime.now(timezone.utc)
+            effective_from=datetime.now(timezone.utc),
         )
 
         input_cost, output_cost, total_cost = pricing_service.calculate_cost_cents(
-            input_tokens=1_000_000,
-            output_tokens=1_000_000,
-            pricing=pricing
+            input_tokens=1_000_000, output_tokens=1_000_000, pricing=pricing
         )
 
         assert input_cost == 100  # $1
@@ -242,15 +236,13 @@ class TestPricingService:
             input_price_per_million_cents=1,  # 1 cent per 1M
             output_price_per_million_cents=1,  # 1 cent per 1M
             price_source="manual",
-            effective_from=datetime.now(timezone.utc)
+            effective_from=datetime.now(timezone.utc),
         )
 
         # With 1 token at 1 cent per million, floor would give 0
         # Ceiling should give 1
         input_cost, output_cost, total_cost = pricing_service.calculate_cost_cents(
-            input_tokens=1,
-            output_tokens=1,
-            pricing=pricing
+            input_tokens=1, output_tokens=1, pricing=pricing
         )
 
         # Ceiling division should round up
@@ -267,14 +259,12 @@ class TestPricingService:
             input_price_per_million_cents=40,  # 40 cents per 1M
             output_price_per_million_cents=40,  # 40 cents per 1M
             price_source="manual",
-            effective_from=datetime.now(timezone.utc)
+            effective_from=datetime.now(timezone.utc),
         )
 
         # 10 tokens should still produce cost due to ceiling division
         input_cost, output_cost, total_cost = pricing_service.calculate_cost_cents(
-            input_tokens=10,
-            output_tokens=10,
-            pricing=pricing
+            input_tokens=10, output_tokens=10, pricing=pricing
         )
 
         # With ceiling division, even small amounts should be at least 1
@@ -291,13 +281,11 @@ class TestPricingService:
             input_price_per_million_cents=100,
             output_price_per_million_cents=200,
             price_source="manual",
-            effective_from=datetime.now(timezone.utc)
+            effective_from=datetime.now(timezone.utc),
         )
 
         input_cost, output_cost, total_cost = pricing_service.calculate_cost_cents(
-            input_tokens=0,
-            output_tokens=0,
-            pricing=pricing
+            input_tokens=0, output_tokens=0, pricing=pricing
         )
 
         # Zero tokens should result in zero cost
@@ -315,14 +303,12 @@ class TestPricingService:
             input_price_per_million_cents=300,  # Claude pricing
             output_price_per_million_cents=1500,
             price_source="manual",
-            effective_from=datetime.now(timezone.utc)
+            effective_from=datetime.now(timezone.utc),
         )
 
         # 10M tokens should be straightforward
         input_cost, output_cost, total_cost = pricing_service.calculate_cost_cents(
-            input_tokens=10_000_000,
-            output_tokens=5_000_000,
-            pricing=pricing
+            input_tokens=10_000_000, output_tokens=5_000_000, pricing=pricing
         )
 
         # 10M * 300 / 1M = 3000 cents ($30)
@@ -340,13 +326,11 @@ class TestPricingService:
             input_price_per_million_cents=2,
             output_price_per_million_cents=0,  # Embeddings have no output
             price_source="manual",
-            effective_from=datetime.now(timezone.utc)
+            effective_from=datetime.now(timezone.utc),
         )
 
         input_cost, output_cost, total_cost = pricing_service.calculate_cost_cents(
-            input_tokens=1_000_000,
-            output_tokens=0,
-            pricing=pricing
+            input_tokens=1_000_000, output_tokens=0, pricing=pricing
         )
 
         assert input_cost == 2
@@ -362,7 +346,7 @@ class TestPricingService:
             model_name="meta-llama/llama-3.1-70b-instruct",
             input_tokens=1_000_000,
             output_tokens=1_000_000,
-            provider_id="privatemode"
+            provider_id="privatemode",
         )
 
         # 40 cents per 1M for both input and output
@@ -375,7 +359,7 @@ class TestPricingService:
             model_name="unknown-model",
             input_tokens=1_000_000,
             output_tokens=1_000_000,
-            provider_id="unknown-provider"
+            provider_id="unknown-provider",
         )
 
         # Should use default pricing: 100 + 200 = 300
@@ -427,7 +411,7 @@ class TestModelPricingDataclass:
             input_price_per_million_cents=100,
             output_price_per_million_cents=200,
             price_source="api_sync",
-            effective_from=now
+            effective_from=now,
         )
 
         assert pricing.provider_id == "test"
@@ -450,7 +434,7 @@ class TestModelPricingDataclass:
                 input_price_per_million_cents=100,
                 output_price_per_million_cents=200,
                 price_source=source,
-                effective_from=datetime.now(timezone.utc)
+                effective_from=datetime.now(timezone.utc),
             )
             assert pricing.price_source == source
 
@@ -473,13 +457,21 @@ class TestStaticPricingData:
             for model_id, pricing in models.items():
                 assert "input" in pricing, f"{provider}/{model_id} missing 'input'"
                 assert "output" in pricing, f"{provider}/{model_id} missing 'output'"
-                assert isinstance(pricing["input"], int), f"{provider}/{model_id} input must be int"
-                assert isinstance(pricing["output"], int), f"{provider}/{model_id} output must be int"
+                assert isinstance(
+                    pricing["input"], int
+                ), f"{provider}/{model_id} input must be int"
+                assert isinstance(
+                    pricing["output"], int
+                ), f"{provider}/{model_id} output must be int"
 
     @pytest.mark.unit
     def test_static_pricing_non_negative(self):
         """Test that all pricing values are non-negative."""
         for provider, models in STATIC_PRICING.items():
             for model_id, pricing in models.items():
-                assert pricing["input"] >= 0, f"{provider}/{model_id} has negative input price"
-                assert pricing["output"] >= 0, f"{provider}/{model_id} has negative output price"
+                assert (
+                    pricing["input"] >= 0
+                ), f"{provider}/{model_id} has negative input price"
+                assert (
+                    pricing["output"] >= 0
+                ), f"{provider}/{model_id} has negative output price"

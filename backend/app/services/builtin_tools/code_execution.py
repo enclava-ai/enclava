@@ -4,9 +4,11 @@ Code Execution Built-in Tool
 Executes Python code in a secure sandbox environment.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
+from app.models.tool import Tool, ToolStatus, ToolType
+
 from .base import BuiltinTool, ToolExecutionContext, ToolResult
-from app.models.tool import Tool, ToolType, ToolStatus
 
 
 class CodeExecutionTool(BuiltinTool):
@@ -31,22 +33,21 @@ class CodeExecutionTool(BuiltinTool):
     parameters_schema = {
         "type": "object",
         "properties": {
-            "code": {
-                "type": "string",
-                "description": "Python code to execute"
-            },
+            "code": {"type": "string", "description": "Python code to execute"},
             "timeout": {
                 "type": "integer",
                 "description": "Execution timeout in seconds (default: 30)",
                 "default": 30,
                 "minimum": 1,
-                "maximum": 300
-            }
+                "maximum": 300,
+            },
         },
-        "required": ["code"]
+        "required": ["code"],
     }
 
-    async def execute(self, params: Dict[str, Any], ctx: ToolExecutionContext) -> ToolResult:
+    async def execute(
+        self, params: Dict[str, Any], ctx: ToolExecutionContext
+    ) -> ToolResult:
         """Execute Python code in a secure sandbox.
 
         Creates an ephemeral Tool record, executes it using ToolExecutionService,
@@ -68,9 +69,7 @@ class CodeExecutionTool(BuiltinTool):
             code = params.get("code")
             if not code:
                 return ToolResult(
-                    success=False,
-                    output=None,
-                    error="Code parameter is required"
+                    success=False, output=None, error="Code parameter is required"
                 )
 
             timeout = params.get("timeout", 30)
@@ -80,7 +79,7 @@ class CodeExecutionTool(BuiltinTool):
                 return ToolResult(
                     success=False,
                     output=None,
-                    error="Timeout must be between 1 and 300 seconds"
+                    error="Timeout must be between 1 and 300 seconds",
                 )
 
             # Create ephemeral tool record for execution
@@ -112,12 +111,12 @@ class CodeExecutionTool(BuiltinTool):
                     tool_id=ephemeral_tool.id,
                     user_id=ctx.user_id,
                     parameters={},  # Code is in the tool itself
-                    timeout_override=timeout
+                    timeout_override=timeout,
                 )
 
                 # IMPORTANT: Use ToolStatus enum, NOT string comparison
                 # execution.status is a ToolStatus enum value, not a string
-                success = (execution.status == ToolStatus.COMPLETED)
+                success = execution.status == ToolStatus.COMPLETED
 
                 return ToolResult(
                     success=success,
@@ -125,9 +124,9 @@ class CodeExecutionTool(BuiltinTool):
                         "stdout": execution.output,
                         "stderr": execution.error_message if not success else None,
                         "status": execution.status.value,
-                        "execution_time": execution.execution_time_seconds
+                        "execution_time": execution.execution_time_seconds,
                     },
-                    error=execution.error_message if not success else None
+                    error=execution.error_message if not success else None,
                 )
 
             finally:
@@ -138,7 +137,5 @@ class CodeExecutionTool(BuiltinTool):
 
         except Exception as e:
             return ToolResult(
-                success=False,
-                output=None,
-                error=f"Code execution failed: {str(e)}"
+                success=False, output=None, error=f"Code execution failed: {str(e)}"
             )
