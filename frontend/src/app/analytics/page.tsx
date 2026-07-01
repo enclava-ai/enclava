@@ -104,7 +104,7 @@ function AnalyticsPageContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -283,7 +283,7 @@ function AnalyticsPageContent() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Uptime</span>
                   <div className="flex items-center space-x-2">
-                    <Badge variant="outline" className="text-green-600">
+                    <Badge variant="outline" className="text-success">
                       {data.performance.uptime}%
                     </Badge>
                   </div>
@@ -291,7 +291,7 @@ function AnalyticsPageContent() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Error Rate</span>
                   <div className="flex items-center space-x-2">
-                    <Badge variant="outline" className="text-orange-600">
+                    <Badge variant="outline" className="text-warning">
                       {(data.performance.errorRate * 100).toFixed(2)}%
                     </Badge>
                   </div>

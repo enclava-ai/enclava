@@ -240,7 +240,7 @@ export default function BudgetsPage() {
       case "exceeded":
         return <Badge variant="destructive">Exceeded</Badge>;
       case "warning":
-        return <Badge className="bg-yellow-500">Warning</Badge>;
+        return <Badge variant="warning">Warning</Badge>;
       default:
         return <Badge variant="default">Active</Badge>;
     }
@@ -261,7 +261,7 @@ export default function BudgetsPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </div>
     );
@@ -433,10 +433,10 @@ export default function BudgetsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Over Threshold</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <AlertTriangle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats?.over_threshold || 0}</div>
+            <div className="text-2xl font-bold text-warning">{stats?.over_threshold || 0}</div>
             <p className="text-xs text-muted-foreground">
               Budgets exceeding alert threshold
             </p>
@@ -446,7 +446,7 @@ export default function BudgetsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Spending</CardTitle>
-            <TrendingUp className="h-4 w-4 text-red-500" />
+            <TrendingUp className="h-4 w-4 text-danger" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats?.total_spending || 0)}</div>
@@ -459,7 +459,7 @@ export default function BudgetsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">This Month</CardTitle>
-            <Calendar className="h-4 w-4 text-green-500" />
+            <Calendar className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats?.monthly_spending || 0)}</div>
@@ -494,7 +494,7 @@ export default function BudgetsPage() {
             const status = getUsageStatus(budget.current_usage, budget.limit_amount, budget.alert_threshold);
             
             return (
-              <Card key={budget.id} className={status === "exceeded" ? "border-red-500" : status === "warning" ? "border-yellow-500" : ""}>
+              <Card key={budget.id} className={status === "exceeded" ? "border-danger-border" : status === "warning" ? "border-warning-border" : ""}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -524,7 +524,7 @@ export default function BudgetsPage() {
                       </div>
                       <Progress 
                         value={usagePercentage} 
-                        className={`h-2 ${status === "exceeded" ? "bg-red-100" : status === "warning" ? "bg-yellow-100" : ""}`}
+                        className={`h-2 ${status === "exceeded" ? "bg-danger-soft" : status === "warning" ? "bg-warning-soft" : ""}`}
                       />
                     </div>
 
@@ -583,7 +583,7 @@ export default function BudgetsPage() {
 
                     {/* Warning Messages */}
                     {status === "exceeded" && (
-                      <Alert className="border-red-500">
+                      <Alert className="border-danger-border">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>
                           This budget has exceeded its limit. {budget.hard_limit && "Spending has been blocked."}
@@ -592,7 +592,7 @@ export default function BudgetsPage() {
                     )}
                     
                     {status === "warning" && (
-                      <Alert className="border-yellow-500">
+                      <Alert className="border-warning-border">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>
                           This budget has exceeded {budget.alert_threshold}% of its limit.

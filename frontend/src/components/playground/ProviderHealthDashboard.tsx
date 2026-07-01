@@ -84,33 +84,33 @@ export default function ProviderHealthDashboard() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'healthy':
-        return <CheckCircle className="h-5 w-5 text-green-500" />
+        return <CheckCircle className="h-5 w-5 text-success" />
       case 'degraded':
-        return <Clock className="h-5 w-5 text-yellow-500" />
+        return <Clock className="h-5 w-5 text-warning" />
       case 'unavailable':
-        return <XCircle className="h-5 w-5 text-red-500" />
+        return <XCircle className="h-5 w-5 text-danger" />
       default:
-        return <AlertCircle className="h-5 w-5 text-gray-400" />
+        return <AlertCircle className="h-5 w-5 text-muted-foreground" />
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
-        return 'text-green-600 bg-green-50 border-green-200'
+        return 'text-success bg-success-soft border-success-border'
       case 'degraded':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200'
+        return 'text-warning bg-warning-soft border-warning-border'
       case 'unavailable':
-        return 'text-red-600 bg-red-50 border-red-200'
+        return 'text-danger bg-danger-soft border-danger-border'
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200'
+        return 'text-muted-foreground bg-muted border-border'
     }
   }
 
   const getLatencyColor = (latency: number) => {
-    if (latency < 500) return 'text-green-600'
-    if (latency < 2000) return 'text-yellow-600'
-    return 'text-red-600'
+    if (latency < 500) return 'text-success'
+    if (latency < 2000) return 'text-warning'
+    return 'text-danger'
   }
 
   if (loading) {
@@ -124,13 +124,13 @@ export default function ProviderHealthDashboard() {
           {[1, 2, 3].map(i => (
             <Card key={i} className="animate-pulse">
               <CardHeader className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+                <div className="h-3 bg-muted rounded w-1/2"></div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <div className="h-3 bg-gray-200 rounded"></div>
-                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                  <div className="h-3 bg-muted rounded"></div>
+                  <div className="h-3 bg-muted rounded w-2/3"></div>
                 </div>
               </CardContent>
             </Card>
@@ -188,7 +188,7 @@ export default function ProviderHealthDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Healthy Providers</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+            <CheckCircle className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{healthyProviders}</div>

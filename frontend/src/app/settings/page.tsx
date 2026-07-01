@@ -244,13 +244,13 @@ function SettingsPageContent() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "loaded":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-success" />;
       case "failed":
-        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+        return <AlertTriangle className="h-4 w-4 text-danger" />;
       case "disabled":
-        return <Square className="h-4 w-4 text-gray-500" />;
+        return <Square className="h-4 w-4 text-muted-foreground" />;
       default:
-        return <Clock className="h-4 w-4 text-yellow-500" />;
+        return <Clock className="h-4 w-4 text-warning" />;
     }
   };
 
@@ -273,7 +273,7 @@ function SettingsPageContent() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </div>
     );
@@ -284,7 +284,7 @@ function SettingsPageContent() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Settings Not Available</h2>
             <p className="text-muted-foreground mb-4">Unable to load system settings. Please try again.</p>
             <Button onClick={fetchSettings} variant="outline">
@@ -477,20 +477,20 @@ function SettingsPageContent() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Loaded</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CheckCircle className="h-4 w-4 text-success" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{moduleStats?.loaded_modules || 0}</div>
+                <div className="text-2xl font-bold text-success">{moduleStats?.loaded_modules || 0}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Failed</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <AlertTriangle className="h-4 w-4 text-danger" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">{moduleStats?.failed_modules || 0}</div>
+                <div className="text-2xl font-bold text-danger">{moduleStats?.failed_modules || 0}</div>
               </CardContent>
             </Card>
 

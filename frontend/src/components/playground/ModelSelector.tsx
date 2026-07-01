@@ -122,11 +122,11 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
   // Get badge style for mode
   const getModeBadgeStyle = (mode: string): string => {
     const styles: Record<string, string> = {
-      'generate': 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-      'tool_calling': 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-      'vision': 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-      'transcribe': 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-      'embed': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
+      'generate': 'bg-info-soft text-info-soft-foreground',
+      'tool_calling': 'bg-muted text-muted-foreground',
+      'vision': 'bg-success-soft text-success-soft-foreground',
+      'transcribe': 'bg-warning-soft text-warning-soft-foreground',
+      'embed': 'bg-info-soft text-info-soft-foreground',
     }
     return styles[mode] || ''
   }
@@ -192,13 +192,13 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
     const status = providerStatus[provider.toLowerCase()]?.status || 'unknown'
     switch (status) {
       case 'healthy':
-        return <CheckCircle className="h-3 w-3 text-green-500" />
+        return <CheckCircle className="h-3 w-3 text-success" />
       case 'degraded':
-        return <Clock className="h-3 w-3 text-yellow-500" />
+        return <Clock className="h-3 w-3 text-warning" />
       case 'unavailable':
-        return <XCircle className="h-3 w-3 text-red-500" />
+        return <XCircle className="h-3 w-3 text-danger" />
       default:
-        return <AlertCircle className="h-3 w-3 text-gray-400" />
+        return <AlertCircle className="h-3 w-3 text-muted-foreground" />
     }
   }
   
@@ -404,9 +404,9 @@ export default function ModelSelector({ value, onValueChange, filter = 'all', cl
                         <div className="flex justify-between">
                           <span>Status:</span>
                           <span className={`font-medium ${
-                            status.status === 'healthy' ? 'text-green-600' :
-                            status.status === 'degraded' ? 'text-yellow-600' :
-                            'text-red-600'
+                            status.status === 'healthy' ? 'text-success' :
+                            status.status === 'degraded' ? 'text-warning' :
+                            'text-danger'
                           }`}>{status.status}</span>
                         </div>
                         {status.latency_ms && (

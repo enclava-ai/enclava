@@ -83,17 +83,17 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'fully_protected':
-        return 'text-green-600 bg-green-100'
+        return 'text-success bg-success-soft'
       case 'well_protected':
-        return 'text-green-600 bg-green-100'
+        return 'text-success bg-success-soft'
       case 'adequately_protected':
-        return 'text-yellow-600 bg-yellow-100'
+        return 'text-warning bg-warning-soft'
       case 'partially_protected':
-        return 'text-orange-600 bg-orange-100'
+        return 'text-warning bg-warning-soft'
       case 'at_risk':
-        return 'text-red-600 bg-red-100'
+        return 'text-danger bg-danger-soft'
       default:
-        return 'text-gray-600 bg-gray-100'
+        return 'text-muted-foreground bg-muted'
     }
   }
 
@@ -115,15 +115,15 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'critical':
-        return 'text-red-600 bg-red-100'
+        return 'text-danger bg-danger-soft'
       case 'high':
-        return 'text-orange-600 bg-orange-100'
+        return 'text-warning bg-warning-soft'
       case 'medium':
-        return 'text-yellow-600 bg-yellow-100'
+        return 'text-warning bg-warning-soft'
       case 'low':
-        return 'text-blue-600 bg-blue-100'
+        return 'text-info bg-info-soft'
       default:
-        return 'text-gray-600 bg-gray-100'
+        return 'text-muted-foreground bg-muted'
     }
   }
 
@@ -139,8 +139,8 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-center py-8">
-              <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
-              <span className="ml-2 text-gray-500">Loading confidentiality report...</span>
+              <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Loading confidentiality report...</span>
             </div>
           </CardContent>
         </Card>
@@ -226,7 +226,7 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
               </div>
               <div className="space-y-1">
                 <Progress value={report.confidence_score} className="h-2" />
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted-foreground">
                   {report.confidence_score}% confident
                 </span>
               </div>
@@ -238,7 +238,7 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
                 <RefreshCw className="w-4 h-4" />
                 <span className="font-medium">Last Updated</span>
               </div>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 {lastUpdated?.toLocaleString()}
               </span>
             </div>
@@ -268,8 +268,8 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
                     <span>Status</span>
                     <Badge className={
                       report.components.connection_test?.connected 
-                        ? "text-green-600 bg-green-100" 
-                        : "text-red-600 bg-red-100"
+                        ? "text-success bg-success-soft"
+                        : "text-danger bg-danger-soft"
                     }>
                       {report.components.connection_test?.connected ? 'Connected' : 'Disconnected'}
                     </Badge>
@@ -286,8 +286,8 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
                     <span>TLS Enabled</span>
                     <Badge className={
                       report.components.connection_test?.tls_enabled 
-                        ? "text-green-600 bg-green-100" 
-                        : "text-yellow-600 bg-yellow-100"
+                        ? "text-success bg-success-soft"
+                        : "text-warning bg-warning-soft"
                     }>
                       {report.components.connection_test?.tls_enabled ? 'Yes' : 'No'}
                     </Badge>
@@ -307,8 +307,8 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
                     <span>Status</span>
                     <Badge className={
                       report.components.encryption_metrics?.encryption_strength === 'strong'
-                        ? "text-green-600 bg-green-100"
-                        : "text-yellow-600 bg-yellow-100"
+                        ? "text-success bg-success-soft"
+                        : "text-warning bg-warning-soft"
                     }>
                       {report.components.encryption_metrics?.encryption_strength || 'Unknown'}
                     </Badge>
@@ -346,9 +346,9 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
             <CardContent>
               <div className="space-y-3">
                 {report.assurances.map((assurance, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
-                    <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-green-800">{assurance}</span>
+                  <div key={index} className="flex items-start gap-3 p-3 bg-success-soft rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-success mt-0.5 flex-shrink-0" />
+                    <span className="text-success-soft-foreground">{assurance}</span>
                   </div>
                 ))}
               </div>
@@ -363,7 +363,7 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <pre className="bg-gray-50 p-4 rounded-lg overflow-auto text-sm">
+                <pre className="bg-muted p-4 rounded-lg overflow-auto text-sm">
                   {JSON.stringify(report.components, null, 2)}
                 </pre>
               </div>
@@ -389,7 +389,7 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
                       </Badge>
                       <span className="font-medium">{rec.issue}</span>
                     </div>
-                    <p className="text-gray-600">{rec.action}</p>
+                    <p className="text-muted-foreground">{rec.action}</p>
                   </div>
                 ))}
               </div>

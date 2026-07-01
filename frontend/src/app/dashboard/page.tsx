@@ -1,35 +1,31 @@
 "use client"
 
-import { useAuth } from "@/components/providers/auth-provider"
+import Link from "next/link"
 import { useState, useEffect } from "react"
+import {
+  Activity,
+  Bot,
+  CheckCircle,
+  Code2,
+  Copy,
+  DollarSign,
+  KeyRound,
+  Server,
+  Shield,
+} from "lucide-react"
+
+import { useAuth } from "@/components/providers/auth-provider"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
 import { useToast } from "@/hooks/use-toast"
 import { config } from "@/lib/config"
 import { apiClient } from "@/lib/api-client"
-
-// Force dynamic rendering for authentication
-export const dynamic = 'force-dynamic'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { 
-  Shield, 
-  Zap, 
-  Database, 
-  Activity, 
-  Users, 
-  Settings,
-  Plus,
-  TrendingUp,
-  Clock,
-  CheckCircle,
-  Copy,
-  AlertTriangle,
-  ExternalLink,
-  Bot,
-  Code2
-} from "lucide-react"
+import { StatusBadge, type StatusBadgeStatus } from "@/components/ui/status-badge"
+
+// Force dynamic rendering for authentication
+export const dynamic = "force-dynamic"
 
 interface DashboardStats {
   activeModules: number
@@ -46,21 +42,21 @@ interface ModuleInfo {
   id: string
   name: string
   description: string
-  status: 'running' | 'standby' | 'error'
+  status: "running" | "standby" | "error"
   icon: string
-}
-
-interface RecentActivity {
-  id: string
-  message: string
-  timestamp: string
-  type: 'info' | 'success' | 'warning' | 'error'
 }
 
 interface AgentSummary {
   id: number
   name: string
   is_active: boolean
+}
+
+interface AttentionItem {
+  title: string
+  description: string
+  status: StatusBadgeStatus
+  href: string
 }
 
 export default function DashboardPage() {
@@ -76,15 +72,36 @@ function DashboardContent() {
   const { toast } = useToast()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [modules, setModules] = useState<ModuleInfo[]>([])
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
   const [agents, setAgents] = useState<AgentSummary[]>([])
+
+  const apiUrl = config.getPublicApiUrl()
+  const runningModules = stats?.runningModules ?? 0
+  const standbyModules = stats?.standbyModules ?? 0
+  const failedModules = modules.filter((module) => module.status === "error").length
+  const activeAgents = agents.length
+  const totalRequests = stats?.totalRequests ?? 0
+  const reliability = stats?.uptime ?? (failedModules > 0 ? 92 : modules.length > 0 ? 99.9 : 0)
+  const spendEstimate = "$0.00"
+
+  const trustStatus: StatusBadgeStatus = failedModules > 0
+    ? "danger"
+    : modules.length === 0
+      ? "warning"
+      : "success"
+
+  const attentionItems = buildAttentionItems({
+    activeAgents,
+    failedModules,
+    modules,
+    standbyModules,
+  })
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     toast({
-      title: "Copied!",
-      description: "API URL copied to clipboard"
+      title: "Copied",
+      description: "API URL copied to clipboard",
     })
   }
 
@@ -95,15 +112,12 @@ function DashboardContent() {
   const fetchDashboardData = async () => {
     try {
       setLoadingStats(true)
-      
-      // Fetch real dashboard stats through API proxy
-      
+
       const [modulesRes, agentsRes] = await Promise.all([
-        apiClient.get('/api-internal/v1/modules/').catch(() => null),
-        apiClient.get('/agent/configs').catch(() => null)
+        apiClient.get("/api-internal/v1/modules/").catch(() => null),
+        apiClient.get("/agent/configs").catch(() => null),
       ])
 
-      // Set default stats since analytics endpoints removed
       setStats({
         activeModules: 0,
         runningModules: 0,
@@ -112,19 +126,17 @@ function DashboardContent() {
         requestsChange: 0,
         totalUsers: 0,
         activeSessions: 0,
-        uptime: 0
+        uptime: 0,
       })
 
-      // Parse modules response
       if (modulesRes) {
-        setModules(modulesRes.modules || [])
-        
-        // Update stats with actual module data
-        setStats(prev => ({
+        const loadedModules = modulesRes.modules || []
+        setModules(loadedModules)
+        setStats((prev) => ({
           ...prev!,
           activeModules: modulesRes.total || 0,
-          runningModules: modulesRes.modules?.filter((m: any) => m.status === 'running').length || 0,
-          standbyModules: modulesRes.modules?.filter((m: any) => m.status === 'standby').length || 0
+          runningModules: loadedModules.filter((module: ModuleInfo) => module.status === "running").length || 0,
+          standbyModules: loadedModules.filter((module: ModuleInfo) => module.status === "standby").length || 0,
         }))
       } else {
         setModules([])
@@ -135,12 +147,7 @@ function DashboardContent() {
       } else {
         setAgents([])
       }
-
-      // No activity data since audit endpoint removed
-      setRecentActivity([])
-
     } catch (error) {
-      // Set empty states on error
       setStats({
         activeModules: 0,
         runningModules: 0,
@@ -149,10 +156,10 @@ function DashboardContent() {
         requestsChange: 0,
         totalUsers: 0,
         activeSessions: 0,
-        uptime: 0
+        uptime: 0,
       })
       setModules([])
-      setRecentActivity([])
+      setAgents([])
     } finally {
       setLoadingStats(false)
     }
@@ -160,308 +167,298 @@ function DashboardContent() {
 
   if (loadingStats) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
+      <div className="flex min-h-[420px] items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
       </div>
     )
   }
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'success': return 'bg-green-400'
-      case 'warning': return 'bg-yellow-400'
-      case 'error': return 'bg-red-400'
-      default: return 'bg-blue-400'
-    }
-  }
-
-  const getModuleIcon = (iconType: string) => {
-    switch (iconType) {
-      case 'database': return Database
-      case 'shield': return Shield
-      case 'trending': return TrendingUp
-      default: return Activity
-    }
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-empire-gold">
-          Welcome back, {user?.name || 'User'}
+        <h1 className="text-3xl font-bold text-foreground">
+          Welcome back, {user?.name || "User"}
         </h1>
-        <p className="text-empire-gold/60 mt-1">
-          Manage your Enclava platform and modules
+        <p className="mt-1 text-muted-foreground">
+          Private AI operations, usage, and attention signals.
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-empire-gold/80">
-              Active Modules
-            </CardTitle>
-            <Zap className="h-4 w-4 text-empire-gold" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-empire-gold">
-              {stats?.activeModules || 0}
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-primary/10 p-2 text-primary">
+              <Shield className="h-5 w-5" aria-hidden="true" />
             </div>
-            <p className="text-xs text-empire-gold/60">
-              {stats?.runningModules || 0} running, {stats?.standbyModules || 0} standby
-            </p>
-          </CardContent>
-        </Card>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-foreground">Trust line</p>
+                <StatusBadge status={trustStatus}>
+                  {trustStatus === "success" ? "Protected" : trustStatus === "warning" ? "Needs setup" : "Attention"}
+                </StatusBadge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {runningModules} running modules, {failedModules} requiring attention, {activeAgents} active agents.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className="bg-muted text-muted-foreground">
+              Confidential runtime
+            </Badge>
+            <Badge variant="outline" className="bg-muted text-muted-foreground">
+              Policy aware
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-empire-gold/80">
-              API Requests
-            </CardTitle>
-            <Activity className="h-4 w-4 text-empire-gold" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-empire-gold">
-              {stats?.totalRequests?.toLocaleString() || 0}
-            </div>
-            <p className="text-xs text-empire-gold/60">
-              {stats?.requestsChange ? 
-                (stats.requestsChange > 0 ? '+' : '') + stats.requestsChange + '% from last hour' : 
-                'No data available'
-              }
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-empire-gold/80">
-              Users
-            </CardTitle>
-            <Users className="h-4 w-4 text-empire-gold" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-empire-gold">
-              {stats?.totalUsers || 0}
-            </div>
-            <p className="text-xs text-empire-gold/60">
-              {stats?.activeSessions || 0} active sessions
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-empire-gold/80">
-              Uptime
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-empire-gold" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-empire-gold">
-              {stats?.uptime ? stats.uptime.toFixed(1) + '%' : '0%'}
-            </div>
-            <p className="text-xs text-empire-gold/60">
-              {stats?.uptime ? 'System operational' : 'No data available'}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <KpiCard
+          title="Spend"
+          value={spendEstimate}
+          description="Current period estimate"
+          icon={DollarSign}
+        />
+        <KpiCard
+          title="Requests"
+          value={totalRequests.toLocaleString()}
+          description={stats?.requestsChange ? `${stats.requestsChange}% change` : "No request trend yet"}
+          icon={Activity}
+        />
+        <KpiCard
+          title="Reliability"
+          value={reliability ? `${reliability.toFixed(1)}%` : "No data"}
+          description={failedModules > 0 ? `${failedModules} module issues` : "Operational"}
+          icon={CheckCircle}
+          status={failedModules > 0 ? "danger" : "success"}
+        />
       </div>
 
-      {/* API Endpoints Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* OpenAI Compatible Endpoint */}
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-empire-gold">
-              <Code2 className="h-5 w-5" />
-              OpenAI-Compatible API
-            </CardTitle>
-            <CardDescription className="text-empire-gold/60">
-              Use with any OpenAI-compatible client
-            </CardDescription>
+            <CardTitle>Usage chart</CardTitle>
+            <CardDescription>Requests, modules, and active agents at a glance.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <code className="flex-1 p-2 bg-empire-dark/50 border border-empire-gold/10 rounded text-xs font-mono text-empire-gold/80">
-                  {config.getPublicApiUrl()}
-                </code>
-                <Button
-                  onClick={() => copyToClipboard(config.getPublicApiUrl())}
-                  variant="ghost"
-                  size="sm"
-                  className="text-empire-gold hover:bg-empire-gold/10"
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-              <div className="text-xs text-empire-gold/50">
-                Use as API base URL in Open WebUI, Continue.dev, etc.
-              </div>
-              <Button
-                onClick={() => window.open('/admin/api-keys', '_blank')}
-                variant="outline"
-                size="sm"
-                className="w-full border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+          <CardContent className="space-y-5">
+            <UsageBar label="Requests" value={totalRequests} max={Math.max(totalRequests, 1)} tone="primary" />
+            <UsageBar label="Running modules" value={runningModules} max={Math.max(modules.length, 1)} tone="success" />
+            <UsageBar label="Standby modules" value={standbyModules} max={Math.max(modules.length, 1)} tone="warning" />
+            <UsageBar label="Active agents" value={activeAgents} max={Math.max(activeAgents, 1)} tone="info" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Needs attention</CardTitle>
+            <CardDescription>Operational items to resolve first.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {attentionItems.map((item) => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="block rounded-md border border-border p-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <Settings className="h-3 w-3 mr-2" />
-                Manage API Keys
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Agent Endpoints */}
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-empire-gold">
-              <Bot className="h-5 w-5" />
-              Agent Endpoints
-            </CardTitle>
-            <CardDescription className="text-empire-gold/60">
-              Active agent configurations
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {agents.length === 0 ? (
-              <div className="space-y-3">
-                <p className="text-sm text-empire-gold/40">No active agents configured</p>
-                <Button
-                  onClick={() => window.open('/agents', '_blank')}
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
-                >
-                  <Plus className="h-3 w-3 mr-2" />
-                  Create Agent
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {agents.slice(0, 3).map(agent => (
-                    <div key={agent.id} className="flex items-center justify-between p-2 bg-empire-dark/30 rounded">
-                      <span className="text-xs text-empire-gold/70">{agent.name}</span>
-                      <Badge variant="outline" className="border-green-500/20 text-green-400 text-xs">
-                        Active
-                      </Badge>
-                    </div>
-                  ))}
-                  {agents.length > 3 && (
-                    <p className="text-xs text-empire-gold/40">+{agents.length - 3} more</p>
-                  )}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-foreground">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                  </div>
+                  <StatusBadge status={item.status}>{item.status}</StatusBadge>
                 </div>
-                <Button
-                  onClick={() => window.open('/agents', '_blank')}
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
-                >
-                  <Settings className="h-3 w-3 mr-2" />
-                  Manage Agents
-                </Button>
-              </div>
-            )}
+              </Link>
+            ))}
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Active Modules */}
-        <div className="lg:col-span-2">
-          <Card className="bg-empire-darker/50 border-empire-gold/20">
-            <CardHeader>
-              <CardTitle className="text-empire-gold">Active Modules</CardTitle>
-              <CardDescription>
-                Currently running AI processing modules
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {modules.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-empire-gold/60">No modules configured yet</p>
-                  <Button className="mt-4 bg-empire-gold hover:bg-empire-gold/90 text-empire-dark">
-                    Configure Modules
-                  </Button>
-                </div>
-              ) : (
-                modules.map((module) => {
-                  const IconComponent = getModuleIcon(module.icon)
-                  return (
-                    <div key={module.name} className="flex items-center justify-between p-4 bg-empire-dark/50 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="p-2 bg-empire-gold/10 rounded-full">
-                          <IconComponent className="h-5 w-5 text-empire-gold" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-empire-gold">{module.name}</h3>
-                          <p className="text-sm text-empire-gold/60">{module.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            module.status === 'running' 
-                              ? "border-green-500/20 text-green-400"
-                              : module.status === 'error'
-                              ? "border-red-500/20 text-red-400"
-                              : "border-yellow-500/20 text-yellow-400"
-                          }
-                        >
-                          <div className={`w-2 h-2 rounded-full mr-1 ${
-                            module.status === 'running' 
-                              ? 'bg-green-400'
-                              : module.status === 'error'
-                              ? 'bg-red-400'
-                              : 'bg-yellow-400'
-                          }`}></div>
-                          {module.status === 'running' ? 'Running' : 
-                           module.status === 'error' ? 'Error' : 'Standby'}
-                        </Badge>
-                        <Button variant="ghost" size="sm">
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Connect</CardTitle>
+          <CardDescription>Use Enclava from OpenAI-compatible clients and agent workflows.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
+          <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-muted p-2">
+            <Code2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <code className="min-w-0 flex-1 truncate text-xs text-foreground">{apiUrl}</code>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => copyToClipboard(apiUrl)}
+            >
+              <Copy className="h-4 w-4" aria-hidden="true" />
+              <span className="sr-only">Copy API URL</span>
+            </Button>
+          </div>
+          <Button variant="outline" asChild>
+            <Link href="/admin/api-keys">
+              <KeyRound className="mr-2 h-4 w-4" />
+              API keys
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/agents">
+              <Bot className="mr-2 h-4 w-4" />
+              Agents
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
-        {/* Recent Activity */}
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
-          <CardHeader>
-            <CardTitle className="text-empire-gold">Recent Activity</CardTitle>
-            <CardDescription>
-              Latest system events and requests
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentActivity.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-empire-gold/60">No recent activity</p>
-              </div>
-            ) : (
-              recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center space-x-3">
-                  <div className={`w-2 h-2 rounded-full ${getActivityIcon(activity.type)}`}></div>
-                  <div className="flex-1">
-                    <p className="text-sm text-empire-gold">{activity.message}</p>
-                    <p className="text-xs text-empire-gold/60">{activity.timestamp}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Module health</CardTitle>
+          <CardDescription>Current runtime module status.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {modules.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Server className="mb-3 h-10 w-10 text-muted-foreground" />
+              <p className="font-medium text-foreground">No modules configured</p>
+              <p className="text-sm text-muted-foreground">Configure modules to start private AI workflows.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {modules.map((module) => (
+                <div key={module.name} className="rounded-md border border-border bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{module.name}</p>
+                      <p className="text-sm text-muted-foreground">{module.description}</p>
+                    </div>
+                    <StatusBadge status={statusForModule(module.status)}>
+                      {module.status}
+                    </StatusBadge>
                   </div>
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function KpiCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+  status = "neutral",
+}: {
+  title: string
+  value: string
+  description: string
+  icon: typeof Activity
+  status?: StatusBadgeStatus
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className={status === "danger" ? "h-4 w-4 text-danger" : "h-4 w-4 text-primary"} />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function UsageBar({
+  label,
+  value,
+  max,
+  tone,
+}: {
+  label: string
+  value: number
+  max: number
+  tone: "primary" | "success" | "warning" | "info"
+}) {
+  const width = `${Math.min(100, Math.round((value / max) * 100))}%`
+  const toneClass = {
+    primary: "bg-primary",
+    success: "bg-success",
+    warning: "bg-warning",
+    info: "bg-info",
+  }[tone]
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="text-muted-foreground">{value.toLocaleString()}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div className={`h-full rounded-full ${toneClass}`} style={{ width }} />
       </div>
     </div>
   )
+}
+
+function buildAttentionItems({
+  activeAgents,
+  failedModules,
+  modules,
+  standbyModules,
+}: {
+  activeAgents: number
+  failedModules: number
+  modules: ModuleInfo[]
+  standbyModules: number
+}): AttentionItem[] {
+  const items: AttentionItem[] = []
+
+  if (failedModules > 0) {
+    items.push({
+      title: "Module errors",
+      description: `${failedModules} module${failedModules === 1 ? "" : "s"} require review.`,
+      status: "danger",
+      href: "/settings",
+    })
+  }
+
+  if (activeAgents === 0) {
+    items.push({
+      title: "No active agents",
+      description: "Create or activate an agent for reusable private workflows.",
+      status: "warning",
+      href: "/agents",
+    })
+  }
+
+  if (modules.length === 0 || standbyModules > 0) {
+    items.push({
+      title: "Module setup",
+      description: modules.length === 0
+        ? "Configure runtime modules before production use."
+        : `${standbyModules} module${standbyModules === 1 ? "" : "s"} in standby.`,
+      status: "info",
+      href: "/settings",
+    })
+  }
+
+  if (items.length === 0) {
+    items.push({
+      title: "No urgent items",
+      description: "The current workspace has no immediate operational action.",
+      status: "success",
+      href: "/dashboard",
+    })
+  }
+
+  return items
+}
+
+function statusForModule(status: ModuleInfo["status"]): StatusBadgeStatus {
+  if (status === "running") return "success"
+  if (status === "error") return "danger"
+  return "warning"
 }

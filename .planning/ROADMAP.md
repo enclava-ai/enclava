@@ -119,7 +119,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04-03: Rework dashboard and sweep dashboard/settings/playground surfaces.
+- [x] 04-03: Rework dashboard and sweep dashboard/settings/playground surfaces.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

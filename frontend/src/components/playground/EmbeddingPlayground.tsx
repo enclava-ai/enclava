@@ -279,7 +279,7 @@ export default function EmbeddingPlayground() {
                               {getProviderDisplayName(embModel.provider || embModel.owned_by)}
                             </Badge>
                           )}
-                          <Badge className="text-xs border-0 bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300">
+                          <Badge className="text-xs border-0 bg-info-soft text-info-soft-foreground">
                             embed
                           </Badge>
                         </div>
