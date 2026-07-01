@@ -36,7 +36,7 @@ This milestone turns the existing Enclava frontend into a coherent professional 
 Plans:
 **Wave 1**
 
-- [ ] 01-01: Delete deprecated routes, API proxies, and sole-use components.
+- [x] 01-01: Delete deprecated routes, API proxies, and sole-use components.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -171,7 +171,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Delete Deprecated Routes | 0/2 | Not started | - |
+| 1. Delete Deprecated Routes | 1/2 | In Progress|  |
 | 2. Design System Foundation | 0/3 | Not started | - |
 | 3. App Shell and LLM IA | 0/3 | Not started | - |
 | 4. Color Sweep and Dashboard | 0/5 | Not started | - |
