@@ -112,3 +112,4 @@ Resume file: None
 ## Operator Next Steps
 
 - Start the next milestone with /gsd-new-milestone
+- Archived phase history lives in `.planning/milestones/v1.0-phases/`.

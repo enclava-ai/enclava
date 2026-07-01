@@ -32,6 +32,7 @@
 - `.planning/milestones/v1.0-ROADMAP.md`
 - `.planning/milestones/v1.0-REQUIREMENTS.md`
 - `.planning/milestones/v1.0-MILESTONE-AUDIT.md`
+- `.planning/milestones/v1.0-phases/`
 
 ---
 *Roadmap reorganized: 2026-07-01 after v1.0 milestone completion*
