@@ -55,11 +55,17 @@ Plans:
   4. Legacy palette definitions remain only as temporary compatibility until Phase 4 removes usages.
 
 **Plans**: 3 plans
-
 Plans:
+**Wave 1**
 
 - [ ] 02-01: Implement Slate Mono tokens and Tailwind status mappings.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 02-02: Build shared UI primitives and helper mappings.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 02-03: Verify foundation behavior in both themes and document usage conventions.
 
 ### Phase 3: App Shell and LLM IA
