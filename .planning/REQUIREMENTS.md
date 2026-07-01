@@ -20,43 +20,43 @@
 
 ### Navigation and Information Architecture
 
-- [ ] **NAV-01**: The current navigation model is extracted or preserved as the authoritative source for sidebar and drawer rendering.
-- [ ] **NAV-02**: Desktop users can navigate through a left sidebar and mobile users can navigate through a drawer exposing the same nav items.
-- [ ] **NAV-03**: LLM settings live at `/settings/llm`, `/llm` redirects with query parameters preserved, and inbound redirects target `/settings/llm?...` directly.
-- [ ] **NAV-04**: Shell navigation active states, focus states, and keyboard behavior work in both themes and responsive widths.
+- [x] **NAV-01**: The current navigation model is extracted or preserved as the authoritative source for sidebar and drawer rendering.
+- [x] **NAV-02**: Desktop users can navigate through a left sidebar and mobile users can navigate through a drawer exposing the same nav items.
+- [x] **NAV-03**: LLM settings live at `/settings/llm`, `/llm` redirects with query parameters preserved, and inbound redirects target `/settings/llm?...` directly.
+- [x] **NAV-04**: Shell navigation active states, focus states, and keyboard behavior work in both themes and responsive widths.
 
 ### Color Migration and Dashboard
 
-- [ ] **COL-01**: `empire-*` and `enclava-*` usage is removed across `frontend/src`.
-- [ ] **COL-02**: Raw Tailwind palette utilities for text, backgrounds, borders, gradients, rings, and dividers are replaced with semantic tokens where covered by the proposal.
-- [ ] **COL-03**: Status severities use `StatusBadge`; category labels use neutral badge treatments.
-- [ ] **COL-04**: Dashboard IA is reworked around trust status, spend, requests, reliability, attention items, and developer connection details.
-- [ ] **COL-05**: Final root greps over `frontend/src` return zero for legacy palette and disallowed hardcoded color patterns.
+- [x] **COL-01**: `empire-*` and `enclava-*` usage is removed across `frontend/src`.
+- [x] **COL-02**: Raw Tailwind palette utilities for text, backgrounds, borders, gradients, rings, and dividers are replaced with semantic tokens where covered by the proposal.
+- [x] **COL-03**: Status severities use `StatusBadge`; category labels use neutral badge treatments.
+- [x] **COL-04**: Dashboard IA is reworked around trust status, spend, requests, reliability, attention items, and developer connection details.
+- [x] **COL-05**: Final root greps over `frontend/src` return zero for legacy palette and disallowed hardcoded color patterns.
 
 ### Client Plumbing
 
-- [ ] **PLUMB-01**: Internal route navigation uses Next.js `Link` or router APIs rather than `window.location` or `window.open`.
-- [ ] **PLUMB-02**: Real client-component backend calls use `apiClient` instead of raw `fetch`.
-- [ ] **PLUMB-03**: Server route-handler fetches and documentation code-sample fetches remain explicitly exempt and documented.
+- [x] **PLUMB-01**: Internal route navigation uses Next.js `Link` or router APIs rather than `window.location` or `window.open`.
+- [x] **PLUMB-02**: Real client-component backend calls use `apiClient` instead of raw `fetch`.
+- [x] **PLUMB-03**: Server route-handler fetches and documentation code-sample fetches remain explicitly exempt and documented.
 
 ### Feedback and Confirmation UX
 
-- [ ] **FDBK-01**: The frontend mounts one toast provider and uses one toast API.
-- [ ] **FDBK-02**: Existing `react-hot-toast` and `sonner` call sites are migrated or removed.
-- [ ] **FDBK-03**: Destructive and confirmation flows use the themed `ConfirmDialog` or `useConfirm` path instead of native `confirm()` or `alert()`.
+- [x] **FDBK-01**: The frontend mounts one toast provider and uses one toast API.
+- [x] **FDBK-02**: Existing `react-hot-toast` and `sonner` call sites are migrated or removed.
+- [x] **FDBK-03**: Destructive and confirmation flows use the themed `ConfirmDialog` or `useConfirm` path instead of native `confirm()` or `alert()`.
 
 ### Loading and Empty States
 
-- [ ] **STATE-01**: Major initial-load full-page spinners are replaced with structure-preserving skeletons.
-- [ ] **STATE-02**: High-traffic empty states provide explanatory copy and a primary action.
+- [x] **STATE-01**: Major initial-load full-page spinners are replaced with structure-preserving skeletons.
+- [x] **STATE-02**: High-traffic empty states provide explanatory copy and a primary action.
 
 ### Accessibility and Guardrails
 
-- [ ] **A11Y-01**: Status is not conveyed by color alone, and icon-only controls have accessible labels.
-- [ ] **A11Y-02**: Sidebar, drawer, dialogs, dropdowns, focus rings, and async/toast regions pass a keyboard and accessibility spot-check.
-- [ ] **GUARD-01**: ESLint or script guardrails catch hardcoded colors and legacy palette names.
-- [ ] **GUARD-02**: Guardrails catch native dialogs and disallowed client fetch calls while preserving documented exceptions.
-- [ ] **GUARD-03**: Project guidance documents the design token, status, and guardrail conventions.
+- [x] **A11Y-01**: Status is not conveyed by color alone, and icon-only controls have accessible labels.
+- [x] **A11Y-02**: Sidebar, drawer, dialogs, dropdowns, focus rings, and async/toast regions pass a keyboard and accessibility spot-check.
+- [x] **GUARD-01**: ESLint or script guardrails catch hardcoded colors and legacy palette names.
+- [x] **GUARD-02**: Guardrails catch native dialogs and disallowed client fetch calls while preserving documented exceptions.
+- [x] **GUARD-03**: Project guidance documents the design token, status, and guardrail conventions.
 
 ## v2 Requirements
 
@@ -91,28 +91,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DS-02 | Phase 2 | Complete |
 | DS-03 | Phase 2 | Complete |
 | DS-04 | Phase 2 | Complete |
-| NAV-01 | Phase 3 | Pending |
-| NAV-02 | Phase 3 | Pending |
-| NAV-03 | Phase 3 | Pending |
-| NAV-04 | Phase 3 | Pending |
-| COL-01 | Phase 4 | Pending |
-| COL-02 | Phase 4 | Pending |
-| COL-03 | Phase 4 | Pending |
-| COL-04 | Phase 4 | Pending |
-| COL-05 | Phase 4 | Pending |
-| PLUMB-01 | Phase 5 | Pending |
-| PLUMB-02 | Phase 5 | Pending |
-| PLUMB-03 | Phase 5 | Pending |
-| FDBK-01 | Phase 6 | Pending |
-| FDBK-02 | Phase 6 | Pending |
-| FDBK-03 | Phase 6 | Pending |
-| STATE-01 | Phase 7 | Pending |
-| STATE-02 | Phase 7 | Pending |
-| A11Y-01 | Phase 7 | Pending |
-| A11Y-02 | Phase 7 | Pending |
-| GUARD-01 | Phase 4 | Pending |
-| GUARD-02 | Phase 5 | Pending |
-| GUARD-03 | Phase 7 | Pending |
+| NAV-01 | Phase 3 | Complete |
+| NAV-02 | Phase 3 | Complete |
+| NAV-03 | Phase 3 | Complete |
+| NAV-04 | Phase 3 | Complete |
+| COL-01 | Phase 4 | Complete |
+| COL-02 | Phase 4 | Complete |
+| COL-03 | Phase 4 | Complete |
+| COL-04 | Phase 4 | Complete |
+| COL-05 | Phase 4 | Complete |
+| PLUMB-01 | Phase 5 | Complete |
+| PLUMB-02 | Phase 5 | Complete |
+| PLUMB-03 | Phase 5 | Complete |
+| FDBK-01 | Phase 6 | Complete |
+| FDBK-02 | Phase 6 | Complete |
+| FDBK-03 | Phase 6 | Complete |
+| STATE-01 | Phase 7 | Complete |
+| STATE-02 | Phase 7 | Complete |
+| A11Y-01 | Phase 7 | Complete |
+| A11Y-02 | Phase 7 | Complete |
+| GUARD-01 | Phase 4 | Complete |
+| GUARD-02 | Phase 5 | Complete |
+| GUARD-03 | Phase 7 | Complete |
 
 **Coverage:**
 
