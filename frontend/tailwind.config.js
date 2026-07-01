@@ -96,35 +96,6 @@ module.exports = {
           4: withA("--chart-4"),
           5: withA("--chart-5"),
         },
-        // Enclava brand colors (cyan/teal palette matching website)
-        enclava: {
-          50: '#ecfeff',
-          100: '#cffafe',
-          200: '#a5f3fc',
-          300: '#67e8f9',
-          400: '#22d3ee',
-          500: '#14b8a6', // primary cyan
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-        },
-        // Legacy alias
-        empire: {
-          gold: '#22d3ee',
-          dark: '#0f172a',
-          darker: '#020617',
-          50: '#ecfeff',
-          100: '#cffafe',
-          200: '#a5f3fc',
-          300: '#67e8f9',
-          400: '#22d3ee',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-        },
       },
       borderRadius: {
         lg: "var(--radius)",

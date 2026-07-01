@@ -224,11 +224,11 @@ export const getConnectionStatus = (server: MCPServer): ConnectionStatus => {
 export const getConnectionStatusColor = (status: ConnectionStatus): string => {
   switch (status) {
     case 'success':
-      return 'bg-green-500'
+      return 'bg-success'
     case 'failed':
-      return 'bg-red-500'
+      return 'bg-danger'
     default:
-      return 'bg-gray-400'
+      return 'bg-muted-foreground'
   }
 }
 

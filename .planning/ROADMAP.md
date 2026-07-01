@@ -127,7 +127,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 04-05: Remove legacy palette definitions and add hardcoded-color guardrails.
+- [x] 04-05: Remove legacy palette definitions and add hardcoded-color guardrails.
 
 ### Phase 5: SPA Navigation and API Client Plumbing
 
@@ -198,7 +198,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 1. Delete Deprecated Routes | 2/2 | Complete    | 2026-07-01 |
 | 2. Design System Foundation | 3/3 | Complete    | 2026-07-01 |
 | 3. App Shell and LLM IA | 3/3 | Complete    | 2026-07-01 |
-| 4. Color Sweep and Dashboard | 4/5 | In progress | - |
+| 4. Color Sweep and Dashboard | 5/5 | In review | - |
 | 5. SPA Navigation and API Client Plumbing | 0/2 | Not started | - |
 | 6. Toasts and Confirmations | 0/2 | Not started | - |
 | 7. Loading, Empty, and Accessibility Polish | 0/3 | Not started | - |

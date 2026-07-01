@@ -136,20 +136,17 @@
   .text-balance {
     text-wrap: balance;
   }
-  .text-glow {
-    text-shadow: 0 0 20px hsla(var(--primary), 0.5);
-  }
   .border-glow {
     box-shadow: 0 0 10px hsla(var(--primary), 0.3);
   }
   .glass-panel {
-    background: rgba(255, 255, 255, 0.7);
+    background: hsl(var(--card) / 0.7);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid hsl(var(--border));
   }
   .dark .glass-panel {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: hsl(var(--card) / 0.7);
+    border: 1px solid hsl(var(--border));
   }
   .gradient-text {
     background-image: linear-gradient(to right, hsl(var(--primary)), hsl(var(--secondary)));
@@ -195,32 +192,6 @@
     0 0 0 4px hsl(var(--ring));
 }
 
-/* Custom enclava branding styles - matching website theme */
-.enclava-gradient {
-  background: linear-gradient(135deg, hsl(190 90% 45%) 0%, hsl(160 84% 39%) 100%);
-}
-
-.enclava-glow {
-  box-shadow: 0 0 20px hsla(190, 90%, 45%, 0.3);
-}
-
-.enclava-border {
-  border: 1px solid hsla(190, 90%, 45%, 0.3);
-}
-
-/* Legacy aliases */
-.empire-gradient {
-  background: linear-gradient(135deg, hsl(190 90% 45%) 0%, hsl(160 84% 39%) 100%);
-}
-
-.empire-glow {
-  box-shadow: 0 0 20px hsla(190, 90%, 45%, 0.3);
-}
-
-.empire-border {
-  border: 1px solid hsla(190, 90%, 45%, 0.3);
-}
-
 /* Markdown content styling */
 .markdown-content {
   word-wrap: break-word;
@@ -259,14 +230,17 @@
 
 .hljs-comment,
 .hljs-quote {
-  color: #6a737d !important;
+  color: hsl(var(--muted-foreground)) !important;
   font-style: italic;
 }
 
 .hljs-keyword,
-.hljs-selector-tag,
+.hljs-selector-tag {
+  color: hsl(var(--danger)) !important;
+}
+
 .hljs-addition {
-  color: #d73a49 !important;
+  color: hsl(var(--success)) !important;
 }
 
 .hljs-number,
@@ -275,7 +249,7 @@
 .hljs-literal,
 .hljs-doctag,
 .hljs-regexp {
-  color: #032f62 !important;
+  color: hsl(var(--info)) !important;
 }
 
 .hljs-title,
@@ -283,7 +257,7 @@
 .hljs-name,
 .hljs-selector-id,
 .hljs-selector-class {
-  color: #6f42c1 !important;
+  color: hsl(var(--primary)) !important;
 }
 
 .hljs-attribute,
@@ -292,7 +266,7 @@
 .hljs-template-variable,
 .hljs-class .hljs-title,
 .hljs-type {
-  color: #e36209 !important;
+  color: hsl(var(--warning)) !important;
 }
 
 .hljs-symbol,
@@ -303,12 +277,15 @@
 .hljs-selector-attr,
 .hljs-selector-pseudo,
 .hljs-link {
-  color: #005cc5 !important;
+  color: hsl(var(--info-soft-foreground)) !important;
 }
 
-.hljs-built_in,
+.hljs-built_in {
+  color: hsl(var(--danger)) !important;
+}
+
 .hljs-deletion {
-  color: #d73a49 !important;
+  color: hsl(var(--danger)) !important;
 }
 
 .hljs-formula {
@@ -321,47 +298,4 @@
 
 .hljs-strong {
   font-weight: bold;
-}
-
-/* Dark mode - github-dark theme */
-.dark .hljs {
-  background: hsl(var(--muted)) !important;
-  color: hsl(var(--foreground)) !important;
-}
-
-.dark .hljs-comment,
-.dark .hljs-quote {
-  color: #8b949e !important;
-}
-
-.dark .hljs-keyword,
-.dark .hljs-selector-tag,
-.dark .hljs-addition {
-  color: #ff7b72 !important;
-}
-
-.dark .hljs-number,
-.dark .hljs-string,
-.dark .hljs-meta .hljs-meta-string,
-.dark .hljs-literal,
-.dark .hljs-doctag,
-.dark .hljs-regexp {
-  color: #a5d6ff !important;
-}
-
-.dark .hljs-title,
-.dark .hljs-section,
-.dark .hljs-name,
-.dark .hljs-selector-id,
-.dark .hljs-selector-class {
-  color: #d2a8ff !important;
-}
-
-.dark .hljs-attribute,
-.dark .hljs-attr,
-.dark .hljs-variable,
-.dark .hljs-template-variable,
-.dark .hljs-class .hljs-title,
-.dark .hljs-type {
-  color: #ffa657 !important;
 }
