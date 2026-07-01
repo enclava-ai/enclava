@@ -220,7 +220,7 @@ function ConnectorsPageContent() {
               </Badge>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{activeCount}</div>
+              <div className="text-2xl font-bold text-success">{activeCount}</div>
               <p className="text-xs text-muted-foreground">Currently syncing</p>
             </CardContent>
           </Card>
@@ -232,7 +232,7 @@ function ConnectorsPageContent() {
               </Badge>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${errorCount > 0 ? "text-red-600" : ""}`}>
+              <div className={`text-2xl font-bold ${errorCount > 0 ? "text-danger" : ""}`}>
                 {errorCount}
               </div>
               <p className="text-xs text-muted-foreground">Require attention</p>

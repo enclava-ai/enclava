@@ -450,11 +450,11 @@ export default function AdminPricingPage() {
   const getPriceSourceBadge = (source: string) => {
     switch (source) {
       case "api_sync":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">API Sync</Badge>;
+        return <Badge variant="outline" className="bg-info-soft text-info-soft-foreground border-info-border">API Sync</Badge>;
       case "manual":
-        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Manual</Badge>;
+        return <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Manual</Badge>;
       case "default":
-        return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">Default</Badge>;
+        return <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Default</Badge>;
       default:
         return <Badge variant="outline">{source}</Badge>;
     }
@@ -490,7 +490,7 @@ export default function AdminPricingPage() {
       </div>
 
       {error && (
-        <div className="flex items-center space-x-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+        <div className="flex items-center space-x-2 p-4 bg-danger-soft border border-danger-border rounded-lg text-danger-soft-foreground">
           <AlertCircle className="h-5 w-5" />
           <span>{error}</span>
           <Button variant="ghost" size="sm" onClick={() => setError(null)}>
@@ -708,11 +708,11 @@ export default function AdminPricingPage() {
                       <TableCell>{getPriceSourceBadge(pricing.price_source)}</TableCell>
                       <TableCell>
                         {pricing.is_override ? (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          <Badge variant="outline" className="bg-warning-soft text-warning-soft-foreground border-warning-border">
                             Override
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          <Badge variant="outline" className="bg-success-soft text-success-soft-foreground border-success-border">
                             Active
                           </Badge>
                         )}
@@ -732,7 +732,7 @@ export default function AdminPricingPage() {
                               size="sm"
                               onClick={() => handleRemoveOverride(pricing.provider_id, pricing.model_id)}
                             >
-                              <Trash2 className="h-4 w-4 text-red-600" />
+                              <Trash2 className="h-4 w-4 text-danger" />
                             </Button>
                           )}
                         </div>
@@ -844,7 +844,7 @@ export default function AdminPricingPage() {
                       </Select>
                     )}
                     {setPricingForm.model_id === "_all" && (
-                      <p className="text-xs text-blue-600">
+                      <p className="text-xs text-info">
                         Pricing will be applied to all {modelsForSelectedProvider.length} models for this provider.
                       </p>
                     )}
@@ -1116,7 +1116,7 @@ export default function AdminPricingPage() {
                         {getPriceSourceBadge(history.price_source)}
                         {history.is_override && (
                           <div className="mt-1">
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
+                            <Badge variant="outline" className="bg-warning-soft text-warning-soft-foreground border-warning-border text-xs">
                               Override
                             </Badge>
                           </div>
@@ -1155,15 +1155,15 @@ export default function AdminPricingPage() {
                 </div>
                 <div className="p-3 border rounded-lg">
                   <div className="text-sm text-muted-foreground">Created</div>
-                  <div className="text-2xl font-bold text-green-600">{syncResult.created_count}</div>
+                  <div className="text-2xl font-bold text-success">{syncResult.created_count}</div>
                 </div>
                 <div className="p-3 border rounded-lg">
                   <div className="text-sm text-muted-foreground">Updated</div>
-                  <div className="text-2xl font-bold text-blue-600">{syncResult.updated_count}</div>
+                  <div className="text-2xl font-bold text-info">{syncResult.updated_count}</div>
                 </div>
                 <div className="p-3 border rounded-lg">
                   <div className="text-sm text-muted-foreground">Errors</div>
-                  <div className="text-2xl font-bold text-red-600">{syncResult.error_count}</div>
+                  <div className="text-2xl font-bold text-danger">{syncResult.error_count}</div>
                 </div>
               </div>
 
@@ -1173,9 +1173,9 @@ export default function AdminPricingPage() {
 
               {syncResult.errors.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-red-600">Errors:</h4>
+                  <h4 className="font-medium text-danger">Errors:</h4>
                   {syncResult.errors.map((error, idx) => (
-                    <div key={idx} className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                    <div key={idx} className="p-2 bg-danger-soft border border-danger-border rounded text-sm text-danger-soft-foreground">
                       {error}
                     </div>
                   ))}
@@ -1204,10 +1204,10 @@ export default function AdminPricingPage() {
                             variant="outline"
                             className={
                               model.action === "created"
-                                ? "bg-green-50 text-green-700 border-green-200"
+                                ? "bg-success-soft text-success-soft-foreground border-success-border"
                                 : model.action === "updated"
-                                ? "bg-blue-50 text-blue-700 border-blue-200"
-                                : "bg-gray-50 text-gray-700 border-gray-200"
+                                ? "bg-info-soft text-info-soft-foreground border-info-border"
+                                : "bg-muted text-muted-foreground border-border"
                             }
                           >
                             {model.action}

@@ -273,10 +273,10 @@ export default function AdminAuditPage() {
 
   const getEntityTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
-      api_key: "bg-blue-50 text-blue-700 border-blue-200",
-      budget: "bg-green-50 text-green-700 border-green-200",
-      pricing: "bg-purple-50 text-purple-700 border-purple-200",
-      usage_record: "bg-orange-50 text-orange-700 border-orange-200",
+      api_key: "bg-muted text-muted-foreground border-border",
+      budget: "bg-muted text-muted-foreground border-border",
+      pricing: "bg-muted text-muted-foreground border-border",
+      usage_record: "bg-muted text-muted-foreground border-border",
     };
     return (
       <Badge variant="outline" className={colors[type] || ""}>
@@ -287,19 +287,19 @@ export default function AdminAuditPage() {
 
   const getActionBadge = (action: string) => {
     const colors: Record<string, string> = {
-      create: "bg-green-50 text-green-700 border-green-200",
-      update: "bg-blue-50 text-blue-700 border-blue-200",
-      delete: "bg-red-50 text-red-700 border-red-200",
-      soft_delete: "bg-red-50 text-red-700 border-red-200",
-      restore: "bg-green-50 text-green-700 border-green-200",
-      regenerate: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      activate: "bg-green-50 text-green-700 border-green-200",
-      deactivate: "bg-gray-50 text-gray-700 border-gray-200",
-      exceeded: "bg-red-50 text-red-700 border-red-200",
-      warning_triggered: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      sync_create: "bg-green-50 text-green-700 border-green-200",
-      sync_update: "bg-blue-50 text-blue-700 border-blue-200",
-      manual_override: "bg-purple-50 text-purple-700 border-purple-200",
+      create: "bg-success-soft text-success-soft-foreground border-success-border",
+      update: "bg-info-soft text-info-soft-foreground border-info-border",
+      delete: "bg-danger-soft text-danger-soft-foreground border-danger-border",
+      soft_delete: "bg-danger-soft text-danger-soft-foreground border-danger-border",
+      restore: "bg-success-soft text-success-soft-foreground border-success-border",
+      regenerate: "bg-warning-soft text-warning-soft-foreground border-warning-border",
+      activate: "bg-success-soft text-success-soft-foreground border-success-border",
+      deactivate: "bg-muted text-muted-foreground border-border",
+      exceeded: "bg-danger-soft text-danger-soft-foreground border-danger-border",
+      warning_triggered: "bg-warning-soft text-warning-soft-foreground border-warning-border",
+      sync_create: "bg-success-soft text-success-soft-foreground border-success-border",
+      sync_update: "bg-info-soft text-info-soft-foreground border-info-border",
+      manual_override: "bg-muted text-muted-foreground border-border",
     };
     return (
       <Badge variant="outline" className={colors[action] || ""}>
@@ -310,9 +310,9 @@ export default function AdminAuditPage() {
 
   const getActorTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
-      user: "bg-blue-50 text-blue-700 border-blue-200",
-      system: "bg-gray-50 text-gray-700 border-gray-200",
-      api_sync: "bg-purple-50 text-purple-700 border-purple-200",
+      user: "bg-muted text-muted-foreground border-border",
+      system: "bg-muted text-muted-foreground border-border",
+      api_sync: "bg-muted text-muted-foreground border-border",
     };
     return (
       <Badge variant="outline" className={colors[type] || ""}>
@@ -340,12 +340,12 @@ export default function AdminAuditPage() {
             <div className="font-semibold text-foreground">{field}:</div>
             <div className="pl-4 space-y-1">
               {old !== null && (
-                <div className="text-red-600">
+                <div className="text-danger">
                   <span className="opacity-50">- </span>
                   {JSON.stringify(old)}
                 </div>
               )}
-              <div className="text-green-600">
+              <div className="text-success">
                 <span className="opacity-50">+ </span>
                 {JSON.stringify(newVal)}
               </div>
@@ -402,7 +402,7 @@ export default function AdminAuditPage() {
       </div>
 
       {error && (
-        <div className="flex items-center space-x-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+        <div className="flex items-center space-x-2 p-4 bg-danger-soft border border-danger-border rounded-lg text-danger-soft-foreground">
           <AlertCircle className="h-5 w-5" />
           <span>{error}</span>
           <Button variant="ghost" size="sm" onClick={() => setError(null)}>
@@ -926,11 +926,11 @@ export default function AdminAuditPage() {
                         </TableCell>
                         <TableCell>
                           {log.actor_user_id?.toString() === userId ? (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            <Badge variant="outline" className="bg-info-soft text-info-soft-foreground border-info-border">
                               Actor
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                            <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
                               Owner
                             </Badge>
                           )}
@@ -1106,7 +1106,7 @@ export default function AdminAuditPage() {
                             </div>
                             <div className="h-2 bg-muted rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-blue-600"
+                                className="h-full bg-info"
                                 style={{
                                   width: `${(count / summary.total_entries) * 100}%`,
                                 }}
@@ -1135,7 +1135,7 @@ export default function AdminAuditPage() {
                             </div>
                             <div className="h-2 bg-muted rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-purple-600"
+                                className="h-full bg-primary"
                                 style={{
                                   width: `${(count / summary.total_entries) * 100}%`,
                                 }}

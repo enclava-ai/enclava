@@ -284,7 +284,7 @@ export default function ApiKeyStatsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
@@ -297,14 +297,14 @@ export default function ApiKeyStatsPage() {
             variant="ghost"
             size="sm"
             onClick={() => router.back()}
-            className="text-empire-gold"
+            className="text-foreground"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
         </div>
         <div className="text-center py-12">
-          <p className="text-empire-gold/60">No usage data available</p>
+          <p className="text-muted-foreground">No usage data available</p>
         </div>
       </div>
     )
@@ -321,14 +321,14 @@ export default function ApiKeyStatsPage() {
             variant="ghost"
             size="sm"
             onClick={() => router.back()}
-            className="text-empire-gold"
+            className="text-foreground"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-empire-gold">API Key Usage Statistics</h1>
-            <p className="text-empire-gold/60 mt-1">API Key ID: {apiKeyId}</p>
+            <h1 className="text-3xl font-bold text-foreground">API Key Usage Statistics</h1>
+            <p className="text-muted-foreground mt-1">API Key ID: {apiKeyId}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -337,7 +337,7 @@ export default function ApiKeyStatsPage() {
             size="sm"
             onClick={() => fetchStats(false)}
             disabled={refreshing}
-            className="border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+            className="border-border text-foreground hover:bg-accent"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
@@ -347,7 +347,7 @@ export default function ApiKeyStatsPage() {
 
       {/* Period Selector */}
       <div className="flex items-center gap-2">
-        <Label className="text-empire-gold/80">Period:</Label>
+        <Label className="text-muted-foreground">Period:</Label>
         <div className="flex gap-2">
           {(["7d", "30d", "90d"] as Period[]).map((p) => (
             <Button
@@ -357,8 +357,8 @@ export default function ApiKeyStatsPage() {
               onClick={() => setPeriod(p)}
               className={
                 period === p
-                  ? "bg-empire-gold text-empire-dark hover:bg-empire-gold/90"
-                  : "border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "border-border text-foreground hover:bg-accent"
               }
             >
               {p === "7d" ? "Last 7 days" : p === "30d" ? "Last 30 days" : "Last 90 days"}
@@ -369,31 +369,31 @@ export default function ApiKeyStatsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
+        <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-empire-gold/80">Total Requests</CardTitle>
-            <Activity className="h-4 w-4 text-empire-gold" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Requests</CardTitle>
+            <Activity className="h-4 w-4 text-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-empire-gold">
+            <div className="text-2xl font-bold text-foreground">
               {formatNumber(summary.total_requests)}
             </div>
-            <p className="text-xs text-empire-gold/60">
+            <p className="text-xs text-muted-foreground">
               {formatNumber(summary.successful_requests)} successful, {formatNumber(summary.failed_requests)} failed
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
+        <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-empire-gold/80">Total Tokens</CardTitle>
-            <TrendingUp className="h-4 w-4 text-empire-gold" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Tokens</CardTitle>
+            <TrendingUp className="h-4 w-4 text-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-empire-gold">
+            <div className="text-2xl font-bold text-foreground">
               {formatNumber(summary.total_tokens)}
             </div>
-            <p className="text-xs text-empire-gold/60">
+            <p className="text-xs text-muted-foreground">
               {summary.total_requests > 0
                 ? `${formatNumber(Math.round(summary.total_tokens / summary.total_requests))} avg per request`
                 : "No requests"}
@@ -401,16 +401,16 @@ export default function ApiKeyStatsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
+        <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-empire-gold/80">Total Cost</CardTitle>
-            <DollarSign className="h-4 w-4 text-empire-gold" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-empire-gold">
+            <div className="text-2xl font-bold text-foreground">
               {formatCurrency(summary.total_cost_dollars)}
             </div>
-            <p className="text-xs text-empire-gold/60">
+            <p className="text-xs text-muted-foreground">
               {summary.total_requests > 0
                 ? `${formatCurrency(summary.total_cost_dollars / summary.total_requests)} avg per request`
                 : "No requests"}
@@ -418,20 +418,20 @@ export default function ApiKeyStatsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-empire-darker/50 border-empire-gold/20">
+        <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-empire-gold/80">Error Rate</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Error Rate</CardTitle>
             {summary.error_rate_percent > 5 ? (
-              <AlertCircle className="h-4 w-4 text-red-400" />
+              <AlertCircle className="h-4 w-4 text-danger" />
             ) : (
-              <CheckCircle className="h-4 w-4 text-green-400" />
+              <CheckCircle className="h-4 w-4 text-success" />
             )}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-empire-gold">
+            <div className="text-2xl font-bold text-foreground">
               {formatPercent(summary.error_rate_percent)}
             </div>
-            <p className="text-xs text-empire-gold/60">
+            <p className="text-xs text-muted-foreground">
               Success rate: {formatPercent(100 - summary.error_rate_percent)}
             </p>
           </CardContent>
@@ -440,20 +440,20 @@ export default function ApiKeyStatsPage() {
 
       {/* Tabs Section */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="bg-empire-darker/50 border border-empire-gold/20">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-empire-gold/20 data-[state=active]:text-empire-gold">
+        <TabsList className="bg-card border border-border">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-accent-soft data-[state=active]:text-foreground">
             Overview
           </TabsTrigger>
-          <TabsTrigger value="providers" className="data-[state=active]:bg-empire-gold/20 data-[state=active]:text-empire-gold">
+          <TabsTrigger value="providers" className="data-[state=active]:bg-accent-soft data-[state=active]:text-foreground">
             Providers
           </TabsTrigger>
-          <TabsTrigger value="models" className="data-[state=active]:bg-empire-gold/20 data-[state=active]:text-empire-gold">
+          <TabsTrigger value="models" className="data-[state=active]:bg-accent-soft data-[state=active]:text-foreground">
             Models
           </TabsTrigger>
-          <TabsTrigger value="trends" className="data-[state=active]:bg-empire-gold/20 data-[state=active]:text-empire-gold">
+          <TabsTrigger value="trends" className="data-[state=active]:bg-accent-soft data-[state=active]:text-foreground">
             Trends
           </TabsTrigger>
-          <TabsTrigger value="records" className="data-[state=active]:bg-empire-gold/20 data-[state=active]:text-empire-gold">
+          <TabsTrigger value="records" className="data-[state=active]:bg-accent-soft data-[state=active]:text-foreground">
             Records
           </TabsTrigger>
         </TabsList>
@@ -462,21 +462,21 @@ export default function ApiKeyStatsPage() {
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Request Breakdown */}
-            <Card className="bg-empire-darker/50 border-empire-gold/20">
+            <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-empire-gold">Request Status</CardTitle>
+                <CardTitle className="text-foreground">Request Status</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-empire-gold/80">Successful</span>
-                    <span className="text-sm font-medium text-green-400">
+                    <span className="text-sm text-muted-foreground">Successful</span>
+                    <span className="text-sm font-medium text-success">
                       {formatNumber(summary.successful_requests)}
                     </span>
                   </div>
-                  <div className="w-full bg-empire-dark/50 rounded-full h-2">
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div
-                      className="bg-green-400 h-2 rounded-full"
+                      className="bg-success h-2 rounded-full"
                       style={{
                         width: `${summary.total_requests > 0 ? (summary.successful_requests / summary.total_requests) * 100 : 0}%`,
                       }}
@@ -485,14 +485,14 @@ export default function ApiKeyStatsPage() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-empire-gold/80">Failed</span>
-                    <span className="text-sm font-medium text-red-400">
+                    <span className="text-sm text-muted-foreground">Failed</span>
+                    <span className="text-sm font-medium text-danger">
                       {formatNumber(summary.failed_requests)}
                     </span>
                   </div>
-                  <div className="w-full bg-empire-dark/50 rounded-full h-2">
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div
-                      className="bg-red-400 h-2 rounded-full"
+                      className="bg-danger h-2 rounded-full"
                       style={{
                         width: `${summary.total_requests > 0 ? (summary.failed_requests / summary.total_requests) * 100 : 0}%`,
                       }}
@@ -503,44 +503,44 @@ export default function ApiKeyStatsPage() {
             </Card>
 
             {/* Top Provider */}
-            <Card className="bg-empire-darker/50 border-empire-gold/20">
+            <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-empire-gold">Top Provider</CardTitle>
+                <CardTitle className="text-foreground">Top Provider</CardTitle>
               </CardHeader>
               <CardContent>
                 {by_provider.length > 0 ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-medium text-empire-gold">
+                      <span className="text-lg font-medium text-foreground">
                         {by_provider[0].provider_name}
                       </span>
-                      <Badge variant="outline" className="border-empire-gold/20 text-empire-gold">
+                      <Badge variant="outline" className="border-border text-foreground">
                         #{1}
                       </Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <p className="text-empire-gold/60">Requests</p>
-                        <p className="text-empire-gold font-medium">{formatNumber(by_provider[0].requests)}</p>
+                        <p className="text-muted-foreground">Requests</p>
+                        <p className="text-foreground font-medium">{formatNumber(by_provider[0].requests)}</p>
                       </div>
                       <div>
-                        <p className="text-empire-gold/60">Tokens</p>
-                        <p className="text-empire-gold font-medium">{formatNumber(by_provider[0].tokens)}</p>
+                        <p className="text-muted-foreground">Tokens</p>
+                        <p className="text-foreground font-medium">{formatNumber(by_provider[0].tokens)}</p>
                       </div>
                       <div>
-                        <p className="text-empire-gold/60">Cost</p>
-                        <p className="text-empire-gold font-medium">{formatCurrency(by_provider[0].cost_dollars)}</p>
+                        <p className="text-muted-foreground">Cost</p>
+                        <p className="text-foreground font-medium">{formatCurrency(by_provider[0].cost_dollars)}</p>
                       </div>
                       <div>
-                        <p className="text-empire-gold/60">Share</p>
-                        <p className="text-empire-gold font-medium">
+                        <p className="text-muted-foreground">Share</p>
+                        <p className="text-foreground font-medium">
                           {formatPercent((by_provider[0].requests / summary.total_requests) * 100)}
                         </p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-empire-gold/60">No provider data</p>
+                  <p className="text-muted-foreground">No provider data</p>
                 )}
               </CardContent>
             </Card>
@@ -549,39 +549,39 @@ export default function ApiKeyStatsPage() {
 
         {/* Providers Tab */}
         <TabsContent value="providers">
-          <Card className="bg-empire-darker/50 border-empire-gold/20">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-empire-gold">Provider Breakdown</CardTitle>
+              <CardTitle className="text-foreground">Provider Breakdown</CardTitle>
               <CardDescription>Usage statistics by provider</CardDescription>
             </CardHeader>
             <CardContent>
               {by_provider.length > 0 ? (
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-empire-gold/20 hover:bg-empire-gold/5">
-                      <TableHead className="text-empire-gold/80">Provider</TableHead>
-                      <TableHead className="text-empire-gold/80 text-right">Requests</TableHead>
-                      <TableHead className="text-empire-gold/80 text-right">Tokens</TableHead>
-                      <TableHead className="text-empire-gold/80 text-right">Cost</TableHead>
-                      <TableHead className="text-empire-gold/80 text-right">Share</TableHead>
+                    <TableRow className="border-border hover:bg-muted/50">
+                      <TableHead className="text-muted-foreground">Provider</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Requests</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Tokens</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Cost</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Share</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {by_provider.map((provider) => (
-                      <TableRow key={provider.provider_id} className="border-empire-gold/20 hover:bg-empire-gold/5">
-                        <TableCell className="font-medium text-empire-gold">
+                      <TableRow key={provider.provider_id} className="border-border hover:bg-muted/50">
+                        <TableCell className="font-medium text-foreground">
                           {provider.provider_name}
                         </TableCell>
-                        <TableCell className="text-right text-empire-gold/80">
+                        <TableCell className="text-right text-muted-foreground">
                           {formatNumber(provider.requests)}
                         </TableCell>
-                        <TableCell className="text-right text-empire-gold/80">
+                        <TableCell className="text-right text-muted-foreground">
                           {formatNumber(provider.tokens)}
                         </TableCell>
-                        <TableCell className="text-right text-empire-gold/80">
+                        <TableCell className="text-right text-muted-foreground">
                           {formatCurrency(provider.cost_dollars)}
                         </TableCell>
-                        <TableCell className="text-right text-empire-gold/80">
+                        <TableCell className="text-right text-muted-foreground">
                           {formatPercent((provider.requests / summary.total_requests) * 100)}
                         </TableCell>
                       </TableRow>
@@ -589,7 +589,7 @@ export default function ApiKeyStatsPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-center py-8 text-empire-gold/60">No provider data available</p>
+                <p className="text-center py-8 text-muted-foreground">No provider data available</p>
               )}
             </CardContent>
           </Card>
@@ -597,37 +597,37 @@ export default function ApiKeyStatsPage() {
 
         {/* Models Tab */}
         <TabsContent value="models">
-          <Card className="bg-empire-darker/50 border-empire-gold/20">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-empire-gold">Model Breakdown</CardTitle>
+              <CardTitle className="text-foreground">Model Breakdown</CardTitle>
               <CardDescription>Usage statistics by model (top 20)</CardDescription>
             </CardHeader>
             <CardContent>
               {by_model.length > 0 ? (
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-empire-gold/20 hover:bg-empire-gold/5">
-                      <TableHead className="text-empire-gold/80">Model</TableHead>
-                      <TableHead className="text-empire-gold/80">Provider</TableHead>
-                      <TableHead className="text-empire-gold/80 text-right">Requests</TableHead>
-                      <TableHead className="text-empire-gold/80 text-right">Tokens</TableHead>
-                      <TableHead className="text-empire-gold/80 text-right">Cost</TableHead>
+                    <TableRow className="border-border hover:bg-muted/50">
+                      <TableHead className="text-muted-foreground">Model</TableHead>
+                      <TableHead className="text-muted-foreground">Provider</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Requests</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Tokens</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Cost</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {by_model.slice(0, 20).map((model, idx) => (
-                      <TableRow key={`${model.provider_id}-${model.model}-${idx}`} className="border-empire-gold/20 hover:bg-empire-gold/5">
-                        <TableCell className="font-medium text-empire-gold">
+                      <TableRow key={`${model.provider_id}-${model.model}-${idx}`} className="border-border hover:bg-muted/50">
+                        <TableCell className="font-medium text-foreground">
                           {model.model}
                         </TableCell>
-                        <TableCell className="text-empire-gold/80">{model.provider_id}</TableCell>
-                        <TableCell className="text-right text-empire-gold/80">
+                        <TableCell className="text-muted-foreground">{model.provider_id}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">
                           {formatNumber(model.requests)}
                         </TableCell>
-                        <TableCell className="text-right text-empire-gold/80">
+                        <TableCell className="text-right text-muted-foreground">
                           {formatNumber(model.tokens)}
                         </TableCell>
-                        <TableCell className="text-right text-empire-gold/80">
+                        <TableCell className="text-right text-muted-foreground">
                           {formatCurrency(model.cost_dollars)}
                         </TableCell>
                       </TableRow>
@@ -635,7 +635,7 @@ export default function ApiKeyStatsPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-center py-8 text-empire-gold/60">No model data available</p>
+                <p className="text-center py-8 text-muted-foreground">No model data available</p>
               )}
             </CardContent>
           </Card>
@@ -643,9 +643,9 @@ export default function ApiKeyStatsPage() {
 
         {/* Trends Tab */}
         <TabsContent value="trends">
-          <Card className="bg-empire-darker/50 border-empire-gold/20">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-empire-gold">Daily Usage Trends</CardTitle>
+              <CardTitle className="text-foreground">Daily Usage Trends</CardTitle>
               <CardDescription>Request volume and cost over time</CardDescription>
             </CardHeader>
             <CardContent>
@@ -653,7 +653,7 @@ export default function ApiKeyStatsPage() {
                 <div className="space-y-6">
                   {/* Simple bar chart visualization */}
                   <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-empire-gold/80">Requests per Day</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground">Requests per Day</h4>
                     <div className="space-y-2">
                       {daily_trend.map((day) => {
                         const maxRequests = Math.max(...daily_trend.map((d) => d.requests))
@@ -661,12 +661,12 @@ export default function ApiKeyStatsPage() {
                         return (
                           <div key={day.date} className="space-y-1">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-empire-gold/60">{formatDate(day.date)}</span>
-                              <span className="text-empire-gold/80">{formatNumber(day.requests)}</span>
+                              <span className="text-muted-foreground">{formatDate(day.date)}</span>
+                              <span className="text-muted-foreground">{formatNumber(day.requests)}</span>
                             </div>
-                            <div className="w-full bg-empire-dark/50 rounded-full h-2">
+                            <div className="w-full bg-muted rounded-full h-2">
                               <div
-                                className="bg-empire-gold h-2 rounded-full"
+                                className="bg-primary h-2 rounded-full"
                                 style={{ width: `${barWidth}%` }}
                               />
                             </div>
@@ -678,7 +678,7 @@ export default function ApiKeyStatsPage() {
 
                   {/* Cost chart */}
                   <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-empire-gold/80">Cost per Day</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground">Cost per Day</h4>
                     <div className="space-y-2">
                       {daily_trend.map((day) => {
                         const maxCost = Math.max(...daily_trend.map((d) => d.cost_dollars))
@@ -686,12 +686,12 @@ export default function ApiKeyStatsPage() {
                         return (
                           <div key={day.date} className="space-y-1">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-empire-gold/60">{formatDate(day.date)}</span>
-                              <span className="text-empire-gold/80">{formatCurrency(day.cost_dollars)}</span>
+                              <span className="text-muted-foreground">{formatDate(day.date)}</span>
+                              <span className="text-muted-foreground">{formatCurrency(day.cost_dollars)}</span>
                             </div>
-                            <div className="w-full bg-empire-dark/50 rounded-full h-2">
+                            <div className="w-full bg-muted rounded-full h-2">
                               <div
-                                className="bg-green-400 h-2 rounded-full"
+                                className="bg-success h-2 rounded-full"
                                 style={{ width: `${barWidth}%` }}
                               />
                             </div>
@@ -702,27 +702,27 @@ export default function ApiKeyStatsPage() {
                   </div>
 
                   {/* Summary table */}
-                  <div className="border-t border-empire-gold/20 pt-4">
+                  <div className="border-t border-border pt-4">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-empire-gold/20 hover:bg-empire-gold/5">
-                          <TableHead className="text-empire-gold/80">Date</TableHead>
-                          <TableHead className="text-empire-gold/80 text-right">Requests</TableHead>
-                          <TableHead className="text-empire-gold/80 text-right">Tokens</TableHead>
-                          <TableHead className="text-empire-gold/80 text-right">Cost</TableHead>
+                        <TableRow className="border-border hover:bg-muted/50">
+                          <TableHead className="text-muted-foreground">Date</TableHead>
+                          <TableHead className="text-muted-foreground text-right">Requests</TableHead>
+                          <TableHead className="text-muted-foreground text-right">Tokens</TableHead>
+                          <TableHead className="text-muted-foreground text-right">Cost</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {daily_trend.map((day) => (
-                          <TableRow key={day.date} className="border-empire-gold/20 hover:bg-empire-gold/5">
-                            <TableCell className="text-empire-gold">{formatDate(day.date)}</TableCell>
-                            <TableCell className="text-right text-empire-gold/80">
+                          <TableRow key={day.date} className="border-border hover:bg-muted/50">
+                            <TableCell className="text-foreground">{formatDate(day.date)}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">
                               {formatNumber(day.requests)}
                             </TableCell>
-                            <TableCell className="text-right text-empire-gold/80">
+                            <TableCell className="text-right text-muted-foreground">
                               {formatNumber(day.tokens)}
                             </TableCell>
-                            <TableCell className="text-right text-empire-gold/80">
+                            <TableCell className="text-right text-muted-foreground">
                               {formatCurrency(day.cost_dollars)}
                             </TableCell>
                           </TableRow>
@@ -732,7 +732,7 @@ export default function ApiKeyStatsPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-center py-8 text-empire-gold/60">No trend data available</p>
+                <p className="text-center py-8 text-muted-foreground">No trend data available</p>
               )}
             </CardContent>
           </Card>
@@ -741,14 +741,14 @@ export default function ApiKeyStatsPage() {
         {/* Records Tab */}
         <TabsContent value="records" className="space-y-4">
           {/* Filters */}
-          <Card className="bg-empire-darker/50 border-empire-gold/20">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-empire-gold">Filters</CardTitle>
+              <CardTitle className="text-foreground">Filters</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-empire-gold/80">Provider</Label>
+                  <Label className="text-muted-foreground">Provider</Label>
                   <Input
                     placeholder="Filter by provider"
                     value={providerFilter}
@@ -756,11 +756,11 @@ export default function ApiKeyStatsPage() {
                       setProviderFilter(e.target.value)
                       setCurrentPage(1)
                     }}
-                    className="bg-empire-dark/50 border-empire-gold/20 text-empire-gold"
+                    className="bg-muted border-border text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-empire-gold/80">Model</Label>
+                  <Label className="text-muted-foreground">Model</Label>
                   <Input
                     placeholder="Filter by model"
                     value={modelFilter}
@@ -768,11 +768,11 @@ export default function ApiKeyStatsPage() {
                       setModelFilter(e.target.value)
                       setCurrentPage(1)
                     }}
-                    className="bg-empire-dark/50 border-empire-gold/20 text-empire-gold"
+                    className="bg-muted border-border text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-empire-gold/80">Status</Label>
+                  <Label className="text-muted-foreground">Status</Label>
                   <Select
                     value={statusFilter}
                     onValueChange={(value) => {
@@ -780,7 +780,7 @@ export default function ApiKeyStatsPage() {
                       setCurrentPage(1)
                     }}
                   >
-                    <SelectTrigger className="bg-empire-dark/50 border-empire-gold/20 text-empire-gold">
+                    <SelectTrigger className="bg-muted border-border text-foreground">
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
@@ -791,7 +791,7 @@ export default function ApiKeyStatsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-empire-gold/80">Start Date</Label>
+                  <Label className="text-muted-foreground">Start Date</Label>
                   <Input
                     type="date"
                     value={startDateFilter}
@@ -799,11 +799,11 @@ export default function ApiKeyStatsPage() {
                       setStartDateFilter(e.target.value)
                       setCurrentPage(1)
                     }}
-                    className="bg-empire-dark/50 border-empire-gold/20 text-empire-gold"
+                    className="bg-muted border-border text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-empire-gold/80">End Date</Label>
+                  <Label className="text-muted-foreground">End Date</Label>
                   <Input
                     type="date"
                     value={endDateFilter}
@@ -811,7 +811,7 @@ export default function ApiKeyStatsPage() {
                       setEndDateFilter(e.target.value)
                       setCurrentPage(1)
                     }}
-                    className="bg-empire-dark/50 border-empire-gold/20 text-empire-gold"
+                    className="bg-muted border-border text-foreground"
                   />
                 </div>
               </div>
@@ -827,7 +827,7 @@ export default function ApiKeyStatsPage() {
                     setEndDateFilter("")
                     setCurrentPage(1)
                   }}
-                  className="border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+                  className="border-border text-foreground hover:bg-accent"
                 >
                   Clear Filters
                 </Button>
@@ -837,7 +837,7 @@ export default function ApiKeyStatsPage() {
                     size="sm"
                     onClick={() => exportData("csv")}
                     disabled={!records || records.records.length === 0}
-                    className="border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+                    className="border-border text-foreground hover:bg-accent"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
@@ -847,7 +847,7 @@ export default function ApiKeyStatsPage() {
                     size="sm"
                     onClick={() => exportData("json")}
                     disabled={!records || records.records.length === 0}
-                    className="border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+                    className="border-border text-foreground hover:bg-accent"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Export JSON
@@ -858,9 +858,9 @@ export default function ApiKeyStatsPage() {
           </Card>
 
           {/* Records Table */}
-          <Card className="bg-empire-darker/50 border-empire-gold/20">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-empire-gold">Usage Records</CardTitle>
+              <CardTitle className="text-foreground">Usage Records</CardTitle>
               <CardDescription>
                 {records ? `Showing ${records.records.length} of ${formatNumber(records.total)} records` : "Loading..."}
               </CardDescription>
@@ -870,15 +870,15 @@ export default function ApiKeyStatsPage() {
                 <div className="space-y-4">
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-empire-gold/20 hover:bg-empire-gold/5">
-                        <TableHead className="text-empire-gold/80 w-[40px]"></TableHead>
-                        <TableHead className="text-empire-gold/80">Timestamp</TableHead>
-                        <TableHead className="text-empire-gold/80">Provider</TableHead>
-                        <TableHead className="text-empire-gold/80">Model</TableHead>
-                        <TableHead className="text-empire-gold/80 text-right">Tokens (In/Out)</TableHead>
-                        <TableHead className="text-empire-gold/80 text-right">Cost</TableHead>
-                        <TableHead className="text-empire-gold/80">Status</TableHead>
-                        <TableHead className="text-empire-gold/80 text-right">Latency</TableHead>
+                      <TableRow className="border-border hover:bg-muted/50">
+                        <TableHead className="text-muted-foreground w-[40px]"></TableHead>
+                        <TableHead className="text-muted-foreground">Timestamp</TableHead>
+                        <TableHead className="text-muted-foreground">Provider</TableHead>
+                        <TableHead className="text-muted-foreground">Model</TableHead>
+                        <TableHead className="text-muted-foreground text-right">Tokens (In/Out)</TableHead>
+                        <TableHead className="text-muted-foreground text-right">Cost</TableHead>
+                        <TableHead className="text-muted-foreground">Status</TableHead>
+                        <TableHead className="text-muted-foreground text-right">Latency</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -886,27 +886,27 @@ export default function ApiKeyStatsPage() {
                         <>
                           <TableRow
                             key={record.id}
-                            className="border-empire-gold/20 hover:bg-empire-gold/5 cursor-pointer"
+                            className="border-border hover:bg-muted/50 cursor-pointer"
                             onClick={() => setExpandedRecordId(expandedRecordId === record.id ? null : record.id)}
                           >
                             <TableCell>
                               {expandedRecordId === record.id ? (
-                                <ChevronUp className="h-4 w-4 text-empire-gold" />
+                                <ChevronUp className="h-4 w-4 text-foreground" />
                               ) : (
-                                <ChevronDown className="h-4 w-4 text-empire-gold" />
+                                <ChevronDown className="h-4 w-4 text-foreground" />
                               )}
                             </TableCell>
-                            <TableCell className="text-empire-gold/80 text-xs">
+                            <TableCell className="text-muted-foreground text-xs">
                               {formatDateTime(record.created_at)}
                             </TableCell>
-                            <TableCell className="text-empire-gold/80">{record.provider_id}</TableCell>
-                            <TableCell className="text-empire-gold/80 font-mono text-xs">
+                            <TableCell className="text-muted-foreground">{record.provider_id}</TableCell>
+                            <TableCell className="text-muted-foreground font-mono text-xs">
                               {record.normalized_model}
                             </TableCell>
-                            <TableCell className="text-right text-empire-gold/80 text-xs">
+                            <TableCell className="text-right text-muted-foreground text-xs">
                               {formatNumber(record.input_tokens)} / {formatNumber(record.output_tokens)}
                             </TableCell>
-                            <TableCell className="text-right text-empire-gold/80">
+                            <TableCell className="text-right text-muted-foreground">
                               {formatCurrency(record.total_cost_dollars)}
                             </TableCell>
                             <TableCell>
@@ -914,59 +914,59 @@ export default function ApiKeyStatsPage() {
                                 variant="outline"
                                 className={
                                   record.status === "success"
-                                    ? "border-green-500/20 text-green-400"
-                                    : "border-red-500/20 text-red-400"
+                                    ? "border-success-border text-success"
+                                    : "border-danger-border text-danger"
                                 }
                               >
                                 {record.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right text-empire-gold/80">
+                            <TableCell className="text-right text-muted-foreground">
                               {record.latency_ms ? `${record.latency_ms}ms` : "-"}
                             </TableCell>
                           </TableRow>
                           {expandedRecordId === record.id && (
-                            <TableRow className="border-empire-gold/20 bg-empire-dark/30">
+                            <TableRow className="border-border bg-muted/50">
                               <TableCell colSpan={8} className="p-6">
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                                   <div>
-                                    <p className="text-empire-gold/60 text-xs">Request ID</p>
-                                    <p className="text-empire-gold font-mono text-xs">{record.request_id}</p>
+                                    <p className="text-muted-foreground text-xs">Request ID</p>
+                                    <p className="text-foreground font-mono text-xs">{record.request_id}</p>
                                   </div>
                                   <div>
-                                    <p className="text-empire-gold/60 text-xs">Provider Model</p>
-                                    <p className="text-empire-gold">{record.provider_model}</p>
+                                    <p className="text-muted-foreground text-xs">Provider Model</p>
+                                    <p className="text-foreground">{record.provider_model}</p>
                                   </div>
                                   <div>
-                                    <p className="text-empire-gold/60 text-xs">Endpoint</p>
-                                    <p className="text-empire-gold">{record.endpoint}</p>
+                                    <p className="text-muted-foreground text-xs">Endpoint</p>
+                                    <p className="text-foreground">{record.endpoint}</p>
                                   </div>
                                   <div>
-                                    <p className="text-empire-gold/60 text-xs">Method</p>
-                                    <p className="text-empire-gold">{record.method}</p>
+                                    <p className="text-muted-foreground text-xs">Method</p>
+                                    <p className="text-foreground">{record.method}</p>
                                   </div>
                                   <div>
-                                    <p className="text-empire-gold/60 text-xs">Streaming</p>
-                                    <p className="text-empire-gold">{record.is_streaming ? "Yes" : "No"}</p>
+                                    <p className="text-muted-foreground text-xs">Streaming</p>
+                                    <p className="text-foreground">{record.is_streaming ? "Yes" : "No"}</p>
                                   </div>
                                   {record.ttft_ms && (
                                     <div>
-                                      <p className="text-empire-gold/60 text-xs">Time to First Token</p>
-                                      <p className="text-empire-gold">{record.ttft_ms}ms</p>
+                                      <p className="text-muted-foreground text-xs">Time to First Token</p>
+                                      <p className="text-foreground">{record.ttft_ms}ms</p>
                                     </div>
                                   )}
                                   <div>
-                                    <p className="text-empire-gold/60 text-xs">Input Cost</p>
-                                    <p className="text-empire-gold">{formatCurrency(record.input_cost_cents / 100)}</p>
+                                    <p className="text-muted-foreground text-xs">Input Cost</p>
+                                    <p className="text-foreground">{formatCurrency(record.input_cost_cents / 100)}</p>
                                   </div>
                                   <div>
-                                    <p className="text-empire-gold/60 text-xs">Output Cost</p>
-                                    <p className="text-empire-gold">{formatCurrency(record.output_cost_cents / 100)}</p>
+                                    <p className="text-muted-foreground text-xs">Output Cost</p>
+                                    <p className="text-foreground">{formatCurrency(record.output_cost_cents / 100)}</p>
                                   </div>
                                   {record.error_type && (
                                     <div className="col-span-2 md:col-span-3">
-                                      <p className="text-empire-gold/60 text-xs">Error Type</p>
-                                      <p className="text-red-400">{record.error_type}</p>
+                                      <p className="text-muted-foreground text-xs">Error Type</p>
+                                      <p className="text-danger">{record.error_type}</p>
                                     </div>
                                   )}
                                 </div>
@@ -980,7 +980,7 @@ export default function ApiKeyStatsPage() {
 
                   {/* Pagination */}
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-empire-gold/60">
+                    <div className="text-sm text-muted-foreground">
                       Page {records.page} of {records.total_pages}
                     </div>
                     <div className="flex gap-2">
@@ -989,7 +989,7 @@ export default function ApiKeyStatsPage() {
                         size="sm"
                         onClick={() => setCurrentPage(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+                        className="border-border text-foreground hover:bg-accent"
                       >
                         Previous
                       </Button>
@@ -998,7 +998,7 @@ export default function ApiKeyStatsPage() {
                         size="sm"
                         onClick={() => setCurrentPage(currentPage + 1)}
                         disabled={currentPage >= records.total_pages}
-                        className="border-empire-gold/20 text-empire-gold hover:bg-empire-gold/10"
+                        className="border-border text-foreground hover:bg-accent"
                       >
                         Next
                       </Button>
@@ -1006,7 +1006,7 @@ export default function ApiKeyStatsPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-center py-8 text-empire-gold/60">
+                <p className="text-center py-8 text-muted-foreground">
                   {records ? "No records found" : "Loading records..."}
                 </p>
               )}

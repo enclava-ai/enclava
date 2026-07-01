@@ -1017,7 +1017,7 @@ export default function UserManagement() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => deleteUser(user.id)}
-                              className="text-red-600"
+                              className="text-danger"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
@@ -1301,7 +1301,7 @@ export default function UserManagement() {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={() => deleteRole(role.id)}
-                                  className="text-red-600"
+                                  className="text-danger"
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Delete
@@ -1732,7 +1732,7 @@ export default function UserManagement() {
                   id="edit-is-active"
                   checked={selectedUser.is_active}
                   onChange={(e) => setSelectedUser({ ...selectedUser, is_active: e.target.checked })}
-                  className="rounded border-gray-300"
+                  className="rounded border-border"
                 />
                 <Label htmlFor="edit-is-active">Active</Label>
               </div>
@@ -1742,7 +1742,7 @@ export default function UserManagement() {
                   id="edit-is-verified"
                   checked={selectedUser.is_verified}
                   onChange={(e) => setSelectedUser({ ...selectedUser, is_verified: e.target.checked })}
-                  className="rounded border-gray-300"
+                  className="rounded border-border"
                 />
                 <Label htmlFor="edit-is-verified">Verified</Label>
               </div>
@@ -2080,7 +2080,7 @@ export default function UserManagement() {
                 id="force-change"
                 checked={passwordForm.force_change_on_login}
                 onChange={(e) => setPasswordForm({ ...passwordForm, force_change_on_login: e.target.checked })}
-                className="rounded border-gray-300"
+                className="rounded border-border"
               />
               <Label htmlFor="force-change" className="text-sm font-normal">
                 Force password change on next login

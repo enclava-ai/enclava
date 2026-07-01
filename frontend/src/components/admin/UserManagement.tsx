@@ -504,7 +504,7 @@ export default function UserManagement() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CheckCircle className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -515,7 +515,7 @@ export default function UserManagement() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Locked</CardTitle>
-            <Shield className="h-4 w-4 text-red-600" />
+            <Shield className="h-4 w-4 text-danger" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -526,7 +526,7 @@ export default function UserManagement() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Need Password Change</CardTitle>
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertCircle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">

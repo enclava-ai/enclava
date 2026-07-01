@@ -179,17 +179,17 @@ export default function AuditPage() {
       return <User className="h-4 w-4" />;
     }
     if (action.includes("create") || action.includes("add")) {
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
+      return <CheckCircle className="h-4 w-4 text-success" />;
     }
     if (action.includes("delete") || action.includes("remove")) {
-      return <XCircle className="h-4 w-4 text-red-500" />;
+      return <XCircle className="h-4 w-4 text-danger" />;
     }
     return <Activity className="h-4 w-4" />;
   };
 
   const getStatusBadge = (success: boolean) => {
     return success ? (
-      <Badge variant="default" className="bg-green-500">Success</Badge>
+      <Badge variant="success">Success</Badge>
     ) : (
       <Badge variant="destructive">Failed</Badge>
     );
@@ -203,7 +203,7 @@ export default function AuditPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </div>
     );
@@ -262,7 +262,7 @@ export default function AuditPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+            <CheckCircle className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{(stats?.success_rate || 0).toFixed(1)}%</div>
@@ -275,10 +275,10 @@ export default function AuditPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Failed Actions</CardTitle>
-            <XCircle className="h-4 w-4 text-red-500" />
+            <XCircle className="h-4 w-4 text-danger" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats?.failed_actions || 0}</div>
+            <div className="text-2xl font-bold text-danger">{stats?.failed_actions || 0}</div>
             <p className="text-xs text-muted-foreground">
               {stats?.recent_failures || 0} in last 24h
             </p>
@@ -451,7 +451,7 @@ export default function AuditPage() {
               </div>
             ) : (
               auditLogs.map((log) => (
-                <Card key={log.id} className="border-l-4 border-l-transparent data-[success=false]:border-l-red-500">
+                <Card key={log.id} className="border-l-4 border-l-transparent data-[success=false]:border-l-danger">
                   <CardContent className="py-4">
                     <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
                       <div className="lg:col-span-2">
@@ -499,7 +499,7 @@ export default function AuditPage() {
                     </div>
 
                     {!log.success && log.error_message && (
-                      <Alert className="mt-3 border-red-200">
+                      <Alert className="mt-3 border-danger-border">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>
                           <strong>Error:</strong> {log.error_message}

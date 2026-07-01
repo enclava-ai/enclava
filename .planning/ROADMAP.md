@@ -111,7 +111,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 04-01: Sweep admin, audit, pricing, user, and API key surfaces.
+- [x] 04-01: Sweep admin, audit, pricing, user, and API key surfaces.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

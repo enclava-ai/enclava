@@ -194,13 +194,13 @@ export default function AdminUsageOverviewPage() {
                   <div className="space-y-2">
                     <div>
                       <div className="text-sm text-muted-foreground">Successful</div>
-                      <div className="text-2xl font-bold text-green-600">
+                      <div className="text-2xl font-bold text-success">
                         {formatNumber(data.summary.successful_requests)}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Failed</div>
-                      <div className="text-2xl font-bold text-red-600">
+                      <div className="text-2xl font-bold text-danger">
                         {formatNumber(data.summary.failed_requests)}
                       </div>
                     </div>
@@ -218,7 +218,7 @@ export default function AdminUsageOverviewPage() {
                 </div>
                 <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-green-600 transition-all duration-500"
+                    className="h-full bg-success transition-all duration-500"
                     style={{
                       width: `${(data.summary.successful_requests / data.summary.total_requests) * 100}%`,
                     }}
@@ -311,7 +311,7 @@ export default function AdminUsageOverviewPage() {
                       <div className="flex-1 text-right text-xs text-muted-foreground">
                         {day.date}
                       </div>
-                      <div className="flex-[2px] bg-blue-600 rounded-t" style={{ height: `${Math.max(20, (day.requests / data.total_requests) * 60)}px` }} />
+                      <div className="flex-[2px] bg-info rounded-t" style={{ height: `${Math.max(20, (day.requests / data.total_requests) * 60)}px` }} />
                       <div className="flex-1 text-right">
                         <div className="text-xs font-medium">{formatNumber(day.requests)} req</div>
                         <div className="text-xs text-muted-foreground">${formatCurrency(day.cost_dollars)}</div>
@@ -352,7 +352,7 @@ function StatCard({
           {trend && (
             <div
               className={`text-xs ${
-                trendUp ? "text-green-600" : trendDown ? "text-red-600" : ""
+                trendUp ? "text-success" : trendDown ? "text-danger" : ""
               }`}
             >
               {trend}
