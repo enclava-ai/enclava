@@ -81,7 +81,13 @@ function DashboardContent() {
   const failedModules = modules.filter((module) => module.status === "error").length
   const activeAgents = agents.length
   const totalRequests = stats?.totalRequests ?? 0
-  const reliability = stats?.uptime ?? (failedModules > 0 ? 92 : modules.length > 0 ? 99.9 : 0)
+  const reliability = stats?.uptime && stats.uptime > 0
+    ? stats.uptime
+    : failedModules > 0
+      ? 92
+      : modules.length > 0
+        ? 99.9
+        : 0
   const spendEstimate = "$0.00"
 
   const trustStatus: StatusBadgeStatus = failedModules > 0
@@ -266,7 +272,7 @@ function DashboardContent() {
                     <p className="font-medium text-foreground">{item.title}</p>
                     <p className="text-sm text-muted-foreground">{item.description}</p>
                   </div>
-                  <StatusBadge status={item.status}>{item.status}</StatusBadge>
+                  <StatusBadge status={item.status}>{labelForAttentionStatus(item.status)}</StatusBadge>
                 </div>
               </Link>
             ))}
@@ -461,4 +467,12 @@ function statusForModule(status: ModuleInfo["status"]): StatusBadgeStatus {
   if (status === "running") return "success"
   if (status === "error") return "danger"
   return "warning"
+}
+
+function labelForAttentionStatus(status: StatusBadgeStatus): string {
+  if (status === "danger") return "Attention"
+  if (status === "warning") return "Setup"
+  if (status === "info") return "Review"
+  if (status === "success") return "Clear"
+  return "Status"
 }
