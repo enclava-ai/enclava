@@ -34,6 +34,7 @@ import {
   Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { apiClient } from "@/lib/api-client";
 
 interface Budget {
@@ -80,6 +81,7 @@ interface NewBudgetData {
 
 export default function BudgetsPage() {
   const { toast } = useToast();
+  const requestConfirmation = useConfirm();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [stats, setStats] = useState<BudgetStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -193,7 +195,13 @@ export default function BudgetsPage() {
   };
 
   const handleDeleteBudget = async (budgetId: string) => {
-    if (!confirm("Are you sure you want to delete this budget? This action cannot be undone.")) {
+    const confirmed = await requestConfirmation({
+      title: "Delete budget?",
+      description: "This action cannot be undone. The budget configuration will be permanently deleted.",
+      confirmText: "Delete budget",
+      destructive: true,
+    });
+    if (!confirmed) {
       return;
     }
 

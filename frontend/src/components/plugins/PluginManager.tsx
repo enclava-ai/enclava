@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { 
   Search, 
   Filter, 
@@ -218,6 +219,7 @@ const AvailablePluginCard: React.FC<AvailablePluginCardProps> = ({ plugin, onIns
 
 export const PluginManager: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
+  const requestConfirmation = useConfirm();
   const {
     installedPlugins,
     availablePlugins,
@@ -274,7 +276,14 @@ export const PluginManager: React.FC = () => {
           await unloadPlugin(plugin.id);
           break;
         case 'uninstall':
-          if (confirm(`Are you sure you want to uninstall ${plugin.name}?`)) {
+          if (
+            await requestConfirmation({
+              title: 'Uninstall plugin?',
+              description: `Uninstall ${plugin.name}? Plugin files and configuration may be removed.`,
+              confirmText: 'Uninstall',
+              destructive: true,
+            })
+          ) {
             await uninstallPlugin(plugin.id);
           }
           break;

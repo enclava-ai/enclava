@@ -13,6 +13,7 @@ import { AddConnectorDialog } from "@/components/connectors/AddConnectorDialog"
 import { SyncHistoryDialog } from "@/components/connectors/SyncHistoryDialog"
 import { apiClient } from "@/lib/api-client"
 import { useToast } from "@/hooks/use-toast"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 
 interface Connector {
   id: number
@@ -39,6 +40,7 @@ function ConnectorsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const requestConfirmation = useConfirm()
   const notify = {
     success: (title: string, options?: { description?: string }) => {
       toast({ title, description: options?.description })
@@ -153,8 +155,13 @@ function ConnectorsPageContent() {
   }
 
   const handleDelete = async (id: number) => {
-    // Confirm before delete
-    if (!window.confirm("Are you sure you want to delete this connector? This action cannot be undone.")) {
+    const confirmed = await requestConfirmation({
+      title: "Delete connector?",
+      description: "This action cannot be undone. The connector and its sync history will be removed.",
+      confirmText: "Delete connector",
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
 

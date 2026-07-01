@@ -37,6 +37,7 @@ import {
   Bot
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { apiClient } from "@/lib/api-client";
 
 interface ApiKey {
@@ -112,6 +113,7 @@ const PERMISSION_OPTIONS = [
 function ApiKeysContent() {
 
   const { toast } = useToast();
+  const requestConfirmation = useConfirm();
   const searchParams = useSearchParams();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
@@ -280,7 +282,13 @@ function ApiKeysContent() {
   };
 
   const handleDeleteApiKey = async (keyId: string) => {
-    if (!confirm("Are you sure you want to delete this API key? This action cannot be undone.")) {
+    const confirmed = await requestConfirmation({
+      title: "Delete API key?",
+      description: "This action cannot be undone. Applications using this key will lose access immediately.",
+      confirmText: "Delete key",
+      destructive: true,
+    });
+    if (!confirmed) {
       return;
     }
 

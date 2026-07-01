@@ -65,6 +65,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // User interfaces
 interface User {
@@ -203,6 +204,7 @@ const roleLevels = [
 
 export default function UserManagement() {
   const { toast } = useToast();
+  const requestConfirmation = useConfirm();
   const notifySuccess = (description: string) => toast({ title: "Success", description });
   const notifyError = (description: string) => toast({ title: "Error", description, variant: "destructive" });
   const [activeTab, setActiveTab] = useState("users");
@@ -435,7 +437,13 @@ export default function UserManagement() {
   };
 
   const handleDeleteApiKey = async (keyId: string) => {
-    if (!confirm("Are you sure you want to delete this API key?")) return;
+    const confirmed = await requestConfirmation({
+      title: "Delete API key?",
+      description: "Applications using this key will lose access immediately.",
+      confirmText: "Delete key",
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       setActionLoading(`delete-${keyId}`);
@@ -521,7 +529,13 @@ export default function UserManagement() {
   };
 
   const deleteUser = async (userId: number) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
+    const confirmed = await requestConfirmation({
+      title: "Delete user?",
+      description: "This user will be removed from the workspace. This action cannot be undone.",
+      confirmText: "Delete user",
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       await apiClient.delete(`/api-internal/v1/user-management/users/${userId}`);
@@ -648,7 +662,13 @@ export default function UserManagement() {
   };
 
   const deleteRole = async (roleId: number) => {
-    if (!confirm("Are you sure you want to delete this role?")) return;
+    const confirmed = await requestConfirmation({
+      title: "Delete role?",
+      description: "Users assigned to this role may lose their configured access. This action cannot be undone.",
+      confirmText: "Delete role",
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       await apiClient.delete(`/api-internal/v1/user-management/roles/${roleId}`);

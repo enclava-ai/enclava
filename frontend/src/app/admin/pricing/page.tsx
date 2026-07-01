@@ -44,6 +44,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface PricingResponse {
   id: number;
@@ -163,6 +164,7 @@ interface PricingAuditLogResponse {
 }
 
 export default function AdminPricingPage() {
+  const requestConfirmation = useConfirm();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pricingData, setPricingData] = useState<PricingListResponse | null>(null);
@@ -357,7 +359,13 @@ export default function AdminPricingPage() {
   };
 
   const handleRemoveOverride = async (provider: string, model: string) => {
-    if (!confirm(`Remove override for ${provider}/${model}?`)) return;
+    const confirmed = await requestConfirmation({
+      title: "Remove pricing override?",
+      description: `Remove override for ${provider}/${model}? Provider pricing will fall back to the current default source.`,
+      confirmText: "Remove override",
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       await apiClient.delete(`/api-internal/v1/admin/pricing/override/${provider}/${encodeURIComponent(model)}`);
@@ -368,7 +376,12 @@ export default function AdminPricingPage() {
   };
 
   const handleSync = async (provider: string) => {
-    if (!confirm(`Trigger pricing sync for ${provider}? This will fetch pricing from the provider's API.`)) return;
+    const confirmed = await requestConfirmation({
+      title: "Sync provider pricing?",
+      description: `Trigger pricing sync for ${provider}? This will fetch current pricing from the provider API.`,
+      confirmText: "Sync pricing",
+    });
+    if (!confirmed) return;
 
     try {
       setLoading(true);

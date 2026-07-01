@@ -7,6 +7,7 @@ import { AuthProvider } from '@/components/providers/auth-provider'
 import { ModulesProvider } from '@/contexts/ModulesContext'
 import { PluginProvider } from '@/contexts/PluginContext'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { ConfirmProvider } from '@/components/ui/confirm-dialog'
 import { Navigation } from '@/components/ui/navigation'
 import { getBaseUrl } from '@/lib/url-utils'
 
@@ -71,10 +72,12 @@ export default function RootLayout({
           <AuthProvider>
             <ModulesProvider>
               <ToastProvider>
-                <PluginProvider>
-                  <Navigation>{children}</Navigation>
-                  <Toaster />
-                </PluginProvider>
+                <ConfirmProvider>
+                  <PluginProvider>
+                    <Navigation>{children}</Navigation>
+                    <Toaster />
+                  </PluginProvider>
+                </ConfirmProvider>
               </ToastProvider>
             </ModulesProvider>
           </AuthProvider>

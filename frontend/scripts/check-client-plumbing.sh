@@ -2,12 +2,15 @@
 set -euo pipefail
 
 target="src"
-include_dialogs=false
+include_dialogs=true
 
 for arg in "$@"; do
   case "$arg" in
     --include-dialogs)
       include_dialogs=true
+      ;;
+    --skip-dialogs)
+      include_dialogs=false
       ;;
     *)
       target="$arg"

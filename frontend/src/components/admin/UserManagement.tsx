@@ -38,6 +38,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { apiClient } from "@/lib/api-client"
 import {
   Search,
@@ -120,6 +121,7 @@ export default function UserManagement() {
   })
 
   const { toast } = useToast()
+  const requestConfirmation = useConfirm()
 
   useEffect(() => {
     fetchUsers()
@@ -239,9 +241,13 @@ export default function UserManagement() {
   }
 
   const handleDeleteUser = async (user: User) => {
-    if (!confirm(`Are you sure you want to deactivate user ${user.email}?`)) {
-      return
-    }
+    const confirmed = await requestConfirmation({
+      title: "Deactivate user?",
+      description: `Deactivate ${user.email}? The user will lose access until reactivated.`,
+      confirmText: "Deactivate user",
+      destructive: true,
+    })
+    if (!confirmed) return
 
     try {
       await apiClient.delete(`/api-internal/v1/admin/user-management/users/${user.id}`)
