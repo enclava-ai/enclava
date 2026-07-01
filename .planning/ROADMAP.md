@@ -108,13 +108,25 @@ Plans:
   5. Root greps and color guardrails pass after legacy palette cleanup.
 
 **Plans**: 5 plans
-
 Plans:
+**Wave 1**
 
 - [ ] 04-01: Sweep admin, audit, pricing, user, and API key surfaces.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 04-02: Sweep RAG, Extract, and related domain components.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 04-03: Rework dashboard and sweep dashboard/settings/playground surfaces.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 04-04: Sweep agents, LLM, connectors, plugins, auth, and catch-all surfaces.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 04-05: Remove legacy palette definitions and add hardcoded-color guardrails.
 
 ### Phase 5: SPA Navigation and API Client Plumbing
