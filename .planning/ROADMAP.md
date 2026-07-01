@@ -12,7 +12,7 @@ This milestone turns the existing Enclava frontend into a coherent professional 
 - Decimal phases (2.1, 2.2): Urgent insertions if needed.
 
 - [x] **Phase 1: Delete Deprecated Routes** - Remove dead/dev-only frontend routes and references before visual sweeps touch deleted code. (completed 2026-07-01)
-- [ ] **Phase 2: Design System Foundation** - Add Slate Mono tokens, status vocabulary, and shared UX primitives.
+- [x] **Phase 2: Design System Foundation** - Add Slate Mono tokens, status vocabulary, and shared UX primitives. (completed 2026-07-01)
 - [ ] **Phase 3: App Shell and LLM IA** - Replace top navigation with sidebar/drawer shell and move LLM under Settings.
 - [ ] **Phase 4: Color Sweep and Dashboard** - Remove hardcoded color systems and rework the dashboard IA.
 - [ ] **Phase 5: SPA Navigation and API Client Plumbing** - Replace internal full reloads/new tabs and raw client fetches.
@@ -66,7 +66,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03: Verify foundation behavior in both themes and document usage conventions.
+- [x] 02-03: Verify foundation behavior in both themes and document usage conventions.
 
 ### Phase 3: App Shell and LLM IA
 
@@ -178,7 +178,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Delete Deprecated Routes | 2/2 | Complete    | 2026-07-01 |
-| 2. Design System Foundation | 2/3 | In Progress|  |
+| 2. Design System Foundation | 3/3 | Complete   | 2026-07-01 |
 | 3. App Shell and LLM IA | 0/3 | Not started | - |
 | 4. Color Sweep and Dashboard | 0/5 | Not started | - |
 | 5. SPA Navigation and API Client Plumbing | 0/2 | Not started | - |
