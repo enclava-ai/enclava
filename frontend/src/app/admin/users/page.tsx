@@ -33,6 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageSkeleton } from "@/components/ui/skeletons";
 import { useToast } from "@/hooks/use-toast";
 import {
   UserPlus,
@@ -759,9 +760,7 @@ export default function UserManagement() {
   if (loading && users.length === 0) {
     return (
       <div className="container mx-auto py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
+        <PageSkeleton />
       </div>
     );
   }

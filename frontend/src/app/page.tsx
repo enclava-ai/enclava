@@ -7,6 +7,7 @@ import { useEffect } from "react"
 // Force dynamic rendering for authentication
 export const dynamic = 'force-dynamic'
 import { Button } from "@/components/ui/button"
+import { PageSkeleton } from "@/components/ui/skeletons"
 import { Shield, ExternalLink } from "lucide-react"
 
 export default function HomePage() {
@@ -21,8 +22,8 @@ export default function HomePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background p-6">
+        <PageSkeleton className="mx-auto max-w-4xl" />
       </div>
     )
   }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/auth-provider"
+import { PageSkeleton } from "@/components/ui/skeletons"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -27,8 +28,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // This ensures consistent rendering between server and client
   if (!isClient || isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background p-6">
+        <PageSkeleton className="mx-auto max-w-6xl" />
       </div>
     )
   }
@@ -37,8 +38,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // (redirect is handled by useEffect)
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background p-6">
+        <PageSkeleton className="mx-auto max-w-6xl" />
       </div>
     )
   }
