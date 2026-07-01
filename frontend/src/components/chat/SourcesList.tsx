@@ -36,7 +36,7 @@ export function SourcesList({ sources }: SourcesListProps) {
           return (
             <div
               key={index}
-              className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 dark:bg-slate-800/50 border border-border/50"
+              className="flex items-start gap-2 p-3 rounded-lg bg-muted/50  border border-border/50"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-start gap-2 flex-wrap">

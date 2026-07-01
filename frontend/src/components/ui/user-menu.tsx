@@ -141,7 +141,7 @@ export function UserMenu() {
             Change Password
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={logout} className="text-red-600">
+          <DropdownMenuItem onClick={logout} className="text-danger">
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </DropdownMenuItem>

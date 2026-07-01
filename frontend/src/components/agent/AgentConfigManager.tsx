@@ -1269,16 +1269,16 @@ export function AgentConfigManager() {
                       </div>
                     </div>
 
-                    <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="p-4 bg-success-soft rounded-lg border border-success-border">
                       <div className="flex items-start space-x-2">
-                        <div className="text-green-600 dark:text-green-400">
+                        <div className="text-success ">
                           <Globe className="h-4 w-4 mt-0.5" />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                          <p className="text-sm font-medium text-success-soft-foreground">
                             API Key Authentication
                           </p>
-                          <p className="text-xs text-green-700 dark:text-green-200 mt-1">
+                          <p className="text-xs text-success-soft-foreground mt-1">
                             Use your API key in the Authorization header as Bearer token. Create an API key in the API Keys section and ensure it has access to this agent.
                           </p>
                         </div>

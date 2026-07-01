@@ -229,7 +229,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
               />
               <Label htmlFor={fieldId} className="text-sm font-medium">
                 {field.title || field.label || key}
-                {field.required && <span className="text-red-500 ml-1">*</span>}
+                {field.required && <span className="text-danger ml-1">*</span>}
               </Label>
             </div>
             {field.description && (
@@ -246,7 +246,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div className="space-y-2">
             <Label htmlFor={fieldId} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Select value={String(value || '')} onValueChange={onChange}>
               <SelectTrigger>
@@ -278,7 +278,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div className="space-y-2">
             <Label htmlFor={fieldId} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Input
               id={fieldId}
@@ -303,7 +303,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div className="space-y-2">
             <Label htmlFor={fieldId} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Input
               id={fieldId}
@@ -344,7 +344,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
               />
               <Label htmlFor={key} className="text-sm font-medium">
                 {field.title || field.label || key}
-                {field.required && <span className="text-red-500 ml-1">*</span>}
+                {field.required && <span className="text-danger ml-1">*</span>}
               </Label>
             </div>
             {field.description && (
@@ -361,7 +361,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div key={key} className="space-y-2">
             <Label htmlFor={key} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Select value={String(value)} onValueChange={(val) => handleFieldChange(key, val)}>
               <SelectTrigger>
@@ -392,7 +392,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div key={key} className="space-y-2">
             <Label htmlFor={key} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Textarea
               id={key}
@@ -414,7 +414,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div key={key} className="space-y-2">
             <Label htmlFor={key} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Input
               id={key}
@@ -439,7 +439,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div key={key} className="space-y-2">
             <Label htmlFor={key} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Input
               id={key}
@@ -464,7 +464,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div key={key} className="space-y-2">
             <Label htmlFor={key} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Input
               id={key}
@@ -486,7 +486,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div key={key} className="space-y-2">
             <Label htmlFor={key} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Input
               id={key}
@@ -517,11 +517,11 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
         }
 
         return (
-          <div key={key} className="space-y-4 p-4 border rounded-lg bg-gray-50">
+          <div key={key} className="space-y-4 p-4 border rounded-lg bg-muted">
             <div>
               <Label className="text-sm font-semibold">
                 {field.title || field.label || key}
-                {field.required && <span className="text-red-500 ml-1">*</span>}
+                {field.required && <span className="text-danger ml-1">*</span>}
               </Label>
               {field.description && (
                 <p className="text-xs text-muted-foreground mt-1">
@@ -558,7 +558,7 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
           <div key={key} className="space-y-2">
             <Label htmlFor={key} className="text-sm font-medium">
               {field.title || field.label || key}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-danger ml-1">*</span>}
             </Label>
             <Input
               id={key}
@@ -618,8 +618,8 @@ export const PluginConfigurationDialog: React.FC<PluginConfigurationDialogProps>
         <div className="space-y-4">
           {/* Success Message */}
           {success && (
-            <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200">
-              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <Alert className="border-success-border bg-success-soft text-success-soft-foreground">
+              <CheckCircle className="h-4 w-4 text-success" />
               <AlertDescription className="font-medium">
                 Configuration saved successfully! All settings have been saved and encrypted.
               </AlertDescription>

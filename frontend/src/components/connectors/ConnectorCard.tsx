@@ -33,10 +33,10 @@ interface ConnectorCardProps {
 }
 
 const CONNECTOR_TYPE_INFO: Record<string, { icon: string; label: string; color: string }> = {
-  notion: { icon: "📄", label: "Notion", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
-  github: { icon: "🐙", label: "GitHub", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200" },
-  slack: { icon: "💬", label: "Slack", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
-  linear: { icon: "📐", label: "Linear", color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200" },
+  notion: { icon: "📄", label: "Notion", color: "bg-info-soft text-info-soft-foreground" },
+  github: { icon: "🐙", label: "GitHub", color: "bg-muted text-muted-foreground" },
+  slack: { icon: "💬", label: "Slack", color: "bg-muted text-muted-foreground" },
+  linear: { icon: "📐", label: "Linear", color: "bg-muted text-muted-foreground" },
 }
 
 function formatRelativeTime(dateString: string | null | undefined): string {
@@ -94,7 +94,7 @@ export function ConnectorCard({
   const typeInfo = CONNECTOR_TYPE_INFO[connector_type] || {
     icon: "🔌",
     label: connector_type,
-    color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+    color: "bg-muted text-muted-foreground",
   }
 
   const handleSync = async () => {

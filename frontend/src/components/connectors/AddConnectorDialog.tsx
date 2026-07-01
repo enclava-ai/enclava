@@ -244,8 +244,8 @@ export function AddConnectorDialog({
                     <span
                       className={`text-xs px-2 py-0.5 rounded ${
                         type.authType === "oauth"
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                          : "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                          ? "bg-info-soft text-info-soft-foreground"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {type.authType === "oauth" ? "OAuth" : "Token"}

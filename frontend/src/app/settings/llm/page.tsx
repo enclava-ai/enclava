@@ -709,7 +709,7 @@ function LLMPageContent() {
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle className="flex items-center gap-2">
-                              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                              <AlertTriangle className="h-5 w-5 text-warning" />
                               Reset Prompt Template
                             </AlertDialogTitle>
                             <AlertDialogDescription>
@@ -721,7 +721,7 @@ function LLMPageContent() {
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleResetTemplate(template)}
-                              className="bg-yellow-600 hover:bg-yellow-700"
+                              className="bg-warning hover:bg-warning/90"
                             >
                               Reset to Default
                             </AlertDialogAction>

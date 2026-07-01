@@ -69,7 +69,7 @@ const InstalledPluginCard: React.FC<PluginCardProps> = ({ plugin, onAction }) =>
           <div className="flex items-center gap-2">
             {getStatusBadge(plugin.status)}
             {plugin.loaded && (
-              <Badge variant="outline" className="text-green-600">
+              <Badge variant="outline" className="text-success">
                 Loaded
               </Badge>
             )}
@@ -181,7 +181,7 @@ const AvailablePluginCard: React.FC<AvailablePluginCardProps> = ({ plugin, onIns
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
             {plugin.local_status.installed ? (
-              <div className="flex items-center gap-1 text-green-600">
+              <div className="flex items-center gap-1 text-success">
                 <CheckCircle className="h-4 w-4" />
                 Installed {plugin.local_status.version && `(v${plugin.local_status.version})`}
               </div>

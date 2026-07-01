@@ -935,12 +935,12 @@ export function MCPServerManager() {
             <DialogTitle className="flex items-center gap-2">
               {testResult?.success ? (
                 <>
-                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <CheckCircle className="h-5 w-5 text-success" />
                   Connection Successful
                 </>
               ) : (
                 <>
-                  <XCircle className="h-5 w-5 text-red-500" />
+                  <XCircle className="h-5 w-5 text-danger" />
                   Connection Failed
                 </>
               )}

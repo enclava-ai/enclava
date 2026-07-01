@@ -135,11 +135,11 @@ export default function ProvidersTab() {
   // Get badge style for mode
   function getModeBadgeStyle(mode: string): string {
     const styles: Record<string, string> = {
-      'generate': 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-      'tool_calling': 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-      'vision': 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-      'transcribe': 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-      'embed': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
+      'generate': 'bg-info-soft text-info-soft-foreground',
+      'tool_calling': 'bg-muted text-muted-foreground',
+      'vision': 'bg-success-soft text-success-soft-foreground',
+      'transcribe': 'bg-warning-soft text-warning-soft-foreground',
+      'embed': 'bg-info-soft text-info-soft-foreground',
     };
     return styles[mode] || '';
   }
@@ -147,7 +147,7 @@ export default function ProvidersTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-empire-gold"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -183,7 +183,7 @@ export default function ProvidersTab() {
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-lg">{provider.display_name}</CardTitle>
               {provider.healthy ? (
-                <Badge className="bg-green-500 hover:bg-green-600 text-white border-transparent">
+                <Badge variant="success">
                   <CheckCircle className="w-3 h-3 mr-1" />
                   Healthy
                 </Badge>
@@ -242,10 +242,10 @@ export default function ProvidersTab() {
                         </div>
                         {model.pricing && (
                           <div className="text-xs mt-1 flex items-center gap-2">
-                            <span className="text-green-600 dark:text-green-400 font-medium">
+                            <span className="text-success font-medium">
                               In: {formatPricing(model.pricing.input_per_million_cents, provider.provider_id)}/M
                             </span>
-                            <span className="text-orange-600 dark:text-orange-400 font-medium">
+                            <span className="text-warning font-medium">
                               Out: {formatPricing(model.pricing.output_per_million_cents, provider.provider_id)}/M
                             </span>
                             {model.pricing.source === 'default' && (

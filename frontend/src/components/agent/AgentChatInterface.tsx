@@ -245,11 +245,11 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
               <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className="max-w-[85%] min-w-0 space-y-2">
                   <div className={`flex items-start space-x-2 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                    <div className={`p-2 rounded-full ${message.role === 'user' ? 'bg-primary' : 'bg-secondary/50 dark:bg-slate-700'}`}>
+                    <div className={`p-2 rounded-full ${message.role === 'user' ? 'bg-primary' : 'bg-secondary/50'}`}>
                       {message.role === 'user' ? (
                         <User className="h-4 w-4 text-primary-foreground" />
                       ) : (
-                        <Bot className="h-4 w-4 text-muted-foreground dark:text-slate-300" />
+                        <Bot className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
                     <div className="flex-1 space-y-2 min-w-0">
@@ -257,7 +257,7 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
                         <div className={`rounded-lg p-4 ${
                           message.role === 'user'
                             ? 'bg-primary text-primary-foreground ml-auto'
-                            : 'bg-muted text-foreground dark:bg-slate-700 dark:text-slate-200'
+                            : 'bg-muted text-foreground'
                         } break-words overflow-wrap-anywhere`}>
                           <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words overflow-wrap-anywhere">
                             {message.role === 'user' ? (
@@ -274,7 +274,7 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
                         <ToolCallDisplay toolCalls={message.tool_calls} />
                       )}
 
-                      <div className="flex items-center justify-between text-xs text-foreground/50 dark:text-slate-400">
+                      <div className="flex items-center justify-between text-xs text-foreground/50">
                         <span>{formatTime(message.timestamp)}</span>
                         {message.content && (
                           <Button
@@ -298,13 +298,13 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
               <div className="flex justify-start">
                 <div className="max-w-[85%]">
                   <div className="flex items-start space-x-2">
-                    <div className="p-2 rounded-full bg-secondary/50 dark:bg-slate-700">
+                    <div className="p-2 rounded-full bg-secondary/50">
                       <Bot className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="bg-muted dark:bg-slate-700 rounded-lg p-3">
+                    <div className="bg-muted rounded-lg p-3">
                       <div className="flex items-center space-x-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-foreground dark:text-slate-200" />
-                        <span className="text-sm text-foreground/70 dark:text-slate-200">Thinking...</span>
+                        <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                        <span className="text-sm text-foreground/70">Thinking...</span>
                       </div>
                     </div>
                   </div>
@@ -322,7 +322,7 @@ export function AgentChatInterface({ agentConfigId, agentName, onClose }: AgentC
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="flex-1 bg-background text-foreground placeholder:text-muted-foreground dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-400"
+              className="flex-1 bg-background text-foreground placeholder:text-muted-foreground"
               aria-label="Agent message input"
               maxLength={4000}
             />

@@ -167,11 +167,11 @@ export default function RegisterPage() {
                 placeholder="Enter your username"
                 value={formData.username}
                 onChange={handleInputChange("username")}
-                className={errors.username ? "border-red-500" : ""}
+                className={errors.username ? "border-danger-border" : ""}
                 disabled={isLoading}
               />
               {errors.username && (
-                <p className="text-sm text-red-500">{errors.username}</p>
+                <p className="text-sm text-danger">{errors.username}</p>
               )}
             </div>
 
@@ -184,11 +184,11 @@ export default function RegisterPage() {
                 placeholder="Enter your email"
                 value={formData.email}
                 onChange={handleInputChange("email")}
-                className={errors.email ? "border-red-500" : ""}
+                className={errors.email ? "border-danger-border" : ""}
                 disabled={isLoading}
               />
               {errors.email && (
-                <p className="text-sm text-red-500">{errors.email}</p>
+                <p className="text-sm text-danger">{errors.email}</p>
               )}
             </div>
 
@@ -201,11 +201,11 @@ export default function RegisterPage() {
                 placeholder="Enter your full name"
                 value={formData.fullName}
                 onChange={handleInputChange("fullName")}
-                className={errors.fullName ? "border-red-500" : ""}
+                className={errors.fullName ? "border-danger-border" : ""}
                 disabled={isLoading}
               />
               {errors.fullName && (
-                <p className="text-sm text-red-500">{errors.fullName}</p>
+                <p className="text-sm text-danger">{errors.fullName}</p>
               )}
             </div>
 
@@ -218,11 +218,11 @@ export default function RegisterPage() {
                 placeholder="Enter your password"
                 value={formData.password}
                 onChange={handleInputChange("password")}
-                className={errors.password ? "border-red-500" : ""}
+                className={errors.password ? "border-danger-border" : ""}
                 disabled={isLoading}
               />
               {errors.password && (
-                <p className="text-sm text-red-500">{errors.password}</p>
+                <p className="text-sm text-danger">{errors.password}</p>
               )}
             </div>
 
@@ -235,11 +235,11 @@ export default function RegisterPage() {
                 placeholder="Confirm your password"
                 value={formData.confirmPassword}
                 onChange={handleInputChange("confirmPassword")}
-                className={errors.confirmPassword ? "border-red-500" : ""}
+                className={errors.confirmPassword ? "border-danger-border" : ""}
                 disabled={isLoading}
               />
               {errors.confirmPassword && (
-                <p className="text-sm text-red-500">{errors.confirmPassword}</p>
+                <p className="text-sm text-danger">{errors.confirmPassword}</p>
               )}
             </div>
 
@@ -275,7 +275,7 @@ export default function RegisterPage() {
               </Label>
             </div>
             {errors.acceptTerms && (
-              <p className="text-sm text-red-500">{errors.acceptTerms}</p>
+              <p className="text-sm text-danger">{errors.acceptTerms}</p>
             )}
 
             {/* Submit Button */}

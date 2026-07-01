@@ -94,15 +94,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-empire-dark to-empire-darker p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-empire-gold/10 rounded-full">
-              <Shield className="h-8 w-8 text-empire-gold" />
+            <div className="p-3 bg-primary/10 rounded-full">
+              <Shield className="h-8 w-8 text-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-empire-gold">
+          <CardTitle className="text-2xl font-bold text-foreground">
             Enclava
           </CardTitle>
           <CardDescription>
@@ -112,8 +112,8 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20">
-                <p className="text-sm text-red-500 flex items-center gap-2">
+              <div className="p-3 rounded-md bg-danger-soft border border-danger-border">
+                <p className="text-sm text-danger flex items-center gap-2">
                   <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
@@ -133,8 +133,8 @@ export default function LoginPage() {
                   setError(null) // Clear error when user starts typing
                 }}
                 required
-                className={`bg-empire-darker/50 border-empire-gold/20 focus:border-empire-gold ${
-                  error ? 'border-red-500/50' : ''
+                className={`bg-muted border-border focus:border-ring ${
+                  error ? 'border-danger-border' : ''
                 }`}
               />
             </div>
@@ -151,8 +151,8 @@ export default function LoginPage() {
                     setError(null) // Clear error when user starts typing
                   }}
                   required
-                  className={`bg-empire-darker/50 border-empire-gold/20 focus:border-empire-gold pr-10 ${
-                    error ? 'border-red-500/50' : ''
+                  className={`bg-muted border-border focus:border-ring pr-10 ${
+                    error ? 'border-danger-border' : ''
                   }`}
                 />
                 <Button
@@ -163,16 +163,16 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-empire-gold/60" />
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
                   ) : (
-                    <Eye className="h-4 w-4 text-empire-gold/60" />
+                    <Eye className="h-4 w-4 text-muted-foreground" />
                   )}
                 </Button>
               </div>
             </div>
             <Button
               type="submit"
-              className="w-full bg-empire-gold hover:bg-empire-gold/90 text-empire-dark disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isLocked}
             >
               {isLocked ? "Account Locked (30s)" : isLoading ? "Signing in..." : "Sign in"}
