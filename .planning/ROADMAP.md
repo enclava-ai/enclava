@@ -88,7 +88,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02: Move the LLM route under Settings and add compatibility redirects.
+- [x] 03-02: Move the LLM route under Settings and add compatibility redirects.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

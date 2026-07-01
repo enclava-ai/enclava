@@ -8,7 +8,7 @@ export default function PromptTemplatesPage() {
 
   useEffect(() => {
     // Redirect to LLM page with prompt-templates tab
-    router.replace('/llm?tab=prompt-templates')
+    router.replace('/settings/llm?tab=prompt-templates')
   }, [router])
 
   return null

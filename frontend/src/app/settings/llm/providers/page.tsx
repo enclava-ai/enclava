@@ -8,7 +8,7 @@ export default function ProvidersRedirect() {
 
   useEffect(() => {
     // Redirect to the new tab location
-    router.replace('/llm?tab=providers');
+    router.replace('/settings/llm?tab=providers');
   }, [router]);
 
   return (
