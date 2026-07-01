@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -36,6 +36,7 @@ interface Collection {
 }
 
 function ConnectorsPageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [connectors, setConnectors] = useState<Connector[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
@@ -58,13 +59,14 @@ function ConnectorsPageContent() {
         description: `Your connector has been set up and is ready to use.`,
       })
 
-      // Clear URL params without reload
-      const url = new URL(window.location.href)
-      url.searchParams.delete("oauth_success")
-      url.searchParams.delete("connector_id")
-      window.history.replaceState({}, "", url.toString())
+      // Clear URL params without reload.
+      const nextParams = new URLSearchParams(searchParams.toString())
+      nextParams.delete("oauth_success")
+      nextParams.delete("connector_id")
+      const nextQuery = nextParams.toString()
+      router.replace(nextQuery ? `/admin/connectors?${nextQuery}` : "/admin/connectors", { scroll: false })
     }
-  }, [searchParams])
+  }, [router, searchParams])
 
   // Fetch connectors and collections
   const fetchData = useCallback(async () => {

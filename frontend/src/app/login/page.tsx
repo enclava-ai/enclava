@@ -51,8 +51,7 @@ export default function LoginPage() {
       setAttemptCount(0)
       // Add a small delay to ensure token is fully stored and propagated
       setTimeout(() => {
-        // For now, do a full page reload to ensure everything is initialized with the new token
-        window.location.href = "/dashboard"
+        router.replace("/dashboard")
       }, 100)
     } catch (error) {
       const newAttemptCount = attemptCount + 1

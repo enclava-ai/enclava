@@ -5,6 +5,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
@@ -139,6 +140,7 @@ export const PluginNavigation: React.FC<PluginNavigationProps> = ({
   className = "" 
 }) => {
   const { installedPlugins, getPluginPages, isPluginPageAuthorized } = usePlugin();
+  const pathname = usePathname();
   
   // Filter to loaded plugins with accessible pages
   const availablePlugins = installedPlugins.filter(plugin => {
@@ -172,7 +174,7 @@ export const PluginNavigation: React.FC<PluginNavigationProps> = ({
               key={plugin.id}
               plugin={plugin}
               pages={pages}
-              currentPath={typeof window !== 'undefined' ? window.location.pathname : ''}
+              currentPath={pathname}
             />
           );
         })}

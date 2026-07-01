@@ -145,7 +145,7 @@ Plans:
 
 Plans:
 
-- [ ] 05-01: Replace internal `window.location` and `window.open` navigation.
+- [x] 05-01: Replace internal `window.location` and `window.open` navigation.
 - [ ] 05-02: Replace real client fetches with `apiClient` and add plumbing guardrails.
 
 ### Phase 6: Toasts and Confirmations
