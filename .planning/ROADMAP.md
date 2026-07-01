@@ -164,7 +164,7 @@ Plans:
 
 Plans:
 
-- [ ] 06-01: Consolidate toast providers, dependencies, and call sites.
+- [x] 06-01: Consolidate toast providers, dependencies, and call sites.
 - [ ] 06-02: Replace native confirmation and alert flows with `ConfirmDialog` or `useConfirm`.
 
 ### Phase 7: Loading, Empty, and Accessibility Polish
@@ -200,7 +200,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. App Shell and LLM IA | 3/3 | Complete    | 2026-07-01 |
 | 4. Color Sweep and Dashboard | 5/5 | Complete    | 2026-07-01 |
 | 5. SPA Navigation and API Client Plumbing | 2/2 | Complete    | 2026-07-01 |
-| 6. Toasts and Confirmations | 0/2 | Not started | - |
+| 6. Toasts and Confirmations | 1/2 | In progress | - |
 | 7. Loading, Empty, and Accessibility Polish | 0/3 | Not started | - |
 
 ---

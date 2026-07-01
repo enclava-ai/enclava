@@ -12,7 +12,7 @@ import { ConnectorCard } from "@/components/connectors/ConnectorCard"
 import { AddConnectorDialog } from "@/components/connectors/AddConnectorDialog"
 import { SyncHistoryDialog } from "@/components/connectors/SyncHistoryDialog"
 import { apiClient } from "@/lib/api-client"
-import { toast } from "sonner"
+import { useToast } from "@/hooks/use-toast"
 
 interface Connector {
   id: number
@@ -38,6 +38,18 @@ interface Collection {
 function ConnectorsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { toast } = useToast()
+  const notify = {
+    success: (title: string, options?: { description?: string }) => {
+      toast({ title, description: options?.description })
+    },
+    error: (title: string, options?: { description?: string }) => {
+      toast({ title, description: options?.description, variant: "destructive" })
+    },
+    info: (title: string, options?: { description?: string }) => {
+      toast({ title, description: options?.description })
+    },
+  }
   const [connectors, setConnectors] = useState<Connector[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,7 +67,8 @@ function ConnectorsPageContent() {
     const connectorId = searchParams.get("connector_id")
 
     if (oauthSuccess === "true" && connectorId) {
-      toast.success("Connector created successfully", {
+      toast({
+        title: "Connector created successfully",
         description: `Your connector has been set up and is ready to use.`,
       })
 
@@ -66,7 +79,7 @@ function ConnectorsPageContent() {
       const nextQuery = nextParams.toString()
       router.replace(nextQuery ? `/admin/connectors?${nextQuery}` : "/admin/connectors", { scroll: false })
     }
-  }, [router, searchParams])
+  }, [router, searchParams, toast])
 
   // Fetch connectors and collections
   const fetchData = useCallback(async () => {
@@ -104,14 +117,14 @@ function ConnectorsPageContent() {
   const handleSync = async (id: number) => {
     try {
       await apiClient.post(`/api-internal/v1/connectors/${id}/sync`)
-      toast.success("Sync started", {
+      notify.success("Sync started", {
         description: "The connector sync has been initiated.",
       })
       // Refresh to show updated status
       fetchData()
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to start sync"
-      toast.error("Sync failed", {
+      notify.error("Sync failed", {
         description: errorMessage,
       })
     }
@@ -120,22 +133,22 @@ function ConnectorsPageContent() {
   const handlePause = async (id: number) => {
     try {
       await apiClient.patch(`/api-internal/v1/connectors/${id}`, { status: "paused" })
-      toast.success("Connector paused")
+      notify.success("Connector paused")
       fetchData()
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to pause connector"
-      toast.error("Error", { description: errorMessage })
+      notify.error("Error", { description: errorMessage })
     }
   }
 
   const handleResume = async (id: number) => {
     try {
       await apiClient.patch(`/api-internal/v1/connectors/${id}`, { status: "active" })
-      toast.success("Connector resumed")
+      notify.success("Connector resumed")
       fetchData()
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to resume connector"
-      toast.error("Error", { description: errorMessage })
+      notify.error("Error", { description: errorMessage })
     }
   }
 
@@ -147,17 +160,17 @@ function ConnectorsPageContent() {
 
     try {
       await apiClient.delete(`/api-internal/v1/connectors/${id}`)
-      toast.success("Connector deleted")
+      notify.success("Connector deleted")
       fetchData()
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to delete connector"
-      toast.error("Error", { description: errorMessage })
+      notify.error("Error", { description: errorMessage })
     }
   }
 
   const handleEdit = (id: number) => {
     // For now, just show a toast - edit functionality can be added later
-    toast.info("Edit functionality coming soon", {
+    notify.info("Edit functionality coming soon", {
       description: `Editing connector ${id}`,
     })
   }
@@ -309,7 +322,7 @@ function ConnectorsPageContent() {
         collections={collections}
         onSuccess={() => {
           fetchData()
-          toast.success("Connector created successfully")
+          notify.success("Connector created successfully")
         }}
       />
 

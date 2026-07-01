@@ -33,7 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import {
   UserPlus,
   Search,
@@ -202,6 +202,9 @@ const roleLevels = [
 ];
 
 export default function UserManagement() {
+  const { toast } = useToast();
+  const notifySuccess = (description: string) => toast({ title: "Success", description });
+  const notifyError = (description: string) => toast({ title: "Error", description, variant: "destructive" });
   const [activeTab, setActiveTab] = useState("users");
 
   // User state
@@ -339,7 +342,7 @@ export default function UserManagement() {
       }
 
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to fetch data"));
+      notifyError(getErrorMessage(error, "Failed to fetch data"));
     } finally {
       setLoading(false);
     }
@@ -352,7 +355,7 @@ export default function UserManagement() {
       const result = await apiClient.get("/api-internal/v1/api-keys/") as any;
       setApiKeys(result.api_keys || result.data || []);
     } catch (error) {
-      toast.error("Failed to fetch API keys");
+      notifyError("Failed to fetch API keys");
     } finally {
       setApiKeysLoading(false);
     }
@@ -381,7 +384,7 @@ export default function UserManagement() {
       setActionLoading("create");
       const data = await apiClient.post("/api-internal/v1/api-keys/", newApiKeyData) as any;
 
-      toast.success("API key created successfully");
+      notifySuccess("API key created successfully");
       setNewKeyVisible(data.secret_key);
       setShowCreateApiKeyDialog(false);
       setNewApiKeyData({
@@ -397,7 +400,7 @@ export default function UserManagement() {
       });
       await fetchApiKeys();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to create API key"));
+      notifyError(getErrorMessage(error, "Failed to create API key"));
     } finally {
       setActionLoading(null);
     }
@@ -407,10 +410,10 @@ export default function UserManagement() {
     try {
       setActionLoading(`toggle-${keyId}`);
       await apiClient.put(`/api-internal/v1/api-keys/${keyId}`, { is_active: active });
-      toast.success(`API key ${active ? "enabled" : "disabled"}`);
+      notifySuccess(`API key ${active ? "enabled" : "disabled"}`);
       await fetchApiKeys();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to update API key"));
+      notifyError(getErrorMessage(error, "Failed to update API key"));
     } finally {
       setActionLoading(null);
     }
@@ -420,12 +423,12 @@ export default function UserManagement() {
     try {
       setActionLoading(`regenerate-${keyId}`);
       const data = await apiClient.post(`/api-internal/v1/api-keys/${keyId}/regenerate`) as any;
-      toast.success("API key regenerated");
+      notifySuccess("API key regenerated");
       setNewKeyVisible(data.secret_key);
       setShowRegenerateDialog(null);
       await fetchApiKeys();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to regenerate API key"));
+      notifyError(getErrorMessage(error, "Failed to regenerate API key"));
     } finally {
       setActionLoading(null);
     }
@@ -437,10 +440,10 @@ export default function UserManagement() {
     try {
       setActionLoading(`delete-${keyId}`);
       await apiClient.delete(`/api-internal/v1/api-keys/${keyId}`);
-      toast.success("API key deleted");
+      notifySuccess("API key deleted");
       await fetchApiKeys();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to delete API key"));
+      notifyError(getErrorMessage(error, "Failed to delete API key"));
     } finally {
       setActionLoading(null);
     }
@@ -457,12 +460,12 @@ export default function UserManagement() {
         budget_type: editKeyData.is_unlimited ? null : editKeyData.budget_type,
         expires_at: editKeyData.expires_at,
       });
-      toast.success("API key updated");
+      notifySuccess("API key updated");
       setShowEditApiKeyDialog(null);
       setEditKeyData({});
       await fetchApiKeys();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to update API key"));
+      notifyError(getErrorMessage(error, "Failed to update API key"));
     } finally {
       setActionLoading(null);
     }
@@ -482,14 +485,14 @@ export default function UserManagement() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard");
+    notifySuccess("Copied to clipboard");
   };
 
   // User operations
   const createUser = async () => {
     try {
       await apiClient.post("/api-internal/v1/user-management/users", createUserForm);
-      toast.success("User created successfully");
+      notifySuccess("User created successfully");
       setShowCreateUserDialog(false);
       setCreateUserForm({
         email: "",
@@ -503,17 +506,17 @@ export default function UserManagement() {
       });
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to create user"));
+      notifyError(getErrorMessage(error, "Failed to create user"));
     }
   };
 
   const updateUser = async (userId: number, updates: Partial<User>) => {
     try {
       await apiClient.put(`/api-internal/v1/user-management/users/${userId}`, updates);
-      toast.success("User updated successfully");
+      notifySuccess("User updated successfully");
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to update user"));
+      notifyError(getErrorMessage(error, "Failed to update user"));
     }
   };
 
@@ -522,41 +525,41 @@ export default function UserManagement() {
 
     try {
       await apiClient.delete(`/api-internal/v1/user-management/users/${userId}`);
-      toast.success("User deleted successfully");
+      notifySuccess("User deleted successfully");
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to delete user"));
+      notifyError(getErrorMessage(error, "Failed to delete user"));
     }
   };
 
   const lockUser = async (userId: number) => {
     try {
       await apiClient.post(`/api-internal/v1/user-management/users/${userId}/lock`);
-      toast.success("User account locked");
+      notifySuccess("User account locked");
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to lock user"));
+      notifyError(getErrorMessage(error, "Failed to lock user"));
     }
   };
 
   const unlockUser = async (userId: number) => {
     try {
       await apiClient.post(`/api-internal/v1/user-management/users/${userId}/unlock`);
-      toast.success("User account unlocked");
+      notifySuccess("User account unlocked");
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to unlock user"));
+      notifyError(getErrorMessage(error, "Failed to unlock user"));
     }
   };
 
   const resetPassword = async () => {
     if (passwordForm.new_password !== passwordForm.confirm_password) {
-      toast.error("Passwords do not match");
+      notifyError("Passwords do not match");
       return;
     }
 
     if (passwordForm.new_password.length < 8) {
-      toast.error("Password must be at least 8 characters long");
+      notifyError("Password must be at least 8 characters long");
       return;
     }
 
@@ -567,7 +570,7 @@ export default function UserManagement() {
         new_password: passwordForm.new_password,
         force_change_on_login: passwordForm.force_change_on_login,
       });
-      toast.success("Password reset successfully");
+      notifySuccess("Password reset successfully");
       setShowPasswordDialog(false);
       setPasswordForm({
         new_password: "",
@@ -575,7 +578,7 @@ export default function UserManagement() {
         force_change_on_login: true,
       });
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to reset password"));
+      notifyError(getErrorMessage(error, "Failed to reset password"));
     }
   };
 
@@ -586,12 +589,12 @@ export default function UserManagement() {
       await apiClient.put(`/api-internal/v1/user-management/users/${selectedUser.id}`, {
         budget_limit_cents: budgetForm.budget_limit_cents,
       });
-      toast.success("User budget updated");
+      notifySuccess("User budget updated");
       setShowBudgetDialog(false);
       setBudgetForm({ budget_limit_cents: 0 });
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to update budget"));
+      notifyError(getErrorMessage(error, "Failed to update budget"));
     }
   };
 
@@ -605,7 +608,7 @@ export default function UserManagement() {
       };
 
       await apiClient.post("/api-internal/v1/user-management/roles", roleData);
-      toast.success("Role created successfully");
+      notifySuccess("Role created successfully");
       setShowCreateRoleDialog(false);
       setCreateRoleForm({
         name: "",
@@ -620,7 +623,7 @@ export default function UserManagement() {
       });
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to create role"));
+      notifyError(getErrorMessage(error, "Failed to create role"));
     }
   };
 
@@ -635,12 +638,12 @@ export default function UserManagement() {
       };
 
       await apiClient.put(`/api-internal/v1/user-management/roles/${selectedRole.id}`, roleData);
-      toast.success("Role updated successfully");
+      notifySuccess("Role updated successfully");
       setShowEditRoleDialog(false);
       setSelectedRole(null);
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to update role"));
+      notifyError(getErrorMessage(error, "Failed to update role"));
     }
   };
 
@@ -649,10 +652,10 @@ export default function UserManagement() {
 
     try {
       await apiClient.delete(`/api-internal/v1/user-management/roles/${roleId}`);
-      toast.success("Role deleted successfully");
+      notifySuccess("Role deleted successfully");
       fetchData();
     } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to delete role"));
+      notifyError(getErrorMessage(error, "Failed to delete role"));
     }
   };
 

@@ -35,9 +35,9 @@ import {
   Zap,
   Bot,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { apiClient } from '@/lib/api-client'
 import { useAuth } from '@/components/providers/auth-provider'
+import { useToast } from '@/hooks/use-toast'
 
 // Type definitions
 interface UsageSummary {
@@ -115,6 +115,7 @@ const sourceIcons: Record<string, React.ReactNode> = {
 export default function UsageTab() {
   const router = useRouter()
   const { isAuthenticated } = useAuth()
+  const { toast } = useToast()
 
   // State
   const [loading, setLoading] = useState(true)
@@ -200,7 +201,11 @@ export default function UsageTab() {
         setApiKeys([])
       }
     } catch (error) {
-      toast.error('Failed to load usage data')
+      toast({
+        title: 'Error',
+        description: 'Failed to load usage data',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
       setRefreshing(false)

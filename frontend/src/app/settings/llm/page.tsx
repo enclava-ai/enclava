@@ -21,10 +21,10 @@ import {
   Sparkles,
   BarChart3
 } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { apiClient } from '@/lib/api-client'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useAuth } from '@/components/providers/auth-provider'
+import { useToast } from '@/hooks/use-toast'
 import { useSearchParams } from 'next/navigation'
 import ChatPlayground from '@/components/playground/ChatPlayground'
 import EmbeddingPlayground from '@/components/playground/EmbeddingPlayground'
@@ -83,6 +83,9 @@ function LLMPageContent() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [saving, setSaving] = useState(false)
   const [improvingWithAI, setImprovingWithAI] = useState(false)
+  const { toast } = useToast()
+  const notifySuccess = (description: string) => toast({ title: 'Success', description })
+  const notifyError = (description: string) => toast({ title: 'Error', description, variant: 'destructive' })
 
   // Form state for editing
   const [editForm, setEditForm] = useState({
@@ -151,7 +154,7 @@ function LLMPageContent() {
       }
     } catch (error) {
       console.error('Error loading prompt templates:', error)
-      toast.error('Failed to load prompt templates')
+      notifyError('Failed to load prompt templates')
     } finally {
       setLoading(false)
     }
@@ -186,12 +189,12 @@ function LLMPageContent() {
         t.type_key === editingTemplate.type_key ? updatedTemplate : t
       ))
 
-      toast.success('Prompt template updated successfully')
+      notifySuccess('Prompt template updated successfully')
       setShowEditDialog(false)
       setEditingTemplate(null)
 
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save template')
+      notifyError(error instanceof Error ? error.message : 'Failed to save template')
     } finally {
       setSaving(false)
     }
@@ -200,17 +203,17 @@ function LLMPageContent() {
   const handleResetTemplate = async (template: PromptTemplate) => {
     try {
       await apiClient.post(`/api-internal/v1/prompt-templates/templates/${template.type_key}/reset`, {})
-      toast.success('Prompt template reset to default')
+      notifySuccess('Prompt template reset to default')
       await loadTemplates()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to reset template')
+      notifyError(error instanceof Error ? error.message : 'Failed to reset template')
     }
   }
 
   const handleCreateTemplate = async () => {
     const typeKey = useCustomType ? customTypeKey : createForm.type_key
     if (!createForm.name.trim() || !typeKey.trim() || !createForm.system_prompt.trim()) {
-      toast.error('Please fill in all required fields')
+      notifyError('Please fill in all required fields')
       return
     }
 
@@ -228,7 +231,7 @@ function LLMPageContent() {
       })
 
       setTemplates([...templates, newTemplate])
-      toast.success('Prompt template created successfully')
+      notifySuccess('Prompt template created successfully')
       setShowCreateDialog(false)
 
       setCreateForm({
@@ -242,7 +245,7 @@ function LLMPageContent() {
       setUseCustomType(false)
 
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to create template')
+      notifyError(error instanceof Error ? error.message : 'Failed to create template')
     } finally {
       setSaving(false)
     }
@@ -264,10 +267,10 @@ function LLMPageContent() {
         setCreateForm(prev => ({ ...prev, system_prompt: result.improved_prompt }))
       }
 
-      toast.success('Prompt improved with AI successfully')
+      notifySuccess('Prompt improved with AI successfully')
 
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to improve prompt')
+      notifyError(error instanceof Error ? error.message : 'Failed to improve prompt')
     } finally {
       setImprovingWithAI(false)
     }
