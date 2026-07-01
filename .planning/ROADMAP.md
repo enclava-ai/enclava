@@ -58,7 +58,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 02-01: Implement Slate Mono tokens and Tailwind status mappings.
+- [x] 02-01: Implement Slate Mono tokens and Tailwind status mappings.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -178,7 +178,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Delete Deprecated Routes | 2/2 | Complete    | 2026-07-01 |
-| 2. Design System Foundation | 0/3 | Not started | - |
+| 2. Design System Foundation | 1/3 | In Progress|  |
 | 3. App Shell and LLM IA | 0/3 | Not started | - |
 | 4. Color Sweep and Dashboard | 0/5 | Not started | - |
 | 5. SPA Navigation and API Client Plumbing | 0/2 | Not started | - |
