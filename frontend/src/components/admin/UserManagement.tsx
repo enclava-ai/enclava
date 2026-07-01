@@ -38,6 +38,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
+import { apiClient } from "@/lib/api-client"
 import {
   Search,
   Plus,
@@ -125,20 +126,18 @@ export default function UserManagement() {
     fetchRoles()
   }, [])
 
+  const getApiErrorMessage = (error: unknown, fallback: string) => {
+    if (error && typeof error === "object" && "details" in error) {
+      const details = (error as { details?: any }).details
+      if (details?.detail) return details.detail
+    }
+    return error instanceof Error ? error.message : fallback
+  }
+
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api-internal/v1/admin/user-management/users", {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch users")
-      }
-
-      const data = await response.json()
+      const data = await apiClient.get<{ users: User[] }>("/api-internal/v1/admin/user-management/users")
       setUsers(data.users || [])
     } catch (error) {
       console.error("Error fetching users:", error)
@@ -154,17 +153,7 @@ export default function UserManagement() {
 
   const fetchRoles = async () => {
     try {
-      const response = await fetch("/api-internal/v1/admin/user-management/roles", {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch roles")
-      }
-
-      const data = await response.json()
+      const data = await apiClient.get<Role[]>("/api-internal/v1/admin/user-management/roles")
       setRoles(data)
     } catch (error) {
       console.error("Error fetching roles:", error)
@@ -178,19 +167,7 @@ export default function UserManagement() {
 
   const handleCreateUser = async () => {
     try {
-      const response = await fetch("/api-internal/v1/admin/user-management/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: JSON.stringify(formData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to create user")
-      }
+      await apiClient.post("/api-internal/v1/admin/user-management/users", formData)
 
       toast({
         title: "Success",
@@ -204,7 +181,7 @@ export default function UserManagement() {
       console.error("Error creating user:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create user",
+        description: getApiErrorMessage(error, "Failed to create user"),
         variant: "destructive",
       })
     }
@@ -215,19 +192,7 @@ export default function UserManagement() {
 
     try {
       const { password, ...updateData } = formData
-      const response = await fetch(`/api-internal/v1/admin/user-management/users/${selectedUser.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: JSON.stringify(updateData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to update user")
-      }
+      await apiClient.put(`/api-internal/v1/admin/user-management/users/${selectedUser.id}`, updateData)
 
       toast({
         title: "Success",
@@ -242,7 +207,7 @@ export default function UserManagement() {
       console.error("Error updating user:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update user",
+        description: getApiErrorMessage(error, "Failed to update user"),
         variant: "destructive",
       })
     }
@@ -252,19 +217,7 @@ export default function UserManagement() {
     if (!selectedUser) return
 
     try {
-      const response = await fetch(`/api-internal/v1/admin/user-management/users/${selectedUser.id}/password-reset`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: JSON.stringify(passwordData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to reset password")
-      }
+      await apiClient.post(`/api-internal/v1/admin/user-management/users/${selectedUser.id}/password-reset`, passwordData)
 
       toast({
         title: "Success",
@@ -279,7 +232,7 @@ export default function UserManagement() {
       console.error("Error resetting password:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to reset password",
+        description: getApiErrorMessage(error, "Failed to reset password"),
         variant: "destructive",
       })
     }
@@ -291,17 +244,7 @@ export default function UserManagement() {
     }
 
     try {
-      const response = await fetch(`/api-internal/v1/admin/user-management/users/${user.id}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-        },
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to delete user")
-      }
+      await apiClient.delete(`/api-internal/v1/admin/user-management/users/${user.id}`)
 
       toast({
         title: "Success",
@@ -313,7 +256,7 @@ export default function UserManagement() {
       console.error("Error deleting user:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete user",
+        description: getApiErrorMessage(error, "Failed to delete user"),
         variant: "destructive",
       })
     }

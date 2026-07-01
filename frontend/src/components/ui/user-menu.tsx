@@ -17,15 +17,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { User, Settings, Lock, LogOut, ChevronDown } from "lucide-react"
 import { useState } from "react"
+import { apiClient } from "@/lib/api-client"
 
-// Helper function to get API URL with proper protocol
-const getApiUrl = () => {
-  if (typeof window !== 'undefined') {
-    const protocol = window.location.protocol.slice(0, -1) // Remove ':' from 'https:'
-    const host = window.location.host // Use host (includes port) instead of hostname
-    return `${protocol}://${host}`
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "details" in error) {
+    const details = (error as { details?: any }).details
+    if (details?.detail) return details.detail
   }
-  return `http://${process.env.NEXT_PUBLIC_BASE_URL || 'localhost'}`
+  return error instanceof Error ? error.message : fallback
 }
 
 export function UserMenu() {
@@ -67,27 +66,10 @@ export function UserMenu() {
     setIsChangingPassword(true)
 
     try {
-      const token = await import('@/lib/token-manager').then(m => m.tokenManager.getAccessToken())
-      if (!token) {
-        throw new Error('Authentication required')
-      }
-
-      const response = await fetch(`${getApiUrl()}/api-internal/v1/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          current_password: passwordData.currentPassword,
-          new_password: passwordData.newPassword
-        })
+      await apiClient.post('/api-internal/v1/auth/change-password', {
+        current_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to change password')
-      }
 
       toast({
         title: "Success",
@@ -104,7 +86,7 @@ export function UserMenu() {
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to change password",
+        description: getApiErrorMessage(error, "Failed to change password"),
         variant: "destructive"
       })
     } finally {

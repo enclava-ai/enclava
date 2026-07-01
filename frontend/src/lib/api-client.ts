@@ -69,6 +69,7 @@ export const apiClient = {
   get: <T = any>(url: string, init?: RequestInit) => request<T>('GET', url, undefined, init),
   post: <T = any>(url: string, body?: any, init?: RequestInit) => request<T>('POST', url, body, init),
   put: <T = any>(url: string, body?: any, init?: RequestInit) => request<T>('PUT', url, body, init),
+  patch: <T = any>(url: string, body?: any, init?: RequestInit) => request<T>('PATCH', url, body, init),
   delete: <T = any>(url: string, init?: RequestInit) => request<T>('DELETE', url, undefined, init),
 }
 

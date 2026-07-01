@@ -146,7 +146,7 @@ Plans:
 Plans:
 
 - [x] 05-01: Replace internal `window.location` and `window.open` navigation.
-- [ ] 05-02: Replace real client fetches with `apiClient` and add plumbing guardrails.
+- [x] 05-02: Replace real client fetches with `apiClient` and add plumbing guardrails.
 
 ### Phase 6: Toasts and Confirmations
 
@@ -199,7 +199,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. Design System Foundation | 3/3 | Complete    | 2026-07-01 |
 | 3. App Shell and LLM IA | 3/3 | Complete    | 2026-07-01 |
 | 4. Color Sweep and Dashboard | 5/5 | Complete    | 2026-07-01 |
-| 5. SPA Navigation and API Client Plumbing | 0/2 | Not started | - |
+| 5. SPA Navigation and API Client Plumbing | 2/2 | In review | - |
 | 6. Toasts and Confirmations | 0/2 | Not started | - |
 | 7. Loading, Empty, and Accessibility Polish | 0/3 | Not started | - |
 

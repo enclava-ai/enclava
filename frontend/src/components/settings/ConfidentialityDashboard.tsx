@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Shield, Lock, Activity, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react'
+import { apiClient } from '@/lib/api-client'
 
 interface ConfidentialityReport {
   report_timestamp: string
@@ -32,6 +33,11 @@ interface ConfidentialityDashboardProps {
   className?: string
 }
 
+interface ConfidentialityReportResponse {
+  success: boolean
+  data: ConfidentialityReport
+}
+
 export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> = ({ 
   className 
 }) => {
@@ -45,18 +51,7 @@ export const ConfidentialityDashboard: React.FC<ConfidentialityDashboardProps> =
       setLoading(true)
       setError(null)
 
-      const response = await fetch('/api/v1/tee/confidentiality-report', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('api_key')}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch confidentiality report: ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await apiClient.get<ConfidentialityReportResponse>('/api/v1/tee/confidentiality-report')
       
       if (data.success) {
         setReport(data.data)

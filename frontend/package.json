@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "check:colors": "bash scripts/check-no-hardcoded-colors.sh"
+    "check:colors": "bash scripts/check-no-hardcoded-colors.sh",
+    "check:plumbing": "bash scripts/check-client-plumbing.sh"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.17",
