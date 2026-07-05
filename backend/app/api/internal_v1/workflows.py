@@ -97,6 +97,36 @@ async def list_workflow_step_catalog(
     }
 
 
+@router.get("/steps/catalog")
+async def list_workflow_builder_step_catalog(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List builder-ready workflow step catalog entries."""
+    return {
+        "success": True,
+        "steps": [
+            entry.model_dump(mode="json")
+            for entry in workflow_service.list_step_catalog()
+        ],
+    }
+
+
+@router.get("/steps/catalog/{step_type}")
+async def get_workflow_builder_step_catalog_entry(
+    step_type: str,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Get one builder-ready step catalog entry."""
+    try:
+        entry = workflow_service.get_step_catalog(step_type)
+        return {"success": True, "step": entry.model_dump(mode="json")}
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
 @router.get("/templates")
 async def list_workflow_templates(
     current_user: dict = Depends(get_current_user),
@@ -111,12 +141,38 @@ async def list_workflow_templates(
     }
 
 
+@router.get("/templates/{template_id}")
+async def get_workflow_template(
+    template_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Get one workflow template seed."""
+    try:
+        template = workflow_service.get_template(template_id)
+        return {"success": True, "template": template.model_dump(mode="json")}
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
 @router.post("/validate")
 async def validate_workflow_definition(
     definition: dict[str, Any],
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Validate a workflow definition document."""
+    result = await workflow_service.validate_workflow_payload(definition)
+    return {"success": result.valid, **result.model_dump(mode="json")}
+
+
+@router.post("/steps/validate")
+async def validate_workflow_builder_definition(
+    definition: dict[str, Any],
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Validate a workflow definition document for builder use."""
     result = await workflow_service.validate_workflow_payload(definition)
     return {"success": result.valid, **result.model_dump(mode="json")}
 

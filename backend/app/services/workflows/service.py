@@ -33,6 +33,7 @@ from app.schemas.workflow import (
     WorkflowTemplate,
     WorkflowTriggerSummary,
     WorkflowTriggerType,
+    WorkflowValidationErrorItem,
     WorkflowValidationResponse,
     WorkflowVersionStatus,
     WorkflowVersionSummary,
@@ -194,13 +195,27 @@ class WorkflowService:
         try:
             normalized = self.validate_definition(definition)
         except ValidationError as exc:
-            return WorkflowValidationResponse(valid=False, errors=exc.errors())
+            return WorkflowValidationResponse(
+                valid=False, errors=_pydantic_validation_errors(exc)
+            )
         except ValueError as exc:
             return WorkflowValidationResponse(
-                valid=False, errors=[{"msg": str(exc), "type": "value_error"}]
+                valid=False,
+                errors=[
+                    WorkflowValidationErrorItem(
+                        path="definition",
+                        message=str(exc),
+                        code="value_error",
+                    )
+                ],
             )
 
-        return WorkflowValidationResponse(valid=True, definition=normalized)
+        errors = self._catalog_validation_errors(normalized)
+        return WorkflowValidationResponse(
+            valid=len(errors) == 0,
+            definition=normalized,
+            errors=errors,
+        )
 
     async def publish_definition(
         self,
@@ -213,6 +228,7 @@ class WorkflowService:
         workflow = await self._get_workflow(db, workflow_id, actor, for_update=True)
         self._require_manage(workflow, actor)
         definition = self._validated_draft(workflow)
+        self._require_supported_definition(definition)
 
         version_number = workflow.latest_version_number + 1
         definition_json = definition.model_dump(mode="json")
@@ -417,6 +433,65 @@ class WorkflowService:
             raise WorkflowValidationError(
                 "workflow draft is invalid", details=exc.errors()
             ) from exc
+
+    def _require_supported_definition(
+        self, definition: WorkflowDefinitionDocument
+    ) -> None:
+        errors = self._catalog_validation_errors(definition)
+        if errors:
+            raise WorkflowValidationError(
+                "workflow draft has unsupported steps",
+                details=[error.model_dump(mode="json") for error in errors],
+            )
+
+    def _catalog_validation_errors(
+        self, definition: WorkflowDefinitionDocument
+    ) -> list[WorkflowValidationErrorItem]:
+        errors: list[WorkflowValidationErrorItem] = []
+        for index, step in enumerate(definition.steps):
+            entry = self.step_registry.get(step.type)
+            if entry is None:
+                errors.append(
+                    WorkflowValidationErrorItem(
+                        path=f"steps[{index}].type",
+                        message=f"Unknown workflow step type: {step.type}",
+                        code="unknown_step_type",
+                        step_key=step.key,
+                        step_index=index,
+                    )
+                )
+                continue
+
+            if not entry.enabled:
+                reason = entry.disabled_reason or "step type is unavailable"
+                errors.append(
+                    WorkflowValidationErrorItem(
+                        path=f"steps[{index}].type",
+                        message=f"{step.type} is not available: {reason}",
+                        code="disabled_step_type",
+                        step_key=step.key,
+                        step_index=index,
+                    )
+                )
+
+            required_fields = entry.config_schema.get("required", [])
+            if not isinstance(required_fields, list):
+                continue
+            for field in required_fields:
+                if not isinstance(field, str):
+                    continue
+                value = step.config.get(field)
+                if value is None or value == "":
+                    errors.append(
+                        WorkflowValidationErrorItem(
+                            path=f"steps[{index}].config.{field}",
+                            message=f"{step.type} requires config field {field}",
+                            code="missing_step_config",
+                            step_key=step.key,
+                            step_index=index,
+                        )
+                    )
+        return errors
 
     def _trigger_for_version(
         self,
@@ -647,6 +722,34 @@ def _workflow_state_snapshot(workflow: WorkflowDefinition) -> dict[str, Any]:
         "current_version_id": workflow.current_version_id,
         "latest_version_number": workflow.latest_version_number,
     }
+
+
+def _pydantic_validation_errors(
+    exc: ValidationError,
+) -> list[WorkflowValidationErrorItem]:
+    return [
+        WorkflowValidationErrorItem(
+            path=_format_validation_path(error.get("loc", ())),
+            message=str(error.get("msg") or "validation error"),
+            code=str(error.get("type") or "validation_error"),
+        )
+        for error in exc.errors()
+    ]
+
+
+def _format_validation_path(location: Any) -> str:
+    if not isinstance(location, (list, tuple)) or not location:
+        return "definition"
+
+    path = ""
+    for part in location:
+        if isinstance(part, int):
+            path += f"[{part}]"
+            continue
+        if path:
+            path += "."
+        path += str(part)
+    return path or "definition"
 
 
 def _current_trigger(workflow: WorkflowDefinition) -> Optional[WorkflowTrigger]:

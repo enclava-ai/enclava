@@ -382,6 +382,12 @@ export type WorkflowTriggerType =
   | 'event'
   | 'api'
 
+export type WorkflowDefinitionStatus =
+  | 'draft'
+  | 'active'
+  | 'disabled'
+  | 'archived'
+
 export type WorkflowStepRunStatus =
   | 'pending'
   | 'running'
@@ -391,9 +397,125 @@ export type WorkflowStepRunStatus =
   | 'retrying'
   | 'cancelled'
 
+export type WorkflowConcurrencyPolicy =
+  | 'skip_if_running'
+  | 'queue_after_current'
+  | 'allow_parallel'
+
+export type WorkflowMisfirePolicy =
+  | 'skip'
+  | 'run_once'
+  | 'catch_up'
+
+export type WorkflowRedactionPolicy =
+  | 'default'
+  | 'strict'
+  | 'none'
+
+export interface WorkflowRetryPolicy {
+  max_attempts?: number
+  backoff_seconds?: number
+}
+
+export interface WorkflowRuntimePolicy {
+  concurrency_policy?: WorkflowConcurrencyPolicy
+  timeout_seconds?: number
+  budget_limit_cents?: number | null
+  redaction_policy?: WorkflowRedactionPolicy
+}
+
+export interface WorkflowTriggerDefinition {
+  type: WorkflowTriggerType
+  cron?: string | null
+  timezone?: string | null
+  misfire_policy?: WorkflowMisfirePolicy
+  catchup_limit?: number | null
+  event_name?: string | null
+  api_slug?: string | null
+  config?: Record<string, any>
+}
+
+export interface WorkflowStepDefinition {
+  key: string
+  type: string
+  name: string
+  config: Record<string, any>
+  depends_on?: string[]
+  retry?: WorkflowRetryPolicy
+  timeout_seconds?: number | null
+}
+
+export interface WorkflowDefinitionDocument {
+  schema_version?: number
+  trigger: WorkflowTriggerDefinition
+  runtime?: WorkflowRuntimePolicy
+  steps: WorkflowStepDefinition[]
+  metadata?: Record<string, any>
+}
+
+export interface WorkflowStepCatalogEntry {
+  type: string
+  display_name: string
+  description: string
+  category?: string | null
+  input_schema: Record<string, any>
+  config_schema: Record<string, any>
+  output_schema: Record<string, any>
+  required_permissions: string[]
+  supports_retry: boolean
+  supports_test: boolean
+  estimated_cost_kind?: string | null
+  enabled: boolean
+  disabled_reason?: string | null
+}
+
+export interface WorkflowStepCatalogApiResponse {
+  success: boolean
+  steps: WorkflowStepCatalogEntry[]
+}
+
+export interface WorkflowStepCatalogEntryApiResponse {
+  success: boolean
+  step: WorkflowStepCatalogEntry
+}
+
+export interface WorkflowValidationErrorItem {
+  path: string
+  message: string
+  severity: string
+  code?: string | null
+  step_key?: string | null
+  step_index?: number | null
+}
+
+export interface WorkflowValidationResponse {
+  success: boolean
+  valid: boolean
+  definition?: WorkflowDefinitionDocument | null
+  errors: WorkflowValidationErrorItem[]
+}
+
+export interface WorkflowTemplate {
+  id: string
+  name: string
+  description: string
+  definition: WorkflowDefinitionDocument
+  tags: string[]
+}
+
+export interface WorkflowTemplateApiResponse {
+  success: boolean
+  template: WorkflowTemplate
+}
+
+export interface WorkflowTemplateCatalogApiResponse {
+  success: boolean
+  templates: WorkflowTemplate[]
+}
+
 export interface WorkflowRedactedPayload {
   redacted: boolean
-  policy: 'default' | 'strict' | 'none'
+  policy: WorkflowRedactionPolicy
   value: any
 }
 
@@ -404,7 +526,7 @@ export interface WorkflowArtifactSummary {
   name: string
   data?: WorkflowRedactedPayload | null
   storage_uri?: string | null
-  redaction_policy: 'default' | 'strict' | 'none'
+  redaction_policy: WorkflowRedactionPolicy
   created_at?: string | null
 }
 
@@ -452,7 +574,7 @@ export interface WorkflowOperationsRow {
   id: string
   name: string
   description?: string | null
-  status: 'draft' | 'active' | 'disabled' | 'archived'
+  status: WorkflowDefinitionStatus
   health: WorkflowHealthState
   owner_user_id?: number | null
   owner_label?: string | null
@@ -501,7 +623,7 @@ export interface WorkflowScheduleBoardRun {
   local_time: string
   timezone: string
   health: WorkflowHealthState
-  workflow_status: 'draft' | 'active' | 'disabled' | 'archived'
+  workflow_status: WorkflowDefinitionStatus
   trigger_enabled: boolean
 }
 
@@ -515,7 +637,7 @@ export interface WorkflowScheduleBoardItem {
   workflow_id: string
   workflow_name: string
   description?: string | null
-  status: 'draft' | 'active' | 'disabled' | 'archived'
+  status: WorkflowDefinitionStatus
   health: WorkflowHealthState
   owner_label?: string | null
   tags: string[]
@@ -613,7 +735,7 @@ export interface WorkflowRunDetail {
   lock_expires_at?: string | null
   cancel_requested_at?: string | null
   cancelled_by_user_id?: number | null
-  redaction_policy: 'default' | 'strict' | 'none'
+  redaction_policy: WorkflowRedactionPolicy
   steps: WorkflowStepRunDetail[]
   artifacts: WorkflowArtifactSummary[]
   events: WorkflowEventSummary[]
@@ -628,6 +750,32 @@ export interface WorkflowRunResponse {
 export const workflowApi = {
   getOperations() {
     return apiClient.get<WorkflowOperationsApiResponse>('/api/workflows')
+  },
+  getStepCatalog() {
+    return apiClient.get<WorkflowStepCatalogApiResponse>('/api/workflows?resource=catalog')
+  },
+  getStepCatalogEntry(stepType: string) {
+    const query = new URLSearchParams({
+      resource: 'catalog_entry',
+      step_type: stepType,
+    })
+    return apiClient.get<WorkflowStepCatalogEntryApiResponse>(`/api/workflows?${query.toString()}`)
+  },
+  getTemplateCatalog() {
+    return apiClient.get<WorkflowTemplateCatalogApiResponse>('/api/workflows?resource=template_catalog')
+  },
+  getTemplate(templateId: string) {
+    const query = new URLSearchParams({
+      resource: 'template',
+      template_id: templateId,
+    })
+    return apiClient.get<WorkflowTemplateApiResponse>(`/api/workflows?${query.toString()}`)
+  },
+  validateDefinition(definition: WorkflowDefinitionDocument) {
+    return apiClient.post<WorkflowValidationResponse>('/api/workflows', {
+      action: 'validate_definition',
+      definition,
+    })
   },
   getRecentRuns(params?: {
     workflow_id?: string

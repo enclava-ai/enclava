@@ -53,6 +53,7 @@ def create_default_step_registry() -> StepRegistry:
                 type="rag.query",
                 display_name="RAG query",
                 description="Retrieve documents from a RAG collection.",
+                category="RAG",
                 config_schema={
                     "type": "object",
                     "required": ["collection_id"],
@@ -79,6 +80,7 @@ def create_default_step_registry() -> StepRegistry:
                 type="agent.run",
                 display_name="Run agent",
                 description="Invoke a configured agent with workflow input.",
+                category="Agent",
                 config_schema={
                     "type": "object",
                     "required": ["agent_id", "prompt_template"],
@@ -105,6 +107,7 @@ def create_default_step_registry() -> StepRegistry:
                 type="notify.in_app",
                 display_name="In-app notification",
                 description="Create an in-app notification for selected recipients.",
+                category="Notification",
                 config_schema={
                     "type": "object",
                     "required": ["recipients", "title_template"],
@@ -128,6 +131,7 @@ def create_default_step_registry() -> StepRegistry:
                 type="condition.no_results_skip",
                 display_name="Skip when no results",
                 description="Skip remaining steps when an input result set is empty.",
+                category="Control",
                 config_schema={
                     "type": "object",
                     "required": ["input_step_key"],
@@ -147,6 +151,60 @@ def create_default_step_registry() -> StepRegistry:
                 supports_retry=False,
                 supports_test=True,
                 estimated_cost_kind="none",
+            ),
+            WorkflowStepCatalogEntry(
+                type="connector.sync",
+                display_name="Sync connector",
+                description="Sync a connector and expose newly ingested records.",
+                category="Connector",
+                config_schema={
+                    "type": "object",
+                    "required": ["connector_id"],
+                    "properties": {
+                        "connector_id": {"type": "string"},
+                        "since": {"type": "object"},
+                    },
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {"type": "array"},
+                        "count": {"type": "integer"},
+                    },
+                },
+                required_permissions=["connectors:sync"],
+                supports_retry=True,
+                supports_test=False,
+                estimated_cost_kind="connector",
+                enabled=False,
+                disabled_reason="Connector workflow steps are scheduled for Phase 6.",
+            ),
+            WorkflowStepCatalogEntry(
+                type="extract.run_template",
+                display_name="Run Extract template",
+                description="Run an Extract template over selected documents.",
+                category="Extract",
+                config_schema={
+                    "type": "object",
+                    "required": ["template_id"],
+                    "properties": {
+                        "template_id": {"type": "string"},
+                        "document_filter": {"type": "object"},
+                    },
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "summary": {"type": "string"},
+                        "results": {"type": "array"},
+                    },
+                },
+                required_permissions=["extract:execute"],
+                supports_retry=True,
+                supports_test=False,
+                estimated_cost_kind="extract",
+                enabled=False,
+                disabled_reason="Extract workflow steps are scheduled for Phase 6.",
             ),
         ]
     )

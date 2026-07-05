@@ -17,14 +17,38 @@ export async function GET(request: NextRequest) {
   const query = new URLSearchParams(url.searchParams)
   query.delete('resource')
   const suffix = query.toString() ? `?${query.toString()}` : ''
-  const endpoint =
-    resource === 'runs'
-      ? `/api-internal/v1/workflows/operations/runs${suffix}`
-      : resource === 'schedules'
-        ? '/api-internal/v1/workflows/operations/schedules'
-        : resource === 'templates'
-          ? '/api-internal/v1/workflows/operations/templates'
-          : '/api-internal/v1/workflows/operations'
+  const templateId = url.searchParams.get('template_id')
+  const stepType = url.searchParams.get('step_type')
+
+  if (resource === 'template' && !templateId) {
+    return NextResponse.json(
+      { success: false, error: 'template_id is required' },
+      { status: 400 }
+    )
+  }
+  if (resource === 'catalog_entry' && !stepType) {
+    return NextResponse.json(
+      { success: false, error: 'step_type is required' },
+      { status: 400 }
+    )
+  }
+
+  let endpoint = '/api-internal/v1/workflows/operations'
+  if (resource === 'runs') {
+    endpoint = `/api-internal/v1/workflows/operations/runs${suffix}`
+  } else if (resource === 'schedules') {
+    endpoint = '/api-internal/v1/workflows/operations/schedules'
+  } else if (resource === 'templates') {
+    endpoint = '/api-internal/v1/workflows/operations/templates'
+  } else if (resource === 'template_catalog') {
+    endpoint = '/api-internal/v1/workflows/templates'
+  } else if (resource === 'template') {
+    endpoint = `/api-internal/v1/workflows/templates/${encodeURIComponent(templateId || '')}`
+  } else if (resource === 'catalog') {
+    endpoint = '/api-internal/v1/workflows/steps/catalog'
+  } else if (resource === 'catalog_entry') {
+    endpoint = `/api-internal/v1/workflows/steps/catalog/${encodeURIComponent(stepType || '')}`
+  }
 
   const response = await proxyAuthenticatedRequest(
     request,
@@ -36,6 +60,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const workflowId = typeof body?.workflow_id === 'string' ? body.workflow_id : ''
+
+  if (body?.action === 'validate_definition') {
+    const response = await proxyAuthenticatedRequest(
+      request,
+      '/api-internal/v1/workflows/steps/validate',
+      {
+        method: 'POST',
+        body: JSON.stringify(body?.definition || {}),
+      }
+    )
+    return forwardResponse(response)
+  }
 
   if (!workflowId) {
     return NextResponse.json(

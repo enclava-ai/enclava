@@ -236,6 +236,7 @@ class WorkflowStepCatalogEntry(BaseModel):
     type: str
     display_name: str
     description: str
+    category: Optional[str] = None
     input_schema: Dict[str, Any] = Field(default_factory=dict)
     config_schema: Dict[str, Any] = Field(default_factory=dict)
     output_schema: Dict[str, Any] = Field(default_factory=dict)
@@ -243,6 +244,8 @@ class WorkflowStepCatalogEntry(BaseModel):
     supports_retry: bool = True
     supports_test: bool = False
     estimated_cost_kind: Optional[str] = None
+    enabled: bool = True
+    disabled_reason: Optional[str] = None
 
     @field_validator("type")
     @classmethod
@@ -413,12 +416,23 @@ class WorkflowDefinitionDetail(WorkflowDefinitionListItem):
     triggers: List[WorkflowTriggerSummary] = Field(default_factory=list)
 
 
+class WorkflowValidationErrorItem(BaseModel):
+    """Actionable workflow validation error returned to the builder."""
+
+    path: str
+    message: str
+    severity: str = "error"
+    code: Optional[str] = None
+    step_key: Optional[str] = None
+    step_index: Optional[int] = None
+
+
 class WorkflowValidationResponse(BaseModel):
     """Definition validation response."""
 
     valid: bool
     definition: Optional[WorkflowDefinitionDocument] = None
-    errors: List[Dict[str, Any]] = Field(default_factory=list)
+    errors: List[WorkflowValidationErrorItem] = Field(default_factory=list)
 
 
 class WorkflowManualRunRequest(BaseModel):
