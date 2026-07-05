@@ -1158,6 +1158,18 @@ function defaultConfigForType(
       path: "documents",
     }
   }
+  if (stepType === "condition.branch") {
+    return {
+      input_step_key: existingSteps[existingSteps.length - 1]?.key || "",
+      path: "count",
+      operator: "greater_than",
+      value: 0,
+      matched_label: "Matched",
+      not_matched_label: "Not matched",
+      matched_skip_step_keys: [],
+      not_matched_skip_step_keys: [],
+    }
+  }
   if (stepType === "notify.in_app") {
     return {
       recipients: ["admin"],
@@ -1179,6 +1191,7 @@ function nextStepKey(
     "connector.sync": "sync_connector",
     "extract.run_template": "run_extract",
     "condition.no_results_skip": "skip_if_empty",
+    "condition.branch": "branch",
     "notify.in_app": "notify_team",
   }
   const existingKeys = new Set(existingSteps.map((step) => step.key))

@@ -149,6 +149,9 @@ export function WorkflowStepList({
                         Retry
                       </span>
                     ) : null}
+                    {step.type === "condition.branch" ? (
+                      <span className="break-words">{branchMetadata(step)}</span>
+                    ) : null}
                     {rowErrors.length > 0 ? (
                       <span className="font-medium text-danger-soft-foreground">
                         {rowErrors.length} validation
@@ -201,4 +204,20 @@ export function WorkflowStepList({
       </div>
     </section>
   )
+}
+
+function branchMetadata(step: WorkflowStepDefinition): string {
+  const inputStep = String(step.config.input_step_key || "input")
+  const path = String(step.config.path || "").trim()
+  const operator = String(step.config.operator || "operator")
+  const matchedCount = branchTargetCount(step.config.matched_skip_step_keys)
+  const notMatchedCount = branchTargetCount(step.config.not_matched_skip_step_keys)
+  const source = path ? `${inputStep}.${path}` : inputStep
+  return `${source} ${operator} | skips ${matchedCount}/${notMatchedCount}`
+}
+
+function branchTargetCount(value: unknown): number {
+  return Array.isArray(value)
+    ? value.filter((item) => typeof item === "string" && item).length
+    : 0
 }

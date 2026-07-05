@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 import { AlertTriangle } from "lucide-react"
 
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -56,6 +57,29 @@ interface WorkflowStepPropertiesProps {
 }
 
 const EMPTY_SELECT_VALUE = "__unset__"
+const BRANCH_VALUE_OPERATORS = new Set([
+  "equals",
+  "not_equals",
+  "contains",
+  "greater_than",
+  "greater_than_or_equal",
+  "less_than",
+  "less_than_or_equal",
+])
+const BRANCH_OPERATORS = [
+  { value: "exists", label: "Exists" },
+  { value: "empty", label: "Empty" },
+  { value: "non_empty", label: "Not empty" },
+  { value: "equals", label: "Equals" },
+  { value: "not_equals", label: "Not equals" },
+  { value: "contains", label: "Contains" },
+  { value: "greater_than", label: "Greater than" },
+  { value: "greater_than_or_equal", label: "Greater than or equal" },
+  { value: "less_than", label: "Less than" },
+  { value: "less_than_or_equal", label: "Less than or equal" },
+  { value: "truthy", label: "Truthy" },
+  { value: "falsy", label: "Falsy" },
+]
 
 export function WorkflowStepProperties({
   step,
@@ -176,6 +200,16 @@ export function WorkflowStepProperties({
 
         {step.type === "condition.no_results_skip" ? (
           <ConditionEditor
+            step={step}
+            stepIndex={stepIndex}
+            allSteps={allSteps}
+            errors={validationErrors}
+            onChange={onChange}
+          />
+        ) : null}
+
+        {step.type === "condition.branch" ? (
+          <BranchConditionEditor
             step={step}
             stepIndex={stepIndex}
             allSteps={allSteps}
@@ -753,6 +787,246 @@ function ConditionEditor({
   )
 }
 
+function BranchConditionEditor({
+  step,
+  stepIndex,
+  allSteps,
+  errors,
+  onChange,
+}: {
+  step: WorkflowStepDefinition
+  stepIndex: number
+  allSteps: WorkflowStepDefinition[]
+  errors: WorkflowValidationErrorItem[]
+  onChange: (step: WorkflowStepDefinition) => void
+}) {
+  const previousSteps = allSteps.slice(0, Math.max(stepIndex, 0))
+  const laterSteps = allSteps.slice(Math.max(stepIndex + 1, 0))
+  const sourceOptions = ensureOption(
+    previousSteps.map((item) => ({ id: item.key, name: item.name || item.key })),
+    String(step.config.input_step_key || ""),
+    "Current step"
+  )
+  const targetOptions = laterSteps.map((item) => ({
+    id: item.key,
+    name: item.name || item.key,
+  }))
+  const allowedTargetKeys = targetOptions.map((item) => item.id)
+  const operator = String(step.config.operator || "exists")
+  const operatorUsesValue = BRANCH_VALUE_OPERATORS.has(operator)
+
+  function updateOperator(value: string) {
+    const nextConfig = { ...step.config, operator: value }
+    if (!BRANCH_VALUE_OPERATORS.has(value)) {
+      delete nextConfig.value
+    } else if (nextConfig.value === undefined) {
+      nextConfig.value = ""
+    }
+    onChange({ ...step, config: nextConfig })
+  }
+
+  function toggleTarget(
+    field: "matched_skip_step_keys" | "not_matched_skip_step_keys",
+    targetKey: string,
+    checked: boolean
+  ) {
+    onChange({
+      ...step,
+      config: toggleBranchTarget(
+        step.config,
+        field,
+        targetKey,
+        checked,
+        allowedTargetKeys
+      ),
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="Input step"
+          htmlFor="workflow-branch-input"
+          error={fieldError(errors, "input_step_key")}
+        >
+          <Select
+            value={selectValue(step.config.input_step_key)}
+            onValueChange={(value) =>
+              updateConfig(step, "input_step_key", selectOutput(value), onChange)
+            }
+          >
+            <SelectTrigger id="workflow-branch-input">
+              <SelectValue placeholder="Select step" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EMPTY_SELECT_VALUE}>Select step</SelectItem>
+              {sourceOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Path" htmlFor="workflow-branch-path">
+          <Input
+            id="workflow-branch-path"
+            value={String(step.config.path || "")}
+            onChange={(event) =>
+              updateConfig(step, "path", event.target.value, onChange)
+            }
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="Operator"
+          htmlFor="workflow-branch-operator"
+          error={fieldError(errors, "operator")}
+        >
+          <Select value={operator} onValueChange={updateOperator}>
+            <SelectTrigger id="workflow-branch-operator">
+              <SelectValue placeholder="Operator" />
+            </SelectTrigger>
+            <SelectContent>
+              {BRANCH_OPERATORS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        {operatorUsesValue ? (
+          <Field
+            label="Value"
+            htmlFor="workflow-branch-value"
+            error={fieldError(errors, "value")}
+          >
+            <Input
+              id="workflow-branch-value"
+              value={String(step.config.value ?? "")}
+              onChange={(event) =>
+                updateConfig(step, "value", event.target.value, onChange)
+              }
+            />
+          </Field>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="When matched" htmlFor="workflow-branch-matched-label">
+          <Input
+            id="workflow-branch-matched-label"
+            value={String(step.config.matched_label || "Matched")}
+            onChange={(event) =>
+              updateConfig(step, "matched_label", event.target.value, onChange)
+            }
+          />
+        </Field>
+        <Field label="When not matched" htmlFor="workflow-branch-not-matched-label">
+          <Input
+            id="workflow-branch-not-matched-label"
+            value={String(step.config.not_matched_label || "Not matched")}
+            onChange={(event) =>
+              updateConfig(step, "not_matched_label", event.target.value, onChange)
+            }
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <BranchTargetList
+          idPrefix="workflow-branch-matched-target"
+          label="Skip steps"
+          pathLabel="When matched"
+          options={targetOptions}
+          selected={normalizeBranchTargets(
+            step.config.matched_skip_step_keys,
+            allowedTargetKeys
+          )}
+          error={fieldError(errors, "matched_skip_step_keys")}
+          onToggle={(targetKey, checked) =>
+            toggleTarget("matched_skip_step_keys", targetKey, checked)
+          }
+        />
+        <BranchTargetList
+          idPrefix="workflow-branch-not-matched-target"
+          label="Skip steps"
+          pathLabel="When not matched"
+          options={targetOptions}
+          selected={normalizeBranchTargets(
+            step.config.not_matched_skip_step_keys,
+            allowedTargetKeys
+          )}
+          error={fieldError(errors, "not_matched_skip_step_keys")}
+          onToggle={(targetKey, checked) =>
+            toggleTarget("not_matched_skip_step_keys", targetKey, checked)
+          }
+        />
+      </div>
+    </div>
+  )
+}
+
+function BranchTargetList({
+  idPrefix,
+  label,
+  pathLabel,
+  options,
+  selected,
+  error,
+  onToggle,
+}: {
+  idPrefix: string
+  label: string
+  pathLabel: string
+  options: { id: string; name: string }[]
+  selected: string[]
+  error?: string
+  onToggle: (targetKey: string, checked: boolean) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div>
+        <Label>{label}</Label>
+        <p className="text-xs text-muted-foreground">{pathLabel}</p>
+      </div>
+      {options.length ? (
+        <div className="space-y-2">
+          {options.map((option) => {
+            const inputId = `${idPrefix}-${option.id}`
+            return (
+              <div key={option.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={inputId}
+                  checked={selected.includes(option.id)}
+                  onCheckedChange={(checked) =>
+                    onToggle(option.id, checked === true)
+                  }
+                />
+                <Label
+                  htmlFor={inputId}
+                  className="min-w-0 break-words text-sm font-normal"
+                >
+                  {option.name}
+                </Label>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No later steps available</p>
+      )}
+      {error ? (
+        <p className="break-words text-xs text-danger-soft-foreground">{error}</p>
+      ) : null}
+    </div>
+  )
+}
+
 function NotificationEditor({
   step,
   errors,
@@ -938,6 +1212,34 @@ function normalizeExtractSourceConfig(
   }
 }
 
+function normalizeBranchTargets(value: unknown, allowedStepKeys: string[]): string[] {
+  if (!Array.isArray(value)) return []
+  const allowed = new Set(allowedStepKeys)
+  return value.filter(
+    (item): item is string => typeof item === "string" && allowed.has(item)
+  )
+}
+
+function toggleBranchTarget(
+  config: Record<string, any>,
+  field: "matched_skip_step_keys" | "not_matched_skip_step_keys",
+  targetKey: string,
+  checked: boolean,
+  allowedStepKeys: string[]
+): Record<string, any> {
+  const current = normalizeBranchTargets(config[field], allowedStepKeys)
+  const next = new Set(current)
+  if (checked) {
+    next.add(targetKey)
+  } else {
+    next.delete(targetKey)
+  }
+  return {
+    ...config,
+    [field]: allowedStepKeys.filter((item) => next.has(item)),
+  }
+}
+
 function formatContextValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return ""
   if (typeof value === "string") return value
@@ -988,7 +1290,11 @@ function fieldError(
   errors: WorkflowValidationErrorItem[],
   fieldName: string
 ): string | undefined {
-  return errors.find((error) => error.path.endsWith(`.${fieldName}`))?.message
+  const suffix = `.${fieldName}`
+  return errors.find(
+    (error) =>
+      error.path.endsWith(suffix) || error.path.includes(`${suffix}[`)
+  )?.message
 }
 
 function ensureOption<T extends { id: string; name: string }>(
