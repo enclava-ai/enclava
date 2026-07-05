@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 2 completed; ready to plan Phase 3
-last_updated: "2026-07-05T19:25:30Z"
-last_activity: 2026-07-05 - Completed Phase 2 Persistence, API, Permissions, and Audit
+stopped_at: Phase 3 planned; ready to execute
+last_updated: "2026-07-05T19:35:00Z"
+last_activity: 2026-07-05 - Planned Phase 3 Manual Execution Engine
 progress:
   total_phases: 8
   completed_phases: 2
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 ## Current Position
 
 Phase: 3 - Manual Execution Engine
-Plan: Not planned yet
-Status: Ready to execute
-Last activity: 2026-07-05 - Completed Phase 2 Persistence, API, Permissions, and Audit
+Plan: 03-01
+Status: Planned
+Last activity: 2026-07-05 - Planned Phase 3 Manual Execution Engine
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 1]: Workflow contracts live in `app.schemas.workflow`; scaffold service and templates live in `app.services.workflows`.
 - [Phase 2]: Workflow lifecycle storage is additive on the legacy `workflow_definitions` anchor, with immutable published versions and inert runtime tables for future phases.
 - [Phase 2]: Dedicated internal workflow lifecycle APIs live under `/api-internal/v1/workflows` and use service-level permission/audit enforcement.
+- [Phase 3]: Manual execution will add one additive runtime migration for lock, cancel, retry, redaction, and budget metadata before wiring runner behavior.
 
 ### Pending Todos
 
@@ -91,10 +92,10 @@ Items intentionally deferred from the first useful workflow release:
 ## Session Continuity
 
 Last session: 2026-07-05T00:00:00.000Z
-Stopped at: Phase 2 completed; ready to plan Phase 3
+Stopped at: Phase 3 planned; ready to execute
 Resume file: None
 
 ## Operator Next Steps
 
-- Start Phase 3 with `$gsd-discuss-phase 3`
-- Or skip discussion and plan directly with `$gsd-plan-phase 3`
+- Execute Phase 3 with `$gsd-execute-phase 3`
+- Or continue autonomous execution with `$gsd-autonomous --auto`
