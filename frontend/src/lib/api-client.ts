@@ -368,6 +368,20 @@ export type WorkflowRunStatus =
   | 'paused'
   | 'skipped'
 
+export type WorkflowHealthState =
+  | 'healthy'
+  | 'disabled'
+  | 'running'
+  | 'failed'
+  | 'missed'
+  | 'no_schedule'
+
+export type WorkflowTriggerType =
+  | 'manual'
+  | 'schedule'
+  | 'event'
+  | 'api'
+
 export type WorkflowStepRunStatus =
   | 'pending'
   | 'running'
@@ -402,6 +416,75 @@ export interface WorkflowEventSummary {
   data: Record<string, any>
   created_by_user_id?: number | null
   created_at?: string | null
+}
+
+export interface WorkflowRunSummary {
+  id: string
+  workflow_id: string
+  workflow_name?: string | null
+  version_id: string
+  version_number?: number | null
+  status: WorkflowRunStatus
+  trigger_type: WorkflowTriggerType
+  requested_by_user_id?: number | null
+  retry_of_run_id?: string | null
+  queued_at?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  duration_ms?: number | null
+  budget_limit_cents?: number | null
+  estimated_cost_cents: number
+  actual_cost_cents: number
+}
+
+export interface WorkflowOperationsTotals {
+  total: number
+  active: number
+  disabled: number
+  running: number
+  failed: number
+  missed: number
+}
+
+export interface WorkflowOperationsRow {
+  id: string
+  name: string
+  description?: string | null
+  status: 'draft' | 'active' | 'disabled' | 'archived'
+  health: WorkflowHealthState
+  owner_user_id?: number | null
+  owner_label?: string | null
+  latest_version_number: number
+  is_active: boolean
+  tags: string[]
+  trigger_type: WorkflowTriggerType
+  trigger_enabled: boolean
+  cron_expression?: string | null
+  timezone?: string | null
+  next_run_at?: string | null
+  last_fire_at?: string | null
+  latest_run?: WorkflowRunSummary | null
+  active_run?: WorkflowRunSummary | null
+  latest_failed_run?: WorkflowRunSummary | null
+  last_successful_run?: WorkflowRunSummary | null
+  run_count: number
+  failure_count: number
+  budget_limit_cents?: number | null
+  estimated_cost_cents: number
+  actual_cost_cents: number
+  updated_at?: string | null
+}
+
+export interface WorkflowOperationsResponse {
+  workflows: WorkflowOperationsRow[]
+  totals: WorkflowOperationsTotals
+}
+
+export interface WorkflowOperationsApiResponse {
+  success: boolean
+  operations: WorkflowOperationsResponse
 }
 
 export interface WorkflowStepRunDetail {
@@ -457,6 +540,18 @@ export interface WorkflowRunResponse {
   success: boolean
   run: WorkflowRunDetail
   error?: string
+}
+
+export const workflowApi = {
+  getOperations() {
+    return apiClient.get<WorkflowOperationsApiResponse>('/api/workflows')
+  },
+  runNow(workflowId: string, inputData: Record<string, any> = {}) {
+    return apiClient.post<WorkflowRunResponse>('/api/workflows', {
+      workflow_id: workflowId,
+      input_data: inputData,
+    })
+  },
 }
 
 export const workflowRunApi = {

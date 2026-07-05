@@ -33,6 +33,7 @@ interface NavigationProps {
 const MODULE_NAV_MAP: Record<string, NavItem> = {
   rag: { href: "/rag", label: "RAG" },
   extract: { href: "/extract", label: "Extract" },
+  workflow: { href: "/workflows", label: "Workflows" },
 }
 
 function isActiveItem(item: NavItem, pathname: string) {

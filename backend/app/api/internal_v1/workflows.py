@@ -21,6 +21,7 @@ from app.schemas.workflow import (
 )
 from app.services.workflows import (
     WorkflowNotFoundError,
+    WorkflowOperationsService,
     WorkflowPermissionError,
     WorkflowRunConflictError,
     WorkflowRunNotFoundError,
@@ -38,6 +39,7 @@ router = APIRouter(tags=["Workflows"])
 workflow_service = WorkflowService()
 runtime_service = WorkflowRuntimeService()
 scheduler_service = WorkflowSchedulerService(runtime_service)
+operations_service = WorkflowOperationsService()
 
 
 def _map_service_error(exc: Exception) -> HTTPException:
@@ -192,6 +194,47 @@ async def run_workflow_scheduler_tick(
     except WorkflowScheduleValidationError as exc:
         await db.rollback()
         raise _map_service_error(exc) from exc
+
+
+@router.get("/operations")
+async def list_workflow_operations(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List compact workflow operations rows."""
+    operations = await operations_service.list_operations(db, current_user)
+    return {"success": True, "operations": operations.model_dump(mode="json")}
+
+
+@router.get("/operations/recent-runs")
+async def list_workflow_operations_recent_runs(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List recent runs visible to the workflow operations console."""
+    runs = await operations_service.list_recent_runs(
+        db,
+        current_user,
+        limit=limit,
+    )
+    return {"success": True, "runs": [run.model_dump(mode="json") for run in runs]}
+
+
+@router.get("/operations/failures")
+async def list_workflow_operations_failures(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List recent failed runs visible to the workflow operations console."""
+    runs = await operations_service.list_recent_runs(
+        db,
+        current_user,
+        failed_only=True,
+        limit=limit,
+    )
+    return {"success": True, "runs": [run.model_dump(mode="json") for run in runs]}
 
 
 @router.get("/runs/{run_id}")

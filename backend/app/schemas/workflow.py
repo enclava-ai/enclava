@@ -48,6 +48,17 @@ class WorkflowRunStatus(str, Enum):
     SKIPPED = "skipped"
 
 
+class WorkflowHealthState(str, Enum):
+    """Operations-console workflow health state."""
+
+    HEALTHY = "healthy"
+    DISABLED = "disabled"
+    RUNNING = "running"
+    FAILED = "failed"
+    MISSED = "missed"
+    NO_SCHEDULE = "no_schedule"
+
+
 class WorkflowStepRunStatus(str, Enum):
     """Durable workflow step run state."""
 
@@ -495,6 +506,55 @@ class WorkflowRunSummary(BaseModel):
     budget_limit_cents: Optional[int] = None
     estimated_cost_cents: int = 0
     actual_cost_cents: int = 0
+
+
+class WorkflowOperationsTotals(BaseModel):
+    """Aggregate counts for the workflow operations console."""
+
+    total: int = 0
+    active: int = 0
+    disabled: int = 0
+    running: int = 0
+    failed: int = 0
+    missed: int = 0
+
+
+class WorkflowOperationsRow(BaseModel):
+    """One workflow row for the operations console."""
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    status: WorkflowDefinitionStatus
+    health: WorkflowHealthState
+    owner_user_id: Optional[int] = None
+    owner_label: Optional[str] = None
+    latest_version_number: int = 0
+    is_active: bool
+    tags: List[str] = Field(default_factory=list)
+    trigger_type: WorkflowTriggerType
+    trigger_enabled: bool = False
+    cron_expression: Optional[str] = None
+    timezone: Optional[str] = None
+    next_run_at: Optional[datetime] = None
+    last_fire_at: Optional[datetime] = None
+    latest_run: Optional[WorkflowRunSummary] = None
+    active_run: Optional[WorkflowRunSummary] = None
+    latest_failed_run: Optional[WorkflowRunSummary] = None
+    last_successful_run: Optional[WorkflowRunSummary] = None
+    run_count: int = 0
+    failure_count: int = 0
+    budget_limit_cents: Optional[int] = None
+    estimated_cost_cents: int = 0
+    actual_cost_cents: int = 0
+    updated_at: Optional[datetime] = None
+
+
+class WorkflowOperationsResponse(BaseModel):
+    """Workflow operations console payload."""
+
+    workflows: List[WorkflowOperationsRow] = Field(default_factory=list)
+    totals: WorkflowOperationsTotals = Field(default_factory=WorkflowOperationsTotals)
 
 
 class WorkflowRunDetail(WorkflowRunSummary):
