@@ -73,3 +73,32 @@ No blocking UI issues found.
 - `cd frontend && npm run build`
 - Live `/workflows/new` route returned 200 after the final rebuild.
 - Authenticated live smoke confirmed approval run-detail data and approve/reject action paths through the Next proxy.
+
+## Plan 07-03 API/Event Trigger UI Review
+
+Overall: 23/24.
+
+The trigger UX remains intentionally compact: API and Event are added as trigger selector options, and each reveals one focused identifier field. The builder still reads as a linear workflow authoring tool, not a webhook console or workflow engine dashboard.
+
+## Pillar Scores
+
+| Pillar | Score | Notes |
+|--------|-------|-------|
+| Copywriting | 4/4 | Labels are direct: Trigger, API slug, Event name. |
+| Visuals | 4/4 | New fields use the same field/grid treatment as schedule fields. |
+| Color | 4/4 | No new colors or hardcoded color values were introduced. |
+| Typography | 4/4 | Uses existing label/input typography and panel heading scale. |
+| Spacing | 4/4 | Adds fields within the existing trigger section grid without nested cards. |
+| Experience Design | 3/4 | The first release keeps the flow simple. Future polish can add generated endpoint copy once broader docs surfaces are built. |
+
+## Findings
+
+No blocking UI issues found.
+
+## Verification Considered
+
+- `cd frontend && npm run lint`
+- `cd frontend && npm run check:colors`
+- `cd frontend && npm run check:plumbing`
+- `cd frontend && npm run build`
+- Live `/workflows/new` route returned 200 after the final rebuild.

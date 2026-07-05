@@ -20,6 +20,7 @@ from app.schemas.workflow import (
     WorkflowRunAction,
     WorkflowRunStatus,
     WorkflowSchedulePreviewRequest,
+    WorkflowTriggerFireRequest,
 )
 from app.services.workflows import (
     WorkflowNotFoundError,
@@ -33,6 +34,7 @@ from app.services.workflows import (
     WorkflowSchedulerService,
     WorkflowScheduleValidationError,
     WorkflowService,
+    WorkflowTriggerFireService,
     WorkflowValidationError,
 )
 from app.services.workflows.steps import WorkflowStepExecutionError
@@ -41,6 +43,7 @@ router = APIRouter(tags=["Workflows"])
 workflow_service = WorkflowService()
 runtime_service = WorkflowRuntimeService()
 scheduler_service = WorkflowSchedulerService(runtime_service)
+trigger_fire_service = WorkflowTriggerFireService(runtime_service)
 operations_service = WorkflowOperationsService()
 
 
@@ -336,6 +339,62 @@ async def list_workflow_operation_templates(
             for template in operations_service.list_template_summaries()
         ],
     }
+
+
+@router.post("/triggers/api/{api_slug}/fire")
+async def fire_workflow_api_trigger(
+    api_slug: str,
+    payload: WorkflowTriggerFireRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Fire an authenticated internal API workflow trigger."""
+    try:
+        result = await trigger_fire_service.fire_api_trigger(
+            db,
+            api_slug,
+            payload,
+            current_user,
+        )
+        await db.commit()
+        return {
+            "success": result.success,
+            "trigger_fire": result.model_dump(mode="json"),
+        }
+    except (
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/triggers/events/{event_name}/fire")
+async def fire_workflow_event_trigger(
+    event_name: str,
+    payload: WorkflowTriggerFireRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Fire authenticated internal event workflow triggers."""
+    try:
+        result = await trigger_fire_service.fire_event_trigger(
+            db,
+            event_name,
+            payload,
+            current_user,
+        )
+        await db.commit()
+        return {
+            "success": result.success,
+            "trigger_fire": result.model_dump(mode="json"),
+        }
+    except (
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
 
 
 @router.post("/{workflow_id}/schedule/preview")

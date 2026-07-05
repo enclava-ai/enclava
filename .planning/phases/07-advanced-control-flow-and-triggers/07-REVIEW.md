@@ -2,7 +2,7 @@
 status: clean
 phase: 07-advanced-control-flow-and-triggers
 depth: standard
-files_reviewed: 29
+files_reviewed: 42
 findings:
   critical: 0
   warning: 0
@@ -92,3 +92,41 @@ No blocking bugs, security issues, or code quality findings remain at standard d
 - Backend formatting and import checks passed.
 - Frontend lint, color guard, plumbing guard, and production build passed.
 - Live containers were rebuilt with `sudo docker compose up -d --build`, nginx was force-recreated, and live health/page/authenticated approval smokes passed.
+
+## Plan 07-03 API/Event Trigger Foundations Review
+
+### Additional Scope
+
+- `backend/app/schemas/workflow.py`
+- `backend/app/services/workflows/service.py`
+- `backend/app/services/workflows/triggers.py`
+- `backend/app/services/workflows/__init__.py`
+- `backend/app/api/internal_v1/workflows.py`
+- `backend/tests/unit/services/test_workflow_contracts.py`
+- `backend/tests/unit/services/test_workflow_trigger_fire.py`
+- `backend/tests/unit/services/test_workflow_trigger_api.py`
+- `backend/tests/unit/services/test_workflow_builder_api.py`
+- `frontend/src/app/api/workflows/route.ts`
+- `frontend/src/components/workflows/WorkflowBuilder.tsx`
+- `frontend/src/lib/api-client.ts`
+
+### Result
+
+No blocking bugs, security issues, or code quality findings remain at standard depth.
+
+### Review Notes
+
+- Trigger fire routes are authenticated internal APIs and continue to use the existing Next proxy for browser callers.
+- API/event fire authorization is limited to workflow owners, admins, `workflow.manage`, or `workflow.trigger`.
+- Idempotency is enforced per trigger, so two workflows can receive the same event key while duplicate retries for the same trigger return existing run metadata.
+- Triggered runs use normal `workflow_runs`, `workflow_events`, audit rows, redaction policy, and budget metadata.
+- Disabled/inactive workflows return skipped metadata instead of silently creating runs.
+- Historical non-current version triggers are ignored so event/API fire responses do not include stale published versions.
+- Builder support stays compact in the existing trigger panel and does not introduce webhook secrets, subscriptions, an event bus, or canvas UI.
+
+### Verification Considered
+
+- Backend contract, trigger service, trigger API, and builder API tests passed: 25 tests.
+- Backend formatting and import checks passed.
+- Frontend lint, color guard, plumbing guard, and production build passed.
+- Live containers were rebuilt with `sudo docker compose up -d --build`, nginx was force-recreated, and live health/page/authenticated API/event trigger smokes passed.

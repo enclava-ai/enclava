@@ -261,6 +261,32 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
         cron: trigger.cron || "0 2 * * *",
         timezone: trigger.timezone || "UTC",
         misfire_policy: trigger.misfire_policy || "run_once",
+        event_name: null,
+        api_slug: null,
+      })
+      return
+    }
+
+    if (value === "api") {
+      updateTrigger({
+        type: "api",
+        cron: null,
+        timezone: null,
+        misfire_policy: "run_once",
+        event_name: null,
+        api_slug: trigger.api_slug || "workflow-api",
+      })
+      return
+    }
+
+    if (value === "event") {
+      updateTrigger({
+        type: "event",
+        cron: null,
+        timezone: null,
+        misfire_policy: "run_once",
+        event_name: trigger.event_name || "workflow.event",
+        api_slug: null,
       })
       return
     }
@@ -270,6 +296,8 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
       cron: null,
       timezone: null,
       misfire_policy: "run_once",
+      event_name: null,
+      api_slug: null,
     })
   }
 
@@ -675,6 +703,8 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
                     <SelectContent>
                       <SelectItem value="manual">Manual</SelectItem>
                       <SelectItem value="schedule">Schedule</SelectItem>
+                      <SelectItem value="api">API</SelectItem>
+                      <SelectItem value="event">Event</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
@@ -761,6 +791,36 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
                       </span>
                     ))}
                   </div>
+                </div>
+              ) : null}
+
+              {trigger.type === "api" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="API slug" htmlFor="workflow-api-slug">
+                    <Input
+                      id="workflow-api-slug"
+                      value={trigger.api_slug || ""}
+                      onChange={(event) =>
+                        updateTrigger({ api_slug: event.target.value })
+                      }
+                      placeholder="nightly-summary"
+                    />
+                  </Field>
+                </div>
+              ) : null}
+
+              {trigger.type === "event" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Event name" htmlFor="workflow-event-name">
+                    <Input
+                      id="workflow-event-name"
+                      value={trigger.event_name || ""}
+                      onChange={(event) =>
+                        updateTrigger({ event_name: event.target.value })
+                      }
+                      placeholder="rag.documents.indexed"
+                    />
+                  </Field>
                 </div>
               ) : null}
             </div>

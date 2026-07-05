@@ -99,6 +99,54 @@ export async function POST(request: NextRequest) {
     return forwardResponse(response)
   }
 
+  if (body?.action === 'fire_api_trigger') {
+    const apiSlug = typeof body?.api_slug === 'string' ? body.api_slug : ''
+    if (!apiSlug) {
+      return NextResponse.json(
+        { success: false, error: 'api_slug is required' },
+        { status: 400 }
+      )
+    }
+
+    const response = await proxyAuthenticatedRequest(
+      request,
+      `/api-internal/v1/workflows/triggers/api/${encodeURIComponent(apiSlug)}/fire`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          input_data: body?.input_data || {},
+          idempotency_key: body?.idempotency_key,
+          execute_now: Boolean(body?.execute_now),
+        }),
+      }
+    )
+    return forwardResponse(response)
+  }
+
+  if (body?.action === 'fire_event_trigger') {
+    const eventName = typeof body?.event_name === 'string' ? body.event_name : ''
+    if (!eventName) {
+      return NextResponse.json(
+        { success: false, error: 'event_name is required' },
+        { status: 400 }
+      )
+    }
+
+    const response = await proxyAuthenticatedRequest(
+      request,
+      `/api-internal/v1/workflows/triggers/events/${encodeURIComponent(eventName)}/fire`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          input_data: body?.input_data || {},
+          idempotency_key: body?.idempotency_key,
+          execute_now: Boolean(body?.execute_now),
+        }),
+      }
+    )
+    return forwardResponse(response)
+  }
+
   if (body?.action === 'create') {
     const response = await proxyAuthenticatedRequest(
       request,

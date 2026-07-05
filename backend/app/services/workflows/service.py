@@ -449,6 +449,7 @@ class WorkflowService:
         self, definition: WorkflowDefinitionDocument
     ) -> list[WorkflowValidationErrorItem]:
         errors: list[WorkflowValidationErrorItem] = []
+        errors.extend(_trigger_validation_errors(definition.trigger))
         for index, step in enumerate(definition.steps):
             entry = self.step_registry.get(step.type)
             if entry is None:
@@ -760,6 +761,9 @@ _BRANCH_VALUE_OPERATORS = {
     "less_than_or_equal",
 }
 
+_API_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{2,79}$")
+_EVENT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{1,119}$")
+
 
 def _contains_template_placeholder(value: Any) -> bool:
     if isinstance(value, str):
@@ -769,6 +773,39 @@ def _contains_template_placeholder(value: Any) -> bool:
     if isinstance(value, dict):
         return any(_contains_template_placeholder(item) for item in value.values())
     return False
+
+
+def _trigger_validation_errors(
+    trigger: Any,
+) -> list[WorkflowValidationErrorItem]:
+    errors: list[WorkflowValidationErrorItem] = []
+    if trigger.type == WorkflowTriggerType.API:
+        api_slug = str(trigger.api_slug or "").strip()
+        if not api_slug or not _API_SLUG_RE.fullmatch(api_slug):
+            errors.append(
+                WorkflowValidationErrorItem(
+                    path="trigger.api_slug",
+                    message=(
+                        "API trigger slug must be lowercase and contain 3-80 "
+                        "letters, numbers, underscores, or hyphens"
+                    ),
+                    code="invalid_trigger_config",
+                )
+            )
+    if trigger.type == WorkflowTriggerType.EVENT:
+        event_name = str(trigger.event_name or "").strip()
+        if not event_name or not _EVENT_NAME_RE.fullmatch(event_name):
+            errors.append(
+                WorkflowValidationErrorItem(
+                    path="trigger.event_name",
+                    message=(
+                        "Event trigger name must contain 2-120 letters, numbers, "
+                        "dots, underscores, colons, or hyphens"
+                    ),
+                    code="invalid_trigger_config",
+                )
+            )
+    return errors
 
 
 def _extract_step_validation_errors(

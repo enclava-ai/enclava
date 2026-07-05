@@ -843,6 +843,40 @@ export interface WorkflowSchedulePreviewApiResponse {
   }
 }
 
+export interface WorkflowTriggerFireRequest {
+  input_data?: Record<string, any>
+  idempotency_key: string
+  execute_now?: boolean
+}
+
+export interface WorkflowTriggerFireRunResult {
+  workflow_id: string
+  trigger_id: string
+  idempotency_key: string
+  trigger_type: WorkflowTriggerType
+  run_id?: string | null
+  status: string
+  reason?: string | null
+}
+
+export interface WorkflowTriggerFireResponse {
+  success: boolean
+  trigger_type: WorkflowTriggerType
+  key: string
+  created_runs: number
+  duplicate_runs: number
+  skipped_triggers: number
+  executed_runs: number
+  failed_runs: number
+  runs: WorkflowTriggerFireRunResult[]
+  errors: string[]
+}
+
+export interface WorkflowTriggerFireApiResponse {
+  success: boolean
+  trigger_fire: WorkflowTriggerFireResponse
+}
+
 export interface WorkflowStepRunDetail {
   id: string
   step_key: string
@@ -980,6 +1014,24 @@ export const workflowApi = {
   },
   getTemplates() {
     return apiClient.get<WorkflowTemplatesApiResponse>('/api/workflows?resource=templates')
+  },
+  fireApiTrigger(apiSlug: string, payload: WorkflowTriggerFireRequest) {
+    return apiClient.post<WorkflowTriggerFireApiResponse>('/api/workflows', {
+      action: 'fire_api_trigger',
+      api_slug: apiSlug,
+      input_data: payload.input_data || {},
+      idempotency_key: payload.idempotency_key,
+      execute_now: Boolean(payload.execute_now),
+    })
+  },
+  fireEventTrigger(eventName: string, payload: WorkflowTriggerFireRequest) {
+    return apiClient.post<WorkflowTriggerFireApiResponse>('/api/workflows', {
+      action: 'fire_event_trigger',
+      event_name: eventName,
+      input_data: payload.input_data || {},
+      idempotency_key: payload.idempotency_key,
+      execute_now: Boolean(payload.execute_now),
+    })
   },
   runNow(workflowId: string, inputData: Record<string, any> = {}) {
     return apiClient.post<WorkflowRunResponse>('/api/workflows', {

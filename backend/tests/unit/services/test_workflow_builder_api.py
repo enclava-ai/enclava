@@ -341,6 +341,66 @@ async def test_builder_validation_reports_approval_errors(
 
 
 @pytest.mark.asyncio
+async def test_builder_validation_reports_api_and_event_trigger_errors(
+    builder_client: AsyncClient,
+) -> None:
+    base_step = {
+        "key": "summarize",
+        "type": "agent.run",
+        "name": "Summarize",
+        "config": {
+            "agent_id": "agent-1",
+            "prompt_template": "Summarize it.",
+        },
+    }
+    valid_api_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json={
+            "trigger": {"type": "api", "api_slug": "nightly-summary"},
+            "steps": [base_step],
+        },
+    )
+    invalid_api_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json={
+            "trigger": {"type": "api", "api_slug": "Nightly Summary"},
+            "steps": [base_step],
+        },
+    )
+    valid_event_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json={
+            "trigger": {"type": "event", "event_name": "rag.documents.indexed"},
+            "steps": [base_step],
+        },
+    )
+    invalid_event_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json={
+            "trigger": {"type": "event", "event_name": "rag/documents/indexed"},
+            "steps": [base_step],
+        },
+    )
+
+    assert valid_api_response.status_code == 200
+    assert valid_api_response.json()["success"] is True
+    assert valid_event_response.status_code == 200
+    assert valid_event_response.json()["success"] is True
+    assert invalid_api_response.json()["success"] is False
+    assert invalid_event_response.json()["success"] is False
+    assert any(
+        error["path"] == "trigger.api_slug"
+        and error["code"] == "invalid_trigger_config"
+        for error in invalid_api_response.json()["errors"]
+    )
+    assert any(
+        error["path"] == "trigger.event_name"
+        and error["code"] == "invalid_trigger_config"
+        for error in invalid_event_response.json()["errors"]
+    )
+
+
+@pytest.mark.asyncio
 async def test_templates_expose_availability_and_raw_placeholder_publish_blocks(
     builder_client: AsyncClient,
 ) -> None:

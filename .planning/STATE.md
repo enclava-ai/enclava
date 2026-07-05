@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 Plan 07-02 completed; ready to plan API/event trigger foundations
-last_updated: "2026-07-05T23:10:00.000Z"
-last_activity: 2026-07-05 - Completed Phase 7 Plan 07-02 approval pause/resume semantics
+stopped_at: Phase 7 completed; ready to plan Phase 8 hardening
+last_updated: "2026-07-05T23:31:00.000Z"
+last_activity: 2026-07-05 - Completed Phase 7 Plan 07-03 API/event trigger foundations
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 22
-  completed_plans: 18
-  percent: 82
+  completed_plans: 19
+  percent: 86
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-05)
 
 **Core value:** Users can run confidential AI automations that are scheduled, auditable, observable, budget-aware, and clear to operate.
-**Current focus:** Phase 7 — Advanced Control Flow and Triggers
+**Current focus:** Phase 8 — Hardening, Observability, and Release
 
 ## Current Position
 
-Phase: 7 (Advanced Control Flow and Triggers) — IN PROGRESS
-Plan: 07-03 (3 of 3)
-Status: Ready to plan Phase 7 Plan 07-03
-Last activity: 2026-07-05 - Completed Phase 7 Plan 07-02 approval pause/resume semantics
+Phase: 8 (Hardening, Observability, and Release) — READY
+Plan: 08-01 (1 of 3)
+Status: Ready to plan Phase 8 Plan 08-01
+Last activity: 2026-07-05 - Completed Phase 7 Plan 07-03 API/event trigger foundations
 
 ## Performance Metrics
 
@@ -79,10 +79,13 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 7]: Approval request steps are durable workflow pause points with first-class approval records serialized on run detail.
 - [Phase 7]: Approving a paused run resumes from the stored next-step index; rejecting a paused run skips remaining ordered steps and completes the run as skipped.
 - [Phase 7]: Approval resolution is authorized for admins, workflow owners, `workflow.manage`, `workflow.approve`, or explicitly assigned approvers.
+- [Phase 7]: API/event trigger foundations are authenticated internal fire paths, not public unauthenticated webhooks.
+- [Phase 7]: API/event trigger requests require caller-supplied idempotency keys with per-trigger run idempotency.
+- [Phase 7]: API/event trigger authoring stays in the existing compact trigger selector; external webhook/event-bus UX remains deferred.
 
 ### Pending Todos
 
-- Phase 7 Plan 07-03 ready for planning.
+- Phase 8 Plan 08-01 ready for planning.
 
 ### Blockers/Concerns
 
@@ -109,11 +112,11 @@ Items intentionally deferred from the first useful workflow release:
 
 ## Session Continuity
 
-Last session: 2026-07-05T23:10:00.000Z
-Stopped at: Phase 7 Plan 07-02 completed; ready to plan API/event trigger foundations
+Last session: 2026-07-05T23:31:00.000Z
+Stopped at: Phase 7 completed; ready to plan Phase 8 hardening
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 7 Plan 07-03 API/event trigger foundations with auth and idempotency.
+- Plan Phase 8 Plan 08-01 recovery/retention/stale-lock hardening.
 - Continue autonomous execution with `$gsd-autonomous --auto`.

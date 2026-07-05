@@ -25,6 +25,7 @@ from .service import (
     WorkflowValidationError,
 )
 from .templates import get_workflow_template, list_workflow_templates
+from .triggers import WorkflowTriggerFireService
 
 __all__ = [
     "StepRegistry",
@@ -45,6 +46,7 @@ __all__ = [
     "WorkflowNotFoundError",
     "WorkflowPermissionError",
     "WorkflowValidationError",
+    "WorkflowTriggerFireService",
     "create_default_step_registry",
     "get_workflow_template",
     "list_workflow_templates",

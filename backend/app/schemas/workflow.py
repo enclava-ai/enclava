@@ -401,6 +401,50 @@ class WorkflowSchedulerStatusResponse(BaseModel):
     last_result: Optional[WorkflowSchedulerTickResponse] = None
 
 
+class WorkflowTriggerFireRequest(BaseModel):
+    """Request body for firing an API or event workflow trigger."""
+
+    input_data: Dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: str = Field(min_length=1, max_length=160)
+    execute_now: bool = False
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def strip_idempotency_key(cls, value: str) -> str:
+        """Normalize and require caller-supplied idempotency keys."""
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("idempotency_key cannot be empty")
+        return normalized
+
+
+class WorkflowTriggerFireRunResult(BaseModel):
+    """One run result from firing a workflow trigger."""
+
+    workflow_id: str
+    trigger_id: str
+    idempotency_key: str
+    trigger_type: WorkflowTriggerType
+    run_id: Optional[str] = None
+    status: str
+    reason: Optional[str] = None
+
+
+class WorkflowTriggerFireResponse(BaseModel):
+    """Summary returned after firing an API or event trigger."""
+
+    success: bool = True
+    trigger_type: WorkflowTriggerType
+    key: str
+    created_runs: int = 0
+    duplicate_runs: int = 0
+    skipped_triggers: int = 0
+    executed_runs: int = 0
+    failed_runs: int = 0
+    runs: List[WorkflowTriggerFireRunResult] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
+
+
 class WorkflowDefinitionListItem(BaseModel):
     """Workflow item returned from list endpoints."""
 

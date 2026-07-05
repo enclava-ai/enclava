@@ -7,6 +7,7 @@ from app.modules.workflow.main import WorkflowModule
 from app.schemas.workflow import (
     WorkflowDefinitionDocument,
     WorkflowTriggerDefinition,
+    WorkflowTriggerFireRequest,
     WorkflowTriggerType,
 )
 from app.services.workflows import WorkflowService, list_workflow_templates
@@ -79,6 +80,20 @@ def test_schedule_trigger_requires_cron_and_timezone() -> None:
 
     with pytest.raises(ValidationError, match="schedule triggers require timezone"):
         WorkflowTriggerDefinition(type=WorkflowTriggerType.SCHEDULE, cron="0 2 * * *")
+
+
+def test_api_and_event_triggers_require_fire_fields() -> None:
+    with pytest.raises(ValidationError, match="api triggers require api_slug"):
+        WorkflowTriggerDefinition(type=WorkflowTriggerType.API)
+
+    with pytest.raises(ValidationError, match="event triggers require event_name"):
+        WorkflowTriggerDefinition(type=WorkflowTriggerType.EVENT)
+
+    request = WorkflowTriggerFireRequest(idempotency_key="  deploy-1  ")
+    assert request.idempotency_key == "deploy-1"
+
+    with pytest.raises(ValidationError, match="idempotency_key"):
+        WorkflowTriggerFireRequest(idempotency_key=" ")
 
 
 def test_workflow_service_exposes_default_catalog() -> None:
