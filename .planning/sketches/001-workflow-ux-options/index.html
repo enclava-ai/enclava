@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Workflow UX Options</title>
-  <link rel="stylesheet" href="../themes/default.css">
+  <link rel="stylesheet" href="default.css">
   <style>
     * { box-sizing: border-box; }
     body {
@@ -756,7 +756,7 @@
 
   <div id="sketch-tools" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.45'">
     Theme
-    <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <select onchange="document.querySelector('link[rel=stylesheet]').href=this.value+'.css'">
       <option value="default">Default</option>
     </select>
     <button onclick="setViewport('375px')">Phone</button>
