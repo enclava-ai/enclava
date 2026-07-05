@@ -50,6 +50,8 @@ class WorkflowStepResult:
     estimated_cost_cents: int = 0
     actual_cost_cents: int = 0
     skip_remaining: bool = False
+    skip_step_keys: list[str] = field(default_factory=list)
+    skip_reason: Optional[str] = None
 
 
 @dataclass
@@ -121,6 +123,61 @@ class NoResultsSkipHandler(BaseWorkflowStepHandler):
                 )
             ],
             skip_remaining=matched,
+        )
+
+
+class BranchConditionHandler(BaseWorkflowStepHandler):
+    """Choose a forward-only branch by skipping configured later steps."""
+
+    step_type = "condition.branch"
+
+    async def execute(self, context: WorkflowStepContext) -> WorkflowStepResult:
+        input_step_key = context.step.config.get("input_step_key")
+        if not input_step_key:
+            raise WorkflowStepExecutionError("input_step_key is required")
+
+        operator = str(context.step.config.get("operator") or "").strip()
+        if not operator:
+            raise WorkflowStepExecutionError("operator is required")
+
+        path = context.step.config.get("path")
+        source = context.previous_outputs.get(str(input_step_key), {})
+        value = _resolve_path(source, path) if path else source
+        expected = context.step.config.get("value")
+        matched = _evaluate_branch_condition(value, operator, expected)
+        selected_label = str(
+            context.step.config.get("matched_label" if matched else "not_matched_label")
+            or ("Matched" if matched else "Not matched")
+        )
+        target_field = (
+            "matched_skip_step_keys" if matched else "not_matched_skip_step_keys"
+        )
+        skipped_step_keys = _branch_target_keys(context.step.config.get(target_field))
+        skip_reason = f"Branch {context.step.key} selected {selected_label}"
+
+        output = {
+            "matched": matched,
+            "input_step_key": str(input_step_key),
+            "path": path,
+            "operator": operator,
+            "selected_label": selected_label,
+            "skipped_step_keys": skipped_step_keys,
+        }
+        return WorkflowStepResult(
+            output_data=output,
+            events=[
+                WorkflowStepEventSpec(
+                    event_type="branch_evaluated",
+                    message=(
+                        f"Branch matched: {selected_label}"
+                        if matched
+                        else f"Branch not matched: {selected_label}"
+                    ),
+                    data=output,
+                )
+            ],
+            skip_step_keys=skipped_step_keys,
+            skip_reason=skip_reason,
         )
 
 
@@ -511,6 +568,7 @@ def create_default_step_handlers(
         AgentRunHandler(),
         NotifyInAppHandler(),
         NoResultsSkipHandler(),
+        BranchConditionHandler(),
     ]
     return {handler.step_type: handler for handler in handlers}
 
@@ -535,6 +593,82 @@ def _resolve_path(source: Any, path: Optional[str]) -> Any:
         else:
             return None
     return current
+
+
+def _branch_target_keys(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
+
+
+def _evaluate_branch_condition(value: Any, operator: str, expected: Any) -> bool:
+    if operator == "exists":
+        return value is not None
+    if operator == "empty":
+        return _is_empty(value)
+    if operator == "non_empty":
+        return not _is_empty(value)
+    if operator == "truthy":
+        return bool(value)
+    if operator == "falsy":
+        return not bool(value)
+    if operator == "equals":
+        return _branch_values_equal(value, expected)
+    if operator == "not_equals":
+        return not _branch_values_equal(value, expected)
+    if operator == "contains":
+        return _branch_contains(value, expected)
+    if operator in {
+        "greater_than",
+        "greater_than_or_equal",
+        "less_than",
+        "less_than_or_equal",
+    }:
+        return _compare_branch_values(value, expected, operator)
+    raise WorkflowStepExecutionError(f"unsupported branch operator: {operator}")
+
+
+def _branch_values_equal(left: Any, right: Any) -> bool:
+    left_number = _branch_number(left)
+    right_number = _branch_number(right)
+    if left_number is not None and right_number is not None:
+        return left_number == right_number
+    return str(left) == str(right)
+
+
+def _branch_contains(value: Any, expected: Any) -> bool:
+    if isinstance(value, Mapping):
+        return str(expected) in {str(key) for key in value.keys()}
+    if isinstance(value, (list, tuple, set)):
+        return any(_branch_values_equal(item, expected) for item in value)
+    if value is None:
+        return False
+    return str(expected) in str(value)
+
+
+def _compare_branch_values(value: Any, expected: Any, operator: str) -> bool:
+    left = _branch_number(value)
+    right = _branch_number(expected)
+    if left is None or right is None:
+        return False
+    if operator == "greater_than":
+        return left > right
+    if operator == "greater_than_or_equal":
+        return left >= right
+    if operator == "less_than":
+        return left < right
+    if operator == "less_than_or_equal":
+        return left <= right
+    return False
+
+
+def _branch_number(value: Any) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _resolve_context_path(path: str, context: WorkflowStepContext) -> Any:

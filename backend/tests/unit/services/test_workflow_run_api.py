@@ -62,6 +62,54 @@ def _workflow_payload(name: str = "Manual execution workflow") -> dict[str, Any]
     }
 
 
+def _branch_workflow_payload() -> dict[str, Any]:
+    return {
+        "name": "Branch execution workflow",
+        "definition": {
+            "runtime": {
+                "redaction_policy": "default",
+                "budget_limit_cents": 10,
+            },
+            "steps": [
+                {
+                    "key": "seed",
+                    "type": "agent.run",
+                    "name": "Seed",
+                    "config": {
+                        "agent_id": "agent-1",
+                        "prompt_template": "Seed {{ input.topic }}",
+                        "estimated_cost_cents": 1,
+                    },
+                },
+                {
+                    "key": "branch",
+                    "type": "condition.branch",
+                    "name": "Branch",
+                    "config": {
+                        "input_step_key": "seed",
+                        "path": "message",
+                        "operator": "contains",
+                        "value": "processed",
+                        "matched_label": "Processed",
+                        "not_matched_label": "Not processed",
+                        "matched_skip_step_keys": ["notify"],
+                        "not_matched_skip_step_keys": [],
+                    },
+                },
+                {
+                    "key": "notify",
+                    "type": "notify.in_app",
+                    "name": "Notify",
+                    "config": {
+                        "recipients": ["1"],
+                        "title_template": "Workflow update",
+                    },
+                },
+            ],
+        },
+    }
+
+
 @pytest_asyncio.fixture
 async def workflow_run_client(test_db, test_user, monkeypatch):
     owner = _actor(
@@ -95,9 +143,11 @@ async def workflow_run_client(test_db, test_user, monkeypatch):
         app.dependency_overrides.clear()
 
 
-async def _create_published_workflow(client: AsyncClient) -> str:
+async def _create_published_workflow(
+    client: AsyncClient, payload: dict[str, Any] | None = None
+) -> str:
     create_response = await client.post(
-        "/api-internal/v1/workflows/", json=_workflow_payload()
+        "/api-internal/v1/workflows/", json=payload or _workflow_payload()
     )
     assert create_response.status_code == 201
     workflow_id = create_response.json()["workflow"]["id"]
@@ -151,6 +201,37 @@ async def test_run_api_creates_executes_and_serializes_detail(
     assert "workflow_run_create" in {
         entry.action for entry in audit_result.scalars().all()
     }
+
+
+@pytest.mark.asyncio
+async def test_run_api_serializes_branch_outputs_and_skipped_steps(
+    workflow_run_client,
+) -> None:
+    client, _, _ = workflow_run_client
+    workflow_id = await _create_published_workflow(client, _branch_workflow_payload())
+
+    create_response = await client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/runs",
+        json={
+            "execute_now": True,
+            "input_data": {"topic": "new docs"},
+        },
+    )
+
+    assert create_response.status_code == 201
+    run = create_response.json()["run"]
+    assert run["status"] == "succeeded"
+    assert run["output_data"]["value"]["outputs"]["branch"]["matched"] is True
+    assert run["output_data"]["value"]["outputs"]["branch"]["skipped_step_keys"] == [
+        "notify"
+    ]
+    assert [(step["step_key"], step["status"]) for step in run["steps"]] == [
+        ("seed", "succeeded"),
+        ("branch", "succeeded"),
+        ("notify", "skipped"),
+    ]
+    event_types = {event["event_type"] for event in run["events"]}
+    assert {"branch_evaluated", "step_skipped"}.issubset(event_types)
 
 
 @pytest.mark.asyncio

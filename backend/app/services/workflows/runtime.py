@@ -281,17 +281,41 @@ class WorkflowRuntimeService:
 
         definition = WorkflowDefinitionDocument.model_validate(run.version.definition)
         previous_outputs: dict[str, dict[str, Any]] = {}
+        targeted_skips: dict[str, dict[str, str]] = {}
         for index, step in enumerate(definition.steps):
             if run.cancel_requested_at:
                 return await self._mark_run_cancelled(db, run, "Run cancelled")
+
+            if step.key in targeted_skips:
+                skip_info = targeted_skips[step.key]
+                await self._mark_step_skipped(
+                    db,
+                    run,
+                    step,
+                    reason=skip_info["reason"],
+                    source_step_key=skip_info["source_step_key"],
+                )
+                continue
 
             result = await self._execute_step_with_retries(
                 db, run, definition, step, previous_outputs, actor
             )
             previous_outputs[step.key] = result.output_data
+            for skip_step_key in result.skip_step_keys:
+                targeted_skips.setdefault(
+                    skip_step_key,
+                    {
+                        "reason": result.skip_reason or f"Skipped by step {step.key}",
+                        "source_step_key": step.key,
+                    },
+                )
             if result.skip_remaining:
                 await self._mark_remaining_steps_skipped(
-                    db, run, definition.steps[index + 1 :]
+                    db,
+                    run,
+                    definition.steps[index + 1 :],
+                    reason=f"Step {step.key} requested remaining steps be skipped",
+                    source_step_key=step.key,
                 )
                 return await self.complete_run(
                     db,
@@ -607,26 +631,59 @@ class WorkflowRuntimeService:
         await db.flush()
 
     async def _mark_remaining_steps_skipped(
-        self, db: AsyncSession, run: WorkflowRun, steps: list[Any]
+        self,
+        db: AsyncSession,
+        run: WorkflowRun,
+        steps: list[Any],
+        *,
+        reason: Optional[str] = None,
+        source_step_key: Optional[str] = None,
     ) -> None:
         for step in steps:
-            step_run = await self.create_step_run(
+            await self._mark_step_skipped(
                 db,
                 run,
-                step_key=step.key,
-                step_type=step.type,
-                status=WorkflowStepRunStatus.SKIPPED,
-            )
-            step_run.completed_at = utc_now()
-            await self.append_event(
-                db,
-                run,
-                "step_skipped",
-                f"Step {step.key} skipped",
-                step_run=step_run,
-                data={"step_key": step.key},
+                step,
+                reason=reason,
+                source_step_key=source_step_key,
             )
         await db.flush()
+
+    async def _mark_step_skipped(
+        self,
+        db: AsyncSession,
+        run: WorkflowRun,
+        step: Any,
+        *,
+        reason: Optional[str] = None,
+        source_step_key: Optional[str] = None,
+    ) -> None:
+        step_run = await self.create_step_run(
+            db,
+            run,
+            step_key=step.key,
+            step_type=step.type,
+            status=WorkflowStepRunStatus.SKIPPED,
+        )
+        now = utc_now()
+        step_run.completed_at = now
+        step_run.updated_at = now
+        step_run.duration_ms = 0
+        message = f"Step {step.key} skipped"
+        if reason:
+            message = f"{message}: {reason}"
+        await self.append_event(
+            db,
+            run,
+            "step_skipped",
+            message,
+            step_run=step_run,
+            data={
+                "step_key": step.key,
+                "reason": reason,
+                "source_step_key": source_step_key,
+            },
+        )
 
     async def _mark_run_cancelled(
         self, db: AsyncSession, run: WorkflowRun, message: str

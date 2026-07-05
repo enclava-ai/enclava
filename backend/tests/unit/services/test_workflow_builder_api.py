@@ -121,6 +121,8 @@ async def test_builder_catalog_exposes_enabled_and_disabled_steps(
     assert len(steps) >= 6
     assert steps["rag.query"]["enabled"] is True
     assert steps["agent.run"]["required_permissions"] == ["agent:execute"]
+    assert steps["condition.branch"]["enabled"] is True
+    assert steps["condition.branch"]["supports_retry"] is False
     assert steps["connector.sync"]["enabled"] is True
     assert steps["connector.sync"]["required_permissions"] == ["connectors:sync"]
     assert steps["extract.run_template"]["enabled"] is True
@@ -212,6 +214,70 @@ async def test_builder_validation_reports_registry_errors(
     assert missing_extract_target_response.json()["success"] is False
     assert missing_extract_target_error["code"] == "missing_step_config"
     assert missing_extract_target_error["path"] == "steps[0].config.collection_id"
+
+
+@pytest.mark.asyncio
+async def test_builder_validation_reports_branch_errors(
+    builder_client: AsyncClient,
+) -> None:
+    base_definition = {
+        "trigger": {"type": "manual"},
+        "steps": [
+            {
+                "key": "query",
+                "type": "rag.query",
+                "name": "Query",
+                "config": {"collection_id": "1", "query": "recent docs"},
+            },
+            {
+                "key": "branch",
+                "type": "condition.branch",
+                "name": "Branch",
+                "config": {
+                    "input_step_key": "query",
+                    "path": "count",
+                    "operator": "greater_than",
+                    "value": 0,
+                    "matched_skip_step_keys": ["notify"],
+                },
+            },
+            {
+                "key": "notify",
+                "type": "notify.in_app",
+                "name": "Notify",
+                "config": {
+                    "recipients": ["1"],
+                    "title_template": "Workflow update",
+                },
+            },
+        ],
+    }
+    valid_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json=base_definition,
+    )
+    invalid_definition = deepcopy(base_definition)
+    invalid_definition["steps"][1]["config"] = {
+        "input_step_key": "query",
+        "operator": "equals",
+        "matched_skip_step_keys": ["query"],
+    }
+    invalid_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json=invalid_definition,
+    )
+
+    assert valid_response.status_code == 200
+    assert valid_response.json()["success"] is True
+    assert invalid_response.status_code == 200
+    assert invalid_response.json()["success"] is False
+    errors = invalid_response.json()["errors"]
+    assert any(error["path"] == "steps[1].config.value" for error in errors)
+    assert any(
+        "matched_skip_step_keys" in error["path"]
+        and error["code"] == "invalid_step_config"
+        for error in errors
+    )
 
 
 @pytest.mark.asyncio

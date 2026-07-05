@@ -508,6 +508,10 @@ class WorkflowService:
 
             if step.type == "extract.run_template":
                 errors.extend(_extract_step_validation_errors(step, index))
+            if step.type == "condition.branch":
+                errors.extend(
+                    _branch_step_validation_errors(step, index, definition.steps)
+                )
         return errors
 
     def _trigger_for_version(
@@ -729,6 +733,31 @@ def _has_permission(actor: Mapping[str, Any], permission: str) -> bool:
 
 _SEED_PLACEHOLDER_RE = re.compile(r"\{\{[a-zA-Z_][a-zA-Z0-9_]*\}\}")
 
+_BRANCH_OPERATORS = {
+    "exists",
+    "empty",
+    "non_empty",
+    "equals",
+    "not_equals",
+    "contains",
+    "greater_than",
+    "greater_than_or_equal",
+    "less_than",
+    "less_than_or_equal",
+    "truthy",
+    "falsy",
+}
+
+_BRANCH_VALUE_OPERATORS = {
+    "equals",
+    "not_equals",
+    "contains",
+    "greater_than",
+    "greater_than_or_equal",
+    "less_than",
+    "less_than_or_equal",
+}
+
 
 def _contains_template_placeholder(value: Any) -> bool:
     if isinstance(value, str):
@@ -798,6 +827,106 @@ def _extract_step_validation_errors(
     return errors
 
 
+def _branch_step_validation_errors(
+    step: Any, step_index: int, steps: list[Any]
+) -> list[WorkflowValidationErrorItem]:
+    errors: list[WorkflowValidationErrorItem] = []
+    step_index_by_key = {candidate.key: index for index, candidate in enumerate(steps)}
+    input_step_key = step.config.get("input_step_key")
+    if input_step_key not in (None, "", [], {}) and not _contains_template_placeholder(
+        input_step_key
+    ):
+        input_index = step_index_by_key.get(str(input_step_key))
+        if input_index is None:
+            _append_invalid_config_error(
+                errors,
+                step,
+                step_index,
+                "input_step_key",
+                f'Branch "{step.key}" references an unknown input step',
+            )
+        elif input_index >= step_index:
+            _append_invalid_config_error(
+                errors,
+                step,
+                step_index,
+                "input_step_key",
+                f'Branch "{step.key}" references a later step',
+            )
+
+    operator = str(step.config.get("operator") or "").strip()
+    if operator:
+        if operator not in _BRANCH_OPERATORS:
+            _append_invalid_config_error(
+                errors,
+                step,
+                step_index,
+                "operator",
+                f"condition.branch has unsupported operator: {operator}",
+            )
+        elif operator in _BRANCH_VALUE_OPERATORS:
+            _append_required_config_error(
+                errors, step, step_index, "value", step.config.get("value")
+            )
+
+    for field in ("matched_skip_step_keys", "not_matched_skip_step_keys"):
+        targets = step.config.get(field, [])
+        if targets in (None, ""):
+            continue
+        if not isinstance(targets, list):
+            _append_invalid_config_error(
+                errors,
+                step,
+                step_index,
+                field,
+                f"condition.branch config field {field} must be an array of step keys",
+            )
+            continue
+
+        seen: set[str] = set()
+        for target_index, target_key in enumerate(targets):
+            target_path = f"{field}[{target_index}]"
+            if not isinstance(target_key, str) or not target_key:
+                _append_invalid_config_error(
+                    errors,
+                    step,
+                    step_index,
+                    target_path,
+                    f"condition.branch config field {field} must contain step keys",
+                )
+                continue
+            if target_key in seen:
+                _append_invalid_config_error(
+                    errors,
+                    step,
+                    step_index,
+                    target_path,
+                    f'Branch "{step.key}" references duplicate target step',
+                )
+                continue
+            seen.add(target_key)
+
+            target_step_index = step_index_by_key.get(target_key)
+            if target_step_index is None:
+                _append_invalid_config_error(
+                    errors,
+                    step,
+                    step_index,
+                    target_path,
+                    f'Branch "{step.key}" references an unknown target step',
+                )
+                continue
+            if target_step_index <= step_index:
+                _append_invalid_config_error(
+                    errors,
+                    step,
+                    step_index,
+                    target_path,
+                    f'Branch "{step.key}" references an earlier step',
+                )
+    return errors
+
+
 def _append_required_config_error(
     errors: list[WorkflowValidationErrorItem],
     step: Any,
@@ -828,6 +957,24 @@ def _append_required_config_error(
                 step_index=step_index,
             )
         )
+
+
+def _append_invalid_config_error(
+    errors: list[WorkflowValidationErrorItem],
+    step: Any,
+    step_index: int,
+    field: str,
+    message: str,
+) -> None:
+    errors.append(
+        WorkflowValidationErrorItem(
+            path=f"steps[{step_index}].config.{field}",
+            message=message,
+            code="invalid_step_config",
+            step_key=step.key,
+            step_index=step_index,
+        )
+    )
 
 
 def _checksum(value: dict[str, Any]) -> str:
