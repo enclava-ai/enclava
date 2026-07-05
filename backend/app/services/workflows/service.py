@@ -505,6 +505,9 @@ class WorkflowService:
                             step_index=index,
                         )
                     )
+
+            if step.type == "extract.run_template":
+                errors.extend(_extract_step_validation_errors(step, index))
         return errors
 
     def _trigger_for_version(
@@ -735,6 +738,96 @@ def _contains_template_placeholder(value: Any) -> bool:
     if isinstance(value, dict):
         return any(_contains_template_placeholder(item) for item in value.values())
     return False
+
+
+def _extract_step_validation_errors(
+    step: Any, step_index: int
+) -> list[WorkflowValidationErrorItem]:
+    errors: list[WorkflowValidationErrorItem] = []
+    source = step.config.get("document_source") or (
+        "previous_step" if step.config.get("input_step_key") else "rag_filter"
+    )
+    if source == "rag_filter":
+        _append_required_config_error(
+            errors, step, step_index, "collection_id", step.config.get("collection_id")
+        )
+    elif source == "previous_step":
+        _append_required_config_error(
+            errors,
+            step,
+            step_index,
+            "input_step_key",
+            step.config.get("input_step_key"),
+        )
+    else:
+        errors.append(
+            WorkflowValidationErrorItem(
+                path=f"steps[{step_index}].config.document_source",
+                message=f"extract.run_template has unknown document_source: {source}",
+                code="invalid_step_config",
+                step_key=step.key,
+                step_index=step_index,
+            )
+        )
+
+    context = step.config.get("context")
+    if isinstance(context, str) and context.strip():
+        try:
+            parsed = json.loads(context)
+        except json.JSONDecodeError:
+            errors.append(
+                WorkflowValidationErrorItem(
+                    path=f"steps[{step_index}].config.context",
+                    message="extract.run_template context must be valid JSON",
+                    code="invalid_step_config",
+                    step_key=step.key,
+                    step_index=step_index,
+                )
+            )
+        else:
+            if not isinstance(parsed, dict):
+                errors.append(
+                    WorkflowValidationErrorItem(
+                        path=f"steps[{step_index}].config.context",
+                        message="extract.run_template context must be a JSON object",
+                        code="invalid_step_config",
+                        step_key=step.key,
+                        step_index=step_index,
+                    )
+                )
+    return errors
+
+
+def _append_required_config_error(
+    errors: list[WorkflowValidationErrorItem],
+    step: Any,
+    step_index: int,
+    field: str,
+    value: Any,
+) -> None:
+    if value is None or value == "" or value == [] or value == {}:
+        errors.append(
+            WorkflowValidationErrorItem(
+                path=f"steps[{step_index}].config.{field}",
+                message=f"{step.type} requires config field {field}",
+                code="missing_step_config",
+                step_key=step.key,
+                step_index=step_index,
+            )
+        )
+    elif _contains_template_placeholder(value):
+        errors.append(
+            WorkflowValidationErrorItem(
+                path=f"steps[{step_index}].config.{field}",
+                message=(
+                    f"{step.type} config field {field} has an unresolved "
+                    "template placeholder"
+                ),
+                code="unresolved_placeholder",
+                step_key=step.key,
+                step_index=step_index,
+            )
+        )
 
 
 def _checksum(value: dict[str, Any]) -> str:

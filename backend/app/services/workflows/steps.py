@@ -6,6 +6,7 @@ import re
 from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Mapping, Optional, Protocol
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workflow import WorkflowRun
@@ -211,6 +212,101 @@ class ConnectorSyncHandler(BaseWorkflowStepHandler):
         )
 
 
+class ExtractRunTemplateHandler(BaseWorkflowStepHandler):
+    """Run an Extract template over workflow-selected documents."""
+
+    step_type = "extract.run_template"
+
+    def estimate_cost_cents(self, context: WorkflowStepContext) -> int:
+        return int(context.step.config.get("estimated_cost_cents") or 1)
+
+    async def execute(self, context: WorkflowStepContext) -> WorkflowStepResult:
+        template_id = _render_value(context.step.config.get("template_id"), context)
+        if template_id in (None, ""):
+            raise WorkflowStepExecutionError("template_id is required")
+
+        max_documents = _bounded_int(
+            context.step.config.get("max_documents"),
+            default=25,
+            minimum=1,
+            maximum=100,
+        )
+        documents = await _resolve_extract_documents(context, max_documents)
+        if not documents:
+            raise WorkflowStepExecutionError(
+                "no documents matched the Extract step input"
+            )
+
+        service = context.dependencies.extract_service
+        if service is None:
+            from app.modules.extract.services.extract_service import ExtractService
+
+            service = ExtractService()
+
+        runner = getattr(service, "run_template_for_workflow", None)
+        if runner is None:
+            raise WorkflowStepExecutionError(
+                "extract service does not support workflow template execution"
+            )
+
+        result = await _maybe_await(
+            runner(
+                db=context.db,
+                template_id=str(template_id),
+                documents=documents,
+                context=_extract_context_config(context.step.config.get("context")),
+                current_user=_workflow_actor_for_extract(context),
+                workflow_run_id=context.run.id,
+                step_key=context.step.key,
+            )
+        )
+        data = _response_mapping(result)
+        status = _status_key(data.get("status"))
+        if status in {"failed", "error"}:
+            root_cause = (
+                data.get("error_message") or "Extract template execution failed"
+            )
+            raise WorkflowStepExecutionError(
+                f"extract template {template_id} failed: {root_cause}"
+            )
+
+        output = {
+            "template_id": str(data.get("template_id") or template_id),
+            "job_id": data.get("job_id"),
+            "status": status or data.get("status") or "completed",
+            "summary": data.get("summary") or "Extract template completed",
+            "document_count": int(data.get("document_count") or len(documents)),
+            "result": data.get("result") or data.get("data") or {},
+            "validation_errors": data.get("validation_errors") or [],
+            "validation_warnings": data.get("validation_warnings") or [],
+            "cost_cents": int(data.get("cost_cents") or 0),
+            "model_used": data.get("model_used"),
+        }
+        return WorkflowStepResult(
+            output_data=output,
+            artifacts=[
+                WorkflowStepArtifactSpec(
+                    artifact_type="extract_result",
+                    name=f"{context.step.key}-extract-result",
+                    data=output,
+                )
+            ],
+            events=[
+                WorkflowStepEventSpec(
+                    event_type="extract_template_completed",
+                    message=f"Extract template processed {output['document_count']} documents",
+                    data={
+                        "template_id": output["template_id"],
+                        "job_id": output["job_id"],
+                        "document_count": output["document_count"],
+                    },
+                )
+            ],
+            estimated_cost_cents=self.estimate_cost_cents(context),
+            actual_cost_cents=output["cost_cents"],
+        )
+
+
 class RAGQueryHandler(BaseWorkflowStepHandler):
     """Run a RAG collection search."""
 
@@ -411,6 +507,7 @@ def create_default_step_handlers(
     handlers: list[WorkflowStepHandler] = [
         RAGQueryHandler(),
         ConnectorSyncHandler(),
+        ExtractRunTemplateHandler(),
         AgentRunHandler(),
         NotifyInAppHandler(),
         NoResultsSkipHandler(),
@@ -501,6 +598,162 @@ def _bounded_int(
 def _status_key(value: Any) -> str:
     raw = str(getattr(value, "value", value) or "")
     return raw.rsplit(".", 1)[-1].lower()
+
+
+async def _resolve_extract_documents(
+    context: WorkflowStepContext, max_documents: int
+) -> list[dict[str, Any]]:
+    source = context.step.config.get("document_source") or (
+        "previous_step" if context.step.config.get("input_step_key") else "rag_filter"
+    )
+    if source == "previous_step":
+        input_step_key = context.step.config.get("input_step_key")
+        if not input_step_key:
+            raise WorkflowStepExecutionError("input_step_key is required")
+        path = context.step.config.get("path") or "items"
+        value = _resolve_path(context.previous_outputs.get(input_step_key, {}), path)
+        if value is None and path == "items":
+            value = _resolve_path(
+                context.previous_outputs.get(input_step_key, {}), "documents"
+            )
+        return _normalize_document_items(value, max_documents)
+
+    if source != "rag_filter":
+        raise WorkflowStepExecutionError(f"unknown document_source: {source}")
+
+    collection_id = _render_value(context.step.config.get("collection_id"), context)
+    if collection_id in (None, ""):
+        raise WorkflowStepExecutionError("collection_id is required")
+    connector_id = _render_value(context.step.config.get("connector_id"), context)
+
+    from app.models.rag_document import RagDocument
+
+    stmt = (
+        select(RagDocument)
+        .where(
+            RagDocument.collection_id == _coerce_int(collection_id, "collection_id"),
+            RagDocument.is_deleted.is_(False),
+        )
+        .order_by(RagDocument.indexed_at.desc().nulls_last(), RagDocument.id.desc())
+        .limit(max_documents)
+    )
+    if connector_id not in (None, ""):
+        stmt = stmt.where(
+            RagDocument.connector_source_id == _coerce_int(connector_id, "connector_id")
+        )
+    since = context.step.config.get("since") or "last_successful_run"
+    if since == "last_successful_run":
+        cutoff = await _last_successful_run_completed_at(context)
+        if cutoff is not None:
+            stmt = stmt.where(
+                RagDocument.indexed_at.is_not(None),
+                RagDocument.indexed_at > cutoff,
+            )
+    elif since != "all_matching":
+        raise WorkflowStepExecutionError(f"unknown since filter: {since}")
+
+    result = await context.db.execute(stmt)
+    return [_rag_document_summary(document) for document in result.scalars().all()]
+
+
+async def _last_successful_run_completed_at(context: WorkflowStepContext) -> Any:
+    stmt = (
+        select(WorkflowRun.completed_at)
+        .where(
+            WorkflowRun.workflow_id == context.run.workflow_id,
+            WorkflowRun.status == "succeeded",
+            WorkflowRun.id != context.run.id,
+            WorkflowRun.completed_at.is_not(None),
+        )
+        .order_by(WorkflowRun.completed_at.desc(), WorkflowRun.created_at.desc())
+        .limit(1)
+    )
+    result = await context.db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+def _normalize_document_items(value: Any, max_documents: int) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if isinstance(value, Mapping):
+        items = [value]
+    elif isinstance(value, list):
+        items = value
+    else:
+        return []
+
+    documents: list[dict[str, Any]] = []
+    for item in items[:max_documents]:
+        if isinstance(item, Mapping):
+            document = dict(item)
+        else:
+            document = {"content": str(item)}
+        if "content" not in document and "content_preview" not in document:
+            document["content_preview"] = str(
+                document.get("summary")
+                or document.get("title")
+                or document.get("filename")
+                or ""
+            )
+        documents.append(document)
+    return documents
+
+
+def _rag_document_summary(document: Any) -> dict[str, Any]:
+    metadata = document.document_metadata or {}
+    content = document.converted_content or ""
+    return {
+        "document_id": document.id,
+        "collection_id": document.collection_id,
+        "title": metadata.get("title")
+        or document.original_filename
+        or document.filename,
+        "filename": document.filename,
+        "original_filename": document.original_filename,
+        "source_url": document.source_url,
+        "external_id": document.external_id,
+        "external_updated_at": (
+            document.external_updated_at.isoformat()
+            if document.external_updated_at
+            else None
+        ),
+        "indexed_at": document.indexed_at.isoformat() if document.indexed_at else None,
+        "word_count": document.word_count,
+        "character_count": document.character_count,
+        "content": content[:12000],
+        "content_preview": content[:4000],
+        "metadata": metadata,
+    }
+
+
+def _extract_context_config(value: Any) -> dict[str, Any]:
+    if value in (None, ""):
+        return {}
+    if isinstance(value, Mapping):
+        return dict(value)
+    if isinstance(value, str):
+        import json
+
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise WorkflowStepExecutionError("context must be valid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise WorkflowStepExecutionError("context must be a JSON object")
+        return parsed
+    raise WorkflowStepExecutionError("context must be a JSON object")
+
+
+def _workflow_actor_for_extract(context: WorkflowStepContext) -> dict[str, Any]:
+    actor = dict(context.actor or {})
+    user_id = actor.get("id") or context.run.requested_by_user_id
+    if user_id is None and context.run.workflow is not None:
+        user_id = context.run.workflow.owner_user_id
+    if user_id is None:
+        raise WorkflowStepExecutionError("extract step requires a workflow owner")
+    actor["id"] = int(user_id)
+    actor.setdefault("email", "workflow-system@local")
+    return actor
 
 
 def _resolve_template_value(

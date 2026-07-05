@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 6 Plan 06-01 complete; ready to execute Plan 06-02 Extract integration
-last_updated: "2026-07-05T22:02:01.000Z"
-last_activity: 2026-07-05 - Completed Phase 6 Plan 06-01 connector workflow integration
+stopped_at: Phase 6 complete; ready to plan Phase 7 Plan 07-01 Advanced Control Flow
+last_updated: "2026-07-05T22:20:13.000Z"
+last_activity: 2026-07-05 - Completed Phase 6 Plan 06-02 Extract template workflow integration
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 22
-  completed_plans: 15
-  percent: 68
+  completed_plans: 16
+  percent: 73
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-05)
 
 **Core value:** Users can run confidential AI automations that are scheduled, auditable, observable, budget-aware, and clear to operate.
-**Current focus:** Phase 6 — Connector and Extract Integration
+**Current focus:** Phase 7 — Advanced Control Flow and Triggers
 
 ## Current Position
 
-Phase: 6 (Connector and Extract Integration) — READY
-Plan: 06-02 (2 of 2)
-Status: Ready to execute Phase 6 Plan 06-02
-Last activity: 2026-07-05 - Completed Phase 6 Plan 06-01 connector workflow integration
+Phase: 7 (Advanced Control Flow and Triggers) — READY
+Plan: 07-01 (1 of 3)
+Status: Ready to plan Phase 7 Plan 07-01
+Last activity: 2026-07-05 - Completed Phase 6 Plan 06-02 Extract template workflow integration
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-07-05 - Completed Phase 6 Plan 06-01 connector workflow inte
 
 - Phases planned: 8
 - Plans planned: 22
-- Plans completed: 15
+- Plans completed: 16
 
 ## Accumulated Context
 
@@ -71,11 +71,14 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 5]: Nightly RAG Summary is the first end-to-end authoring template; connector/extract templates remain visible but unavailable until Phase 6 runtime support.
 - [Phase 5]: Builder draft save, publish, enable, and schedule preview actions route through the Next workflow proxy to preserve centralized auth and audit behavior.
 - [Phase 5]: Template seed placeholders are blocked in required config fields, while runtime prompt templates remain valid.
-- [Phase 5]: Connector and Extract template availability is intentionally false until Phase 6 step handlers land.
+- [Phase 5]: Connector and Extract template availability was intentionally false until Phase 6 step handlers landed.
+- [Phase 6]: Connector sync workflows expose newly indexed records without credentials and keep transaction ownership in workflow runtime.
+- [Phase 6]: Extract template workflow runs persist normal Extract jobs/results and expose validation warnings/errors in workflow artifacts.
+- [Phase 6]: Weekly Extraction Report uses RAG-backed document selection and `last_successful_run` indexed-at cutoffs.
 
 ### Pending Todos
 
-- Phase 6 Plan 06-02 ready for Extract template workflow integration.
+- Phase 7 Plan 07-01 ready for minimal branch semantics and readable branch UI planning.
 
 ### Blockers/Concerns
 
@@ -102,11 +105,11 @@ Items intentionally deferred from the first useful workflow release:
 
 ## Session Continuity
 
-Last session: 2026-07-05T22:02:01.000Z
-Stopped at: Phase 6 Plan 06-01 complete; ready to execute Plan 06-02
+Last session: 2026-07-05T22:20:13.000Z
+Stopped at: Phase 6 complete; ready to plan Phase 7 Plan 07-01
 Resume file: None
 
 ## Operator Next Steps
 
-- Execute Phase 6 Plan 06-02 Extract integration.
+- Plan and execute Phase 7 Plan 07-01 minimal branch semantics.
 - Continue autonomous execution with `$gsd-autonomous --auto`.

@@ -235,6 +235,137 @@ class ExtractService:
             await self._mark_job_failed(db, job, str(e))
             raise ProcessingError(f"Processing failed: {e}") from e
 
+    async def run_template_for_workflow(
+        self,
+        db: AsyncSession,
+        *,
+        template_id: str,
+        documents: list[dict[str, Any]],
+        context: Optional[dict],
+        current_user: Dict[str, Any],
+        workflow_run_id: str,
+        step_key: str,
+        config: Optional[dict] = None,
+    ) -> dict[str, Any]:
+        """
+        Run an Extract template over existing workflow document summaries.
+
+        This path is intentionally separate from upload processing. It creates
+        normal ExtractJob/ExtractResult records but does not commit; workflow
+        runtime owns the transaction for step state and artifacts.
+        """
+        config = config or {}
+        start_time = time.time()
+        user_id = int(current_user["id"])
+        template_manager = TemplateManager(db)
+        template = await template_manager.get_template(template_id)
+        serialized_documents = json.dumps(documents, default=str)
+        context_json = json.dumps(context) if context else None
+        job = ExtractJob(
+            user_id=user_id,
+            api_key_id=None,
+            filename=f"workflow-{workflow_run_id}-{step_key}.json",
+            original_filename=f"Workflow {workflow_run_id} {step_key}",
+            file_type="json",
+            file_size=len(serialized_documents.encode("utf-8")),
+            num_pages=max(1, len(documents)),
+            status="pending",
+            template_id=template_id,
+            buyer_context=context_json,
+        )
+        db.add(job)
+        await db.flush()
+
+        try:
+            if not documents:
+                raise ProcessingError("No documents matched the Extract step input")
+
+            model_name = await self._get_model_for_processing(db, template, config)
+            job.model_used = model_name
+            job.status = "processing"
+            await db.flush()
+
+            messages = self._build_workflow_messages(documents, template, context)
+            estimated_tokens = self._estimate_workflow_tokens(
+                documents, template, context
+            )
+            llm_request = ChatRequest(
+                model=model_name,
+                messages=messages,
+                response_format={"type": "json_object"},
+                user_id=str(user_id),
+                api_key_id=None,
+            )
+            response = await llm_service.create_chat_completion(
+                llm_request,
+                db=db,
+                user_id=user_id,
+                api_key_id=None,
+                endpoint="extract/workflow",
+            )
+            content = response.choices[0].message.content
+            parsed_data = self._parse_response(content)
+            validation_result = self.validator.validate(parsed_data, template)
+            usage = response.usage
+            actual_cost_cents = CostCalculator.calculate_cost_cents(
+                model_name,
+                usage.prompt_tokens,
+                usage.completion_tokens,
+            )
+
+            count_stmt = select(func.count(ExtractResult.id)).where(
+                ExtractResult.job_id == job.id
+            )
+            count_result = await db.execute(count_stmt)
+            attempt_number = count_result.scalar_one() + 1
+            result = ExtractResult(
+                job_id=job.id,
+                attempt_number=attempt_number,
+                raw_response=content,
+                parsed_data=parsed_data,
+                validation_errors=validation_result.errors,
+                validation_warnings=validation_result.warnings,
+                is_final=not validation_result.has_errors,
+            )
+            db.add(result)
+
+            job.prompt_tokens = usage.prompt_tokens
+            job.completion_tokens = usage.completion_tokens
+            job.total_cost_cents = actual_cost_cents
+            job.status = (
+                "completed"
+                if not validation_result.has_errors
+                else "completed_with_errors"
+            )
+            job.completed_at = utc_now()
+            await db.flush()
+
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            return {
+                "success": not validation_result.has_errors,
+                "job_id": str(job.id),
+                "template_id": template_id,
+                "status": job.status,
+                "summary": _workflow_extract_summary(parsed_data, len(documents)),
+                "document_count": len(documents),
+                "result": parsed_data,
+                "validation_errors": validation_result.errors,
+                "validation_warnings": validation_result.warnings,
+                "processing_time_ms": processing_time_ms,
+                "tokens_used": usage.total_tokens,
+                "estimated_tokens": estimated_tokens,
+                "cost_cents": actual_cost_cents,
+                "model_used": model_name,
+            }
+
+        except Exception as e:
+            logger.exception("Workflow Extract processing failed for job %s", job.id)
+            job.status = "failed"
+            job.error_message = str(e)
+            job.completed_at = utc_now()
+            await db.flush()
+            raise ProcessingError(f"Workflow extraction failed: {e}") from e
+
     def _build_messages(
         self,
         images: list,
@@ -284,6 +415,48 @@ class ExtractService:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": content},
         ]
+
+    def _build_workflow_messages(
+        self,
+        documents: list[dict[str, Any]],
+        template,
+        context: Optional[dict],
+    ) -> list:
+        """Build text-only messages for workflow document extraction."""
+        user_prompt = template.user_prompt
+        system_prompt = template.system_prompt
+
+        if context:
+            for key, value in context.items():
+                placeholder = f"{{{key}}}"
+                system_prompt = system_prompt.replace(placeholder, str(value))
+                user_prompt = user_prompt.replace(placeholder, str(value))
+
+        document_text = "\n\n".join(
+            _workflow_document_prompt(document, index)
+            for index, document in enumerate(documents, start=1)
+        )
+        return [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": (
+                    f"{user_prompt}\n\nDocuments to extract from:\n{document_text}"
+                ),
+            },
+        ]
+
+    def _estimate_workflow_tokens(
+        self, documents: list[dict[str, Any]], template, context: Optional[dict]
+    ) -> int:
+        """Estimate tokens for text-only workflow extraction."""
+        document_chars = sum(
+            len(str(document.get("content") or document.get("content_preview") or ""))
+            for document in documents
+        )
+        context_chars = len(json.dumps(context or {}, default=str))
+        prompt_chars = len(template.system_prompt + template.user_prompt)
+        return (document_chars + context_chars + prompt_chars) // 4 + 2000
 
     async def _get_model_for_processing(
         self, db: AsyncSession, template, config: dict
@@ -566,3 +739,31 @@ class ExtractService:
             "validation_errors": validation_errors,
             "validation_warnings": validation_warnings,
         }
+
+
+def _workflow_document_prompt(document: dict[str, Any], index: int) -> str:
+    """Format one workflow document for text-only extraction prompts."""
+    title = (
+        document.get("title")
+        or document.get("original_filename")
+        or document.get("filename")
+        or f"Document {index}"
+    )
+    source_url = document.get("source_url") or ""
+    external_id = document.get("external_id") or document.get("document_id") or ""
+    content = document.get("content") or document.get("content_preview") or ""
+    return (
+        f"Document {index}: {title}\n"
+        f"Source: {source_url}\n"
+        f"External ID: {external_id}\n"
+        f"Content:\n{content}"
+    )
+
+
+def _workflow_extract_summary(data: dict[str, Any], document_count: int) -> str:
+    """Return a compact extraction summary for workflow step output."""
+    for key in ("summary", "report_summary", "description"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return f"Processed {document_count} document{'s' if document_count != 1 else ''}"

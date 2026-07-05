@@ -131,10 +131,9 @@ WEEKLY_EXTRACTION_REPORT_TEMPLATE = WorkflowTemplate(
     name="Weekly Extraction Report",
     description="Run an Extract template over weekly documents and notify the owner.",
     tags=["extract", "schedule"],
-    required_placeholders=["template_id", "owner_user_id"],
+    required_placeholders=["template_id", "collection_id", "owner_user_id"],
     builder_category="Extract",
-    available_for_authoring=False,
-    unavailable_reason="Extract workflow steps are scheduled for Phase 6.",
+    available_for_authoring=True,
     definition=WorkflowDefinitionDocument(
         trigger=WorkflowTriggerDefinition(
             type=WorkflowTriggerType.SCHEDULE,
@@ -149,7 +148,10 @@ WEEKLY_EXTRACTION_REPORT_TEMPLATE = WorkflowTemplate(
                 "name": "Run extraction template",
                 "config": {
                     "template_id": "{{template_id}}",
-                    "document_filter": {"uploaded_since": "last_successful_run"},
+                    "document_source": "rag_filter",
+                    "collection_id": "{{collection_id}}",
+                    "since": "last_successful_run",
+                    "max_documents": 25,
                 },
                 "retry": {"max_attempts": 1},
             },

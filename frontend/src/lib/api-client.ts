@@ -158,6 +158,17 @@ export const connectorApi = {
   },
 }
 
+export interface ExtractTemplateSummary {
+  id: string
+  description?: string | null
+  is_default?: boolean
+  is_active?: boolean
+}
+
+export interface ExtractTemplatesApiResponse {
+  templates: ExtractTemplateSummary[]
+}
+
 export const toolApi = {
   listTools() {
     return apiClient.get('/api/v1/tool-calling/available')
@@ -253,7 +264,7 @@ export const extractApi = {
    * List all extraction templates
    */
   listTemplates() {
-    return apiClient.get('/api/v1/extract/templates')
+    return apiClient.get<ExtractTemplatesApiResponse>('/api/v1/extract/templates')
   },
 
   /**

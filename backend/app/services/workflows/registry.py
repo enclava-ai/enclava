@@ -196,7 +196,20 @@ def create_default_step_registry() -> StepRegistry:
                     "required": ["template_id"],
                     "properties": {
                         "template_id": {"type": "string"},
-                        "document_filter": {"type": "object"},
+                        "document_source": {
+                            "type": "string",
+                            "enum": ["previous_step", "rag_filter"],
+                        },
+                        "input_step_key": {"type": "string"},
+                        "path": {"type": "string"},
+                        "collection_id": {"type": "string"},
+                        "connector_id": {"type": "string"},
+                        "since": {
+                            "type": "string",
+                            "enum": ["last_successful_run", "all_matching"],
+                        },
+                        "max_documents": {"type": "integer", "minimum": 1},
+                        "context": {"type": "object"},
                     },
                 },
                 output_schema={
@@ -210,8 +223,7 @@ def create_default_step_registry() -> StepRegistry:
                 supports_retry=True,
                 supports_test=False,
                 estimated_cost_kind="extract",
-                enabled=False,
-                disabled_reason="Extract workflow steps are scheduled for Phase 6.",
+                enabled=True,
             ),
         ]
     )

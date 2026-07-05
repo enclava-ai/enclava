@@ -37,6 +37,11 @@ export interface WorkflowBuilderConnectorOption {
   status?: string | null
 }
 
+export interface WorkflowBuilderExtractTemplateOption {
+  id: string
+  name: string
+}
+
 interface WorkflowStepPropertiesProps {
   step: WorkflowStepDefinition | null
   stepIndex: number
@@ -46,6 +51,7 @@ interface WorkflowStepPropertiesProps {
   agents: WorkflowBuilderAgentOption[]
   collections: WorkflowBuilderCollectionOption[]
   connectors: WorkflowBuilderConnectorOption[]
+  extractTemplates: WorkflowBuilderExtractTemplateOption[]
   onChange: (step: WorkflowStepDefinition) => void
 }
 
@@ -60,6 +66,7 @@ export function WorkflowStepProperties({
   agents,
   collections,
   connectors,
+  extractTemplates,
   onChange,
 }: WorkflowStepPropertiesProps) {
   if (!step) {
@@ -147,6 +154,20 @@ export function WorkflowStepProperties({
           <ConnectorSyncEditor
             step={step}
             connectors={connectors}
+            errors={validationErrors}
+            catalogEntry={catalogEntry}
+            onChange={onChange}
+          />
+        ) : null}
+
+        {step.type === "extract.run_template" ? (
+          <ExtractTemplateEditor
+            step={step}
+            stepIndex={stepIndex}
+            allSteps={allSteps}
+            collections={collections}
+            connectors={connectors}
+            templates={extractTemplates}
             errors={validationErrors}
             catalogEntry={catalogEntry}
             onChange={onChange}
@@ -434,6 +455,245 @@ function ConnectorSyncEditor({
   )
 }
 
+function ExtractTemplateEditor({
+  step,
+  stepIndex,
+  allSteps,
+  collections,
+  connectors,
+  templates,
+  errors,
+  catalogEntry,
+  onChange,
+}: {
+  step: WorkflowStepDefinition
+  stepIndex: number
+  allSteps: WorkflowStepDefinition[]
+  collections: WorkflowBuilderCollectionOption[]
+  connectors: WorkflowBuilderConnectorOption[]
+  templates: WorkflowBuilderExtractTemplateOption[]
+  errors: WorkflowValidationErrorItem[]
+  catalogEntry: WorkflowStepCatalogEntry
+  onChange: (step: WorkflowStepDefinition) => void
+}) {
+  const templateOptions = ensureOption(
+    templates,
+    String(step.config.template_id || ""),
+    "Current template"
+  )
+  const collectionOptions = ensureOption(
+    collections,
+    String(step.config.collection_id || ""),
+    "Current collection"
+  )
+  const connectorOptions = ensureOption(
+    connectors,
+    String(step.config.connector_id || ""),
+    "Current connector"
+  )
+  const previousStepOptions = ensureOption(
+    allSteps
+      .slice(0, Math.max(stepIndex, 0))
+      .map((item) => ({ id: item.key, name: item.name || item.key })),
+    String(step.config.input_step_key || ""),
+    "Current step"
+  )
+  const source = String(step.config.document_source || "previous_step")
+
+  return (
+    <div className="space-y-4">
+      <Field
+        label="Template"
+        htmlFor="workflow-extract-template"
+        error={fieldError(errors, "template_id")}
+      >
+        <Select
+          value={selectValue(step.config.template_id)}
+          onValueChange={(value) =>
+            updateConfig(step, "template_id", selectOutput(value), onChange)
+          }
+        >
+          <SelectTrigger id="workflow-extract-template">
+            <SelectValue placeholder="Select template" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={EMPTY_SELECT_VALUE}>Select template</SelectItem>
+            {templateOptions.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                {template.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+
+      <Field label="Documents" htmlFor="workflow-extract-source">
+        <Select
+          value={source}
+          onValueChange={(value) =>
+            onChange({
+              ...step,
+              config: normalizeExtractSourceConfig(
+                step.config,
+                value,
+                allSteps.slice(0, Math.max(stepIndex, 0))
+              ),
+            })
+          }
+        >
+          <SelectTrigger id="workflow-extract-source">
+            <SelectValue placeholder="Document source" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="previous_step">Previous step</SelectItem>
+            <SelectItem value="rag_filter">RAG collection</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+
+      {source === "previous_step" ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field
+            label="Input step"
+            htmlFor="workflow-extract-input-step"
+            error={fieldError(errors, "input_step_key")}
+          >
+            <Select
+              value={selectValue(step.config.input_step_key)}
+              onValueChange={(value) =>
+                updateConfig(step, "input_step_key", selectOutput(value), onChange)
+              }
+            >
+              <SelectTrigger id="workflow-extract-input-step">
+                <SelectValue placeholder="Select step" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_SELECT_VALUE}>Select step</SelectItem>
+                {previousStepOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Path" htmlFor="workflow-extract-path">
+            <Input
+              id="workflow-extract-path"
+              value={String(step.config.path || "items")}
+              onChange={(event) =>
+                updateConfig(step, "path", event.target.value, onChange)
+              }
+            />
+          </Field>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field
+            label="Collection"
+            htmlFor="workflow-extract-collection"
+            error={fieldError(errors, "collection_id")}
+          >
+            <Select
+              value={selectValue(step.config.collection_id)}
+              onValueChange={(value) =>
+                updateConfig(step, "collection_id", selectOutput(value), onChange)
+              }
+            >
+              <SelectTrigger id="workflow-extract-collection">
+                <SelectValue placeholder="Select collection" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_SELECT_VALUE}>Select collection</SelectItem>
+                {collectionOptions.map((collection) => (
+                  <SelectItem key={collection.id} value={collection.id}>
+                    {collection.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Connector" htmlFor="workflow-extract-connector">
+            <Select
+              value={selectValue(step.config.connector_id)}
+              onValueChange={(value) =>
+                updateConfig(step, "connector_id", selectOutput(value), onChange)
+              }
+            >
+              <SelectTrigger id="workflow-extract-connector">
+                <SelectValue placeholder="Any connector" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_SELECT_VALUE}>Any connector</SelectItem>
+                {connectorOptions.map((connector) => (
+                  <SelectItem key={connector.id} value={connector.id}>
+                    {connector.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Since" htmlFor="workflow-extract-since">
+          <Select
+            value={String(step.config.since || "last_successful_run")}
+            onValueChange={(value) => updateConfig(step, "since", value, onChange)}
+          >
+            <SelectTrigger id="workflow-extract-since">
+              <SelectValue placeholder="Since" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="last_successful_run">
+                Last successful run
+              </SelectItem>
+              <SelectItem value="all_matching">All matching</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Max documents" htmlFor="workflow-extract-max-documents">
+          <Input
+            id="workflow-extract-max-documents"
+            type="number"
+            min={1}
+            max={100}
+            value={inputNumber(step.config.max_documents ?? 25)}
+            onChange={(event) =>
+              updateOptionalNumberConfig(
+                step,
+                "max_documents",
+                event.target.value,
+                onChange
+              )
+            }
+          />
+        </Field>
+      </div>
+
+      <Field
+        label="Context JSON"
+        htmlFor="workflow-extract-context"
+        error={fieldError(errors, "context")}
+      >
+        <Textarea
+          id="workflow-extract-context"
+          value={formatContextValue(step.config.context)}
+          onChange={(event) =>
+            updateConfig(step, "context", event.target.value, onChange)
+          }
+          rows={4}
+        />
+      </Field>
+
+      {catalogEntry.supports_retry ? (
+        <RetryField step={step} onChange={onChange} />
+      ) : null}
+    </div>
+  )
+}
+
 function ConditionEditor({
   step,
   stepIndex,
@@ -645,6 +905,43 @@ function updateConfig(
       [key]: value,
     },
   })
+}
+
+function normalizeExtractSourceConfig(
+  config: Record<string, any>,
+  source: string,
+  allSteps: WorkflowStepDefinition[]
+): Record<string, any> {
+  if (source === "previous_step") {
+    const next = { ...config }
+    delete next.collection_id
+    delete next.connector_id
+    return {
+      ...next,
+      document_source: "previous_step",
+      input_step_key:
+        String(config.input_step_key || "") ||
+        allSteps[allSteps.length - 1]?.key ||
+        "",
+      path: String(config.path || "items"),
+    }
+  }
+
+  const next = { ...config }
+  delete next.input_step_key
+  delete next.path
+  return {
+    ...next,
+    document_source: "rag_filter",
+    collection_id: String(config.collection_id || ""),
+    since: String(config.since || "last_successful_run"),
+  }
+}
+
+function formatContextValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return ""
+  if (typeof value === "string") return value
+  return JSON.stringify(value, null, 2)
 }
 
 function updateOptionalNumberConfig(

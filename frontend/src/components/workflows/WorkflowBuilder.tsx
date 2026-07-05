@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 
 import { useToast } from "@/hooks/use-toast"
-import { agentApi, connectorApi, ragApi, workflowApi } from "@/lib/api-client"
+import { agentApi, connectorApi, extractApi, ragApi, workflowApi } from "@/lib/api-client"
 import type {
   WorkflowConcurrencyPolicy,
   WorkflowDefinitionDetail,
@@ -52,6 +52,7 @@ import {
   WorkflowBuilderAgentOption,
   WorkflowBuilderCollectionOption,
   WorkflowBuilderConnectorOption,
+  WorkflowBuilderExtractTemplateOption,
   WorkflowStepProperties,
 } from "@/components/workflows/WorkflowStepProperties"
 import { WorkflowValidationSummary } from "@/components/workflows/WorkflowValidationSummary"
@@ -87,6 +88,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
   const [agents, setAgents] = useState<WorkflowBuilderAgentOption[]>([])
   const [collections, setCollections] = useState<WorkflowBuilderCollectionOption[]>([])
   const [connectors, setConnectors] = useState<WorkflowBuilderConnectorOption[]>([])
+  const [extractTemplates, setExtractTemplates] = useState<WorkflowBuilderExtractTemplateOption[]>([])
   const [workflowIdState, setWorkflowIdState] = useState(workflowId || "")
   const [status, setStatus] = useState<WorkflowDefinitionStatus>("draft")
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null)
@@ -175,6 +177,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
         agentResponse,
         collectionResponse,
         connectorResponse,
+        extractTemplateResponse,
         workflowResponse,
         templateResponse,
       ] = await Promise.all([
@@ -186,6 +189,9 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
         connectorApi.listConnectors().catch(() => ({
           connectors: [],
         })),
+        extractApi.listTemplates().catch(() => ({
+          templates: [],
+        })),
         workflowPromise,
         templatePromise,
       ])
@@ -194,6 +200,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
       setAgents(normalizeAgents(agentResponse))
       setCollections(normalizeCollections(collectionResponse))
       setConnectors(normalizeConnectors(connectorResponse))
+      setExtractTemplates(normalizeExtractTemplates(extractTemplateResponse))
 
       if (workflowResponse?.workflow) {
         applyWorkflow(workflowResponse.workflow)
@@ -856,6 +863,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
               agents={agents}
               collections={collections}
               connectors={connectors}
+              extractTemplates={extractTemplates}
               onChange={updateSelectedStep}
             />
           </div>
@@ -1019,6 +1027,20 @@ function seedStepFromTemplate(
       },
     }
   }
+  if (step.type === "extract.run_template") {
+    return {
+      ...step,
+      config: {
+        ...step.config,
+        template_id: "",
+        collection_id:
+          step.config.document_source === "rag_filter"
+            ? ""
+            : step.config.collection_id,
+        max_documents: step.config.max_documents || 25,
+      },
+    }
+  }
   if (step.type === "notify.in_app") {
     return {
       ...step,
@@ -1118,6 +1140,18 @@ function defaultConfigForType(
       max_records: 50,
     }
   }
+  if (stepType === "extract.run_template") {
+    return {
+      template_id: "",
+      document_source: existingSteps.length ? "previous_step" : "rag_filter",
+      input_step_key: existingSteps[existingSteps.length - 1]?.key || "",
+      path: "items",
+      collection_id: "",
+      since: "last_successful_run",
+      max_documents: 25,
+      context: {},
+    }
+  }
   if (stepType === "condition.no_results_skip") {
     return {
       input_step_key: existingSteps[existingSteps.length - 1]?.key || "",
@@ -1143,6 +1177,7 @@ function nextStepKey(
     "rag.query": "query_context",
     "agent.run": "run_agent",
     "connector.sync": "sync_connector",
+    "extract.run_template": "run_extract",
     "condition.no_results_skip": "skip_if_empty",
     "notify.in_app": "notify_team",
   }
@@ -1207,6 +1242,20 @@ function normalizeConnectors(data: any): WorkflowBuilderConnectorOption[] {
       status: item.status,
     }))
     .filter((item: WorkflowBuilderConnectorOption) => item.id && item.name)
+}
+
+function normalizeExtractTemplates(data: any): WorkflowBuilderExtractTemplateOption[] {
+  const items = Array.isArray(data?.templates)
+    ? data.templates
+    : Array.isArray(data)
+      ? data
+      : []
+  return items
+    .map((item: any) => ({
+      id: String(item.id),
+      name: String(item.id || item.name || `Template ${item.id}`),
+    }))
+    .filter((item: WorkflowBuilderExtractTemplateOption) => item.id && item.name)
 }
 
 function parseTags(value: string): string[] {

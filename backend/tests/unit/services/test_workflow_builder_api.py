@@ -93,6 +93,23 @@ def _connector_authoring_definition(
     return authored
 
 
+def _weekly_authoring_definition(
+    definition: dict[str, Any], owner_user_id: int
+) -> dict[str, Any]:
+    authored = deepcopy(definition)
+    steps = {step["key"]: step for step in authored["steps"]}
+    steps["run_extract"]["config"]["template_id"] = "weekly"
+    steps["run_extract"]["config"]["collection_id"] = "1"
+    steps["notify_owner"]["config"]["recipients"] = [str(owner_user_id)]
+    authored["runtime"] = {
+        "concurrency_policy": "skip_if_running",
+        "timeout_seconds": 1800,
+        "budget_limit_cents": 100,
+        "redaction_policy": "default",
+    }
+    return authored
+
+
 @pytest.mark.asyncio
 async def test_builder_catalog_exposes_enabled_and_disabled_steps(
     builder_client: AsyncClient,
@@ -106,7 +123,7 @@ async def test_builder_catalog_exposes_enabled_and_disabled_steps(
     assert steps["agent.run"]["required_permissions"] == ["agent:execute"]
     assert steps["connector.sync"]["enabled"] is True
     assert steps["connector.sync"]["required_permissions"] == ["connectors:sync"]
-    assert steps["extract.run_template"]["enabled"] is False
+    assert steps["extract.run_template"]["enabled"] is True
 
 
 @pytest.mark.asyncio
@@ -165,14 +182,17 @@ async def test_builder_validation_reports_registry_errors(
             }
         ),
     )
-    disabled_response = await builder_client.post(
+    missing_extract_target_response = await builder_client.post(
         "/api-internal/v1/workflows/steps/validate",
         json=_definition_with_step(
             {
                 "key": "extract",
                 "type": "extract.run_template",
                 "name": "Extract",
-                "config": {"template_id": "template-1"},
+                "config": {
+                    "template_id": "template-1",
+                    "document_source": "rag_filter",
+                },
             }
         ),
     )
@@ -188,10 +208,10 @@ async def test_builder_validation_reports_registry_errors(
     assert unknown_error["path"] == "steps[0].type"
     assert unknown_error["code"] == "unknown_step_type"
 
-    disabled_error = disabled_response.json()["errors"][0]
-    assert disabled_response.json()["success"] is False
-    assert disabled_error["code"] == "disabled_step_type"
-    assert "Phase 6" in disabled_error["message"]
+    missing_extract_target_error = missing_extract_target_response.json()["errors"][0]
+    assert missing_extract_target_response.json()["success"] is False
+    assert missing_extract_target_error["code"] == "missing_step_config"
+    assert missing_extract_target_error["path"] == "steps[0].config.collection_id"
 
 
 @pytest.mark.asyncio
@@ -236,8 +256,12 @@ async def test_templates_expose_availability_and_raw_placeholder_publish_blocks(
         for error in validate_response.json()["errors"]
     )
     assert connector["available_for_authoring"] is True
-    assert weekly["available_for_authoring"] is False
-    assert "Phase 6" in weekly["unavailable_reason"]
+    assert weekly["available_for_authoring"] is True
+    assert weekly["required_placeholders"] == [
+        "template_id",
+        "collection_id",
+        "owner_user_id",
+    ]
     assert create_response.status_code == 201
     assert publish_response.status_code == 422
     publish_errors = publish_response.json()["detail"]["errors"]
@@ -320,6 +344,58 @@ async def test_connector_template_authoring_payload_publishes_enables_and_runs(
             "description": "Authoring test",
             "tags": ["connector", "agent"],
             "metadata": {"template_id": "connector-intake-triage"},
+            "definition": definition,
+        },
+    )
+    workflow_id = create_response.json()["workflow"]["id"]
+    publish_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/publish",
+        json={"reason": "authoring test"},
+    )
+    enable_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/enable",
+        json={"reason": "authoring test"},
+    )
+    run_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/runs",
+        json={},
+    )
+
+    assert validate_response.status_code == 200
+    assert validate_response.json()["success"] is True
+    assert create_response.status_code == 201
+    assert publish_response.status_code == 200
+    assert publish_response.json()["workflow"]["latest_version_number"] == 1
+    assert enable_response.status_code == 200
+    assert enable_response.json()["workflow"]["status"] == "active"
+    assert run_response.status_code == 201
+    assert run_response.json()["run"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_weekly_extract_template_authoring_payload_publishes_enables_and_runs(
+    builder_client: AsyncClient,
+    test_user,
+) -> None:
+    template_response = await builder_client.get(
+        "/api-internal/v1/workflows/templates/weekly-extraction-report"
+    )
+    definition = _weekly_authoring_definition(
+        template_response.json()["template"]["definition"],
+        int(test_user["id"]),
+    )
+
+    validate_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json=definition,
+    )
+    create_response = await builder_client.post(
+        "/api-internal/v1/workflows/",
+        json={
+            "name": "Weekly Extraction Report",
+            "description": "Authoring test",
+            "tags": ["extract", "schedule"],
+            "metadata": {"template_id": "weekly-extraction-report"},
             "definition": definition,
         },
     )

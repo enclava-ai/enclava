@@ -23,7 +23,7 @@ The first vertical slice is Nightly RAG Summary: a scheduled workflow that finds
 - [x] **Phase 3: Manual Execution Engine** - Implement persisted manual runs, ordered step execution, MVP step types, run detail, artifacts, retries, cancellation, budget checks, and redaction. (completed 2026-07-05)
 - [x] **Phase 4: Scheduler and Operations Console** - Add timezone-aware scheduling, due-run creation, idempotency, misfire/concurrency policy, operations console, schedule board, and health states. (completed 2026-07-05)
 - [x] **Phase 5: Builder, Templates, and Validation** - Build the typed step builder, step catalog forms, schedule preview validation, templates, draft/publish flow, and Nightly RAG Summary template. (completed 2026-07-05)
-- [ ] **Phase 6: Connector and Extract Integration** - Add connector sync and Extract template step types with artifact handling and module-specific run summaries.
+- [x] **Phase 6: Connector and Extract Integration** - Add connector sync and Extract template step types with artifact handling and module-specific run summaries. (completed 2026-07-05)
 - [ ] **Phase 7: Advanced Control Flow and Triggers** - Add only proven advanced controls: branches, approvals, pause/resume, and API/event trigger foundations.
 - [ ] **Phase 8: Hardening, Observability, and Release** - Add recovery, scale, retention, admin metrics, E2E/UAT coverage, docs, container rebuilds, and release smoke checks.
 
@@ -175,7 +175,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 06-02: Add Extract template step type, UI config, artifact views, and weekly report workflow.
+- [x] 06-02: Add Extract template step type, UI config, artifact views, and weekly report workflow. (completed 2026-07-05)
 
 ### Phase 7: Advanced Control Flow and Triggers
 
@@ -240,8 +240,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 2. Persistence, API, Permissions, and Audit | 3/3 | Complete | 2026-07-05 |
 | 3. Manual Execution Engine | 3/3 | Complete | 2026-07-05 |
 | 4. Scheduler and Operations Console | 3/3 | Complete | 2026-07-05 |
-| 5. Builder, Templates, and Validation | 1/3 | In Progress | - |
-| 6. Connector and Extract Integration | 0/2 | Planned | - |
+| 5. Builder, Templates, and Validation | 3/3 | Complete | 2026-07-05 |
+| 6. Connector and Extract Integration | 2/2 | Complete | 2026-07-05 |
 | 7. Advanced Control Flow and Triggers | 0/3 | Planned | - |
 | 8. Hardening, Observability, and Release | 0/3 | Planned | - |
 

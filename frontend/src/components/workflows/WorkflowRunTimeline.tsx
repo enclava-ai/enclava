@@ -254,6 +254,11 @@ function ArtifactList({ artifacts }: { artifacts: WorkflowArtifactSummary[] }) {
               <p className="text-xs text-muted-foreground">
                 {formatDate(artifact.created_at)}
               </p>
+              {artifact.data ? (
+                <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-background p-3 text-xs leading-5">
+                  {formatPayload(artifact.data)}
+                </pre>
+              ) : null}
             </div>
           ))
         ) : (
