@@ -110,6 +110,50 @@ def _branch_workflow_payload() -> dict[str, Any]:
     }
 
 
+def _approval_workflow_payload() -> dict[str, Any]:
+    return {
+        "name": "Approval execution workflow",
+        "definition": {
+            "runtime": {
+                "redaction_policy": "default",
+                "budget_limit_cents": 10,
+            },
+            "steps": [
+                {
+                    "key": "seed",
+                    "type": "agent.run",
+                    "name": "Seed",
+                    "config": {
+                        "agent_id": "agent-1",
+                        "prompt_template": "Seed {{ input.topic }}",
+                        "estimated_cost_cents": 1,
+                    },
+                },
+                {
+                    "key": "approval",
+                    "type": "approval.request",
+                    "name": "Approval",
+                    "config": {
+                        "title_template": "Approve seeded run",
+                        "body_template": "{{ seed.message }}",
+                        "allow_requester_approval": True,
+                    },
+                },
+                {
+                    "key": "summarize",
+                    "type": "agent.run",
+                    "name": "Summarize",
+                    "config": {
+                        "agent_id": "agent-1",
+                        "prompt_template": "Decision {{ approval.status }}",
+                        "estimated_cost_cents": 1,
+                    },
+                },
+            ],
+        },
+    }
+
+
 @pytest_asyncio.fixture
 async def workflow_run_client(test_db, test_user, monkeypatch):
     owner = _actor(
@@ -232,6 +276,55 @@ async def test_run_api_serializes_branch_outputs_and_skipped_steps(
     ]
     event_types = {event["event_type"] for event in run["events"]}
     assert {"branch_evaluated", "step_skipped"}.issubset(event_types)
+
+
+@pytest.mark.asyncio
+async def test_run_api_approves_and_rejects_paused_runs(
+    workflow_run_client,
+) -> None:
+    client, _, _ = workflow_run_client
+    workflow_id = await _create_published_workflow(client, _approval_workflow_payload())
+
+    create_response = await client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/runs",
+        json={"execute_now": True, "input_data": {"topic": "new docs"}},
+    )
+    paused = create_response.json()["run"]
+    approve_response = await client.post(
+        f"/api-internal/v1/workflows/runs/{paused['id']}/approve",
+        json={"comment": "continue"},
+    )
+
+    reject_seed_response = await client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/runs",
+        json={"execute_now": True, "input_data": {"topic": "other docs"}},
+    )
+    reject_paused = reject_seed_response.json()["run"]
+    reject_response = await client.post(
+        f"/api-internal/v1/workflows/runs/{reject_paused['id']}/reject",
+        json={"comment": "stop"},
+    )
+
+    assert create_response.status_code == 201
+    assert paused["status"] == "paused"
+    assert paused["approvals"][0]["status"] == "pending"
+    assert approve_response.status_code == 200
+    approved = approve_response.json()["run"]
+    assert approved["status"] == "succeeded"
+    assert approved["approvals"][0]["status"] == "approved"
+    assert (
+        approved["output_data"]["value"]["outputs"]["approval"]["status"] == "approved"
+    )
+
+    assert reject_response.status_code == 200
+    rejected = reject_response.json()["run"]
+    assert rejected["status"] == "skipped"
+    assert rejected["approvals"][0]["status"] == "rejected"
+    assert [(step["step_key"], step["status"]) for step in rejected["steps"]] == [
+        ("seed", "succeeded"),
+        ("approval", "succeeded"),
+        ("summarize", "skipped"),
+    ]
 
 
 @pytest.mark.asyncio

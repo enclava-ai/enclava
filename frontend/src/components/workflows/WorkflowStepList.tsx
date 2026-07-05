@@ -152,6 +152,9 @@ export function WorkflowStepList({
                     {step.type === "condition.branch" ? (
                       <span className="break-words">{branchMetadata(step)}</span>
                     ) : null}
+                    {step.type === "approval.request" ? (
+                      <span className="break-words">{approvalMetadata(step)}</span>
+                    ) : null}
                     {rowErrors.length > 0 ? (
                       <span className="font-medium text-danger-soft-foreground">
                         {rowErrors.length} validation
@@ -220,4 +223,12 @@ function branchTargetCount(value: unknown): number {
   return Array.isArray(value)
     ? value.filter((item) => typeof item === "string" && item).length
     : 0
+}
+
+function approvalMetadata(step: WorkflowStepDefinition): string {
+  const title = String(step.config.title_template || "Approval")
+  const approvers = Array.isArray(step.config.approver_user_ids)
+    ? step.config.approver_user_ids.length
+    : 0
+  return `${title} | ${approvers || "any"} approvers`
 }

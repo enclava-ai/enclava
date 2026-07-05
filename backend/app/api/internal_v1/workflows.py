@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_current_user
 from app.db.database import get_db
 from app.schemas.workflow import (
+    WorkflowApprovalAction,
     WorkflowDefinitionCreate,
     WorkflowDefinitionStatus,
     WorkflowDefinitionUpdate,
@@ -467,6 +468,73 @@ async def cancel_workflow_run(
             run_id,
             current_user,
             reason=(action.reason if action else None),
+        )
+        await db.commit()
+        return {"success": True, "run": run.model_dump(mode="json")}
+    except (
+        WorkflowRunNotFoundError,
+        WorkflowRunPermissionError,
+        WorkflowRunValidationError,
+        WorkflowRunConflictError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/runs/{run_id}/approve")
+async def approve_workflow_run(
+    run_id: str,
+    action: Optional[WorkflowApprovalAction] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Approve a paused workflow run and resume execution."""
+    try:
+        try:
+            run = await runtime_service.resolve_approval(
+                db,
+                run_id,
+                current_user,
+                approved=True,
+                comment=(action.comment if action else None),
+                worker_id=f"approval-user-{current_user.get('id')}",
+            )
+        except WorkflowStepExecutionError as exc:
+            await db.commit()
+            failed = await runtime_service.get_run_detail(db, run_id, current_user)
+            return {
+                "success": False,
+                "error": str(exc),
+                "run": failed.model_dump(mode="json"),
+            }
+        await db.commit()
+        return {"success": True, "run": run.model_dump(mode="json")}
+    except (
+        WorkflowRunNotFoundError,
+        WorkflowRunPermissionError,
+        WorkflowRunValidationError,
+        WorkflowRunConflictError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/runs/{run_id}/reject")
+async def reject_workflow_run(
+    run_id: str,
+    action: Optional[WorkflowApprovalAction] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Reject a paused workflow run and skip remaining steps."""
+    try:
+        run = await runtime_service.resolve_approval(
+            db,
+            run_id,
+            current_user,
+            approved=False,
+            comment=(action.comment if action else None),
+            worker_id=f"approval-user-{current_user.get('id')}",
         )
         await db.commit()
         return {"success": True, "run": run.model_dump(mode="json")}

@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.database import utc_now
 from app.models.workflow import (
+    WorkflowApproval,
     WorkflowArtifact,
     WorkflowDefinition,
     WorkflowEvent,
@@ -21,6 +22,8 @@ from app.models.workflow import (
     WorkflowVersion,
 )
 from app.schemas.workflow import (
+    WorkflowApprovalStatus,
+    WorkflowApprovalSummary,
     WorkflowArtifactSummary,
     WorkflowDefinitionDocument,
     WorkflowDefinitionStatus,
@@ -280,9 +283,29 @@ class WorkflowRuntimeService:
             raise WorkflowRunConflictError("only queued or running runs can execute")
 
         definition = WorkflowDefinitionDocument.model_validate(run.version.definition)
-        previous_outputs: dict[str, dict[str, Any]] = {}
-        targeted_skips: dict[str, dict[str, str]] = {}
-        for index, step in enumerate(definition.steps):
+        return await self._execute_steps(
+            db,
+            run,
+            definition,
+            previous_outputs={},
+            start_index=0,
+            targeted_skips={},
+            actor=actor,
+        )
+
+    async def _execute_steps(
+        self,
+        db: AsyncSession,
+        run: WorkflowRun,
+        definition: WorkflowDefinitionDocument,
+        *,
+        previous_outputs: dict[str, dict[str, Any]],
+        start_index: int,
+        targeted_skips: dict[str, dict[str, str]],
+        actor: Optional[Mapping[str, Any]],
+    ) -> WorkflowRunDetail:
+        """Execute an ordered definition slice from a stable step index."""
+        for index, step in enumerate(definition.steps[start_index:], start=start_index):
             if run.cancel_requested_at:
                 return await self._mark_run_cancelled(db, run, "Run cancelled")
 
@@ -301,6 +324,18 @@ class WorkflowRuntimeService:
                 db, run, definition, step, previous_outputs, actor
             )
             previous_outputs[step.key] = result.output_data
+            if result.pause_run:
+                return await self._pause_run_for_approval(
+                    db,
+                    run,
+                    definition,
+                    step,
+                    result,
+                    previous_outputs=previous_outputs,
+                    targeted_skips=targeted_skips,
+                    next_step_index=index + 1,
+                    actor=actor,
+                )
             for skip_step_key in result.skip_step_keys:
                 targeted_skips.setdefault(
                     skip_step_key,
@@ -426,6 +461,124 @@ class WorkflowRuntimeService:
         loaded = await self._get_run(db, run.id, actor=None)
         return self._to_detail(loaded)
 
+    async def resolve_approval(
+        self,
+        db: AsyncSession,
+        run_id: str,
+        actor: Mapping[str, Any],
+        *,
+        approved: bool,
+        comment: Optional[str] = None,
+        worker_id: str = "approval-api",
+    ) -> WorkflowRunDetail:
+        """Approve or reject the pending approval for a paused run."""
+        run = await self._get_run(db, run_id, actor=actor, for_update=True)
+        if WorkflowRunStatus(run.status) != WorkflowRunStatus.PAUSED:
+            raise WorkflowRunConflictError("only paused runs can resolve approval")
+
+        approval = _pending_approval(run)
+        if approval is None:
+            raise WorkflowRunConflictError("paused run has no pending approval")
+
+        self._require_approve(run, approval, actor)
+        definition = WorkflowDefinitionDocument.model_validate(run.version.definition)
+        pause_state = _pause_state(run)
+        next_step_index = int(pause_state.get("next_step_index") or 0)
+        previous_outputs = _coerce_outputs(pause_state.get("outputs"))
+        targeted_skips = _coerce_targeted_skips(pause_state.get("targeted_skips"))
+        resolved_output = {
+            "status": (
+                WorkflowApprovalStatus.APPROVED.value
+                if approved
+                else WorkflowApprovalStatus.REJECTED.value
+            ),
+            "approved": approved,
+            "approval_id": approval.id,
+            "step_key": approval.step_key,
+            "comment": comment,
+            "resolved_by_user_id": _actor_id(actor),
+        }
+        previous_outputs[approval.step_key] = resolved_output
+
+        await self._resolve_approval_record(
+            db,
+            run,
+            approval,
+            approved=approved,
+            comment=comment,
+            resolved_output=resolved_output,
+            actor=actor,
+        )
+
+        if approved:
+            now = utc_now()
+            run.status = WorkflowRunStatus.RUNNING.value
+            run.output_data = {
+                "resumed": True,
+                "approval_id": approval.id,
+                "approval_step_key": approval.step_key,
+                "outputs": previous_outputs,
+            }
+            run.locked_by = worker_id
+            run.lock_expires_at = now + timedelta(seconds=300)
+            run.updated_at = now
+            await self.append_event(
+                db,
+                run,
+                "run_resumed",
+                "Run resumed after approval",
+                actor=actor,
+                data={
+                    "approval_id": approval.id,
+                    "step_key": approval.step_key,
+                    "next_step_index": next_step_index,
+                },
+            )
+            await self._record_audit(
+                db,
+                actor,
+                "workflow_run_approval_approved",
+                run,
+                details={"approval_id": approval.id, "comment": comment},
+            )
+            await db.flush()
+            return await self._execute_steps(
+                db,
+                run,
+                definition,
+                previous_outputs=previous_outputs,
+                start_index=next_step_index,
+                targeted_skips=targeted_skips,
+                actor=None,
+            )
+
+        await self._mark_remaining_steps_skipped(
+            db,
+            run,
+            definition.steps[next_step_index:],
+            reason=comment or f"Approval rejected at step {approval.step_key}",
+            source_step_key=approval.step_key,
+        )
+        await self._record_audit(
+            db,
+            actor,
+            "workflow_run_approval_rejected",
+            run,
+            details={"approval_id": approval.id, "comment": comment},
+        )
+        return await self.complete_run(
+            db,
+            run,
+            output_data={
+                "skipped": True,
+                "approval_id": approval.id,
+                "approval_step_key": approval.step_key,
+                "approval_status": WorkflowApprovalStatus.REJECTED.value,
+                "outputs": previous_outputs,
+            },
+            status=WorkflowRunStatus.SKIPPED,
+        )
+
     async def fail_run(
         self, db: AsyncSession, run: WorkflowRun, *, error: str
     ) -> WorkflowRunDetail:
@@ -472,6 +625,129 @@ class WorkflowRuntimeService:
         )
         await db.flush()
         return run
+
+    async def _pause_run_for_approval(
+        self,
+        db: AsyncSession,
+        run: WorkflowRun,
+        definition: WorkflowDefinitionDocument,
+        step: Any,
+        result: Any,
+        *,
+        previous_outputs: dict[str, dict[str, Any]],
+        targeted_skips: dict[str, dict[str, str]],
+        next_step_index: int,
+        actor: Optional[Mapping[str, Any]],
+    ) -> WorkflowRunDetail:
+        request = result.approval_request
+        if request is None:
+            raise WorkflowRunValidationError(
+                "approval pause requested without approval metadata"
+            )
+
+        now = utc_now()
+        approval = WorkflowApproval(
+            workflow_id=run.workflow_id,
+            run_id=run.id,
+            step_run_id=result.step_run_id,
+            step_key=step.key,
+            status=WorkflowApprovalStatus.PENDING.value,
+            title=request.title,
+            body=request.body,
+            approver_user_ids=request.approver_user_ids,
+            requested_by_user_id=_actor_id(actor or {}) or run.requested_by_user_id,
+            approval_metadata={
+                **(request.metadata or {}),
+                "allow_requester_approval": request.allow_requester_approval,
+                "next_step_index": next_step_index,
+                "total_steps": len(definition.steps),
+            },
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(approval)
+        await db.flush()
+
+        run.status = WorkflowRunStatus.PAUSED.value
+        run.output_data = {
+            "paused": True,
+            "approval_id": approval.id,
+            "approval_step_key": step.key,
+            "next_step_index": next_step_index,
+            "outputs": previous_outputs,
+            "targeted_skips": targeted_skips,
+        }
+        run.locked_by = None
+        run.lock_expires_at = None
+        run.updated_at = now
+        await self.append_event(
+            db,
+            run,
+            "approval_requested",
+            f"Approval requested: {request.title}",
+            actor=actor,
+            data={
+                "approval_id": approval.id,
+                "step_key": step.key,
+                "approver_user_ids": request.approver_user_ids,
+            },
+        )
+        await self.append_event(
+            db,
+            run,
+            "run_paused",
+            "Run paused for approval",
+            actor=actor,
+            data={"approval_id": approval.id, "step_key": step.key},
+        )
+        await db.flush()
+        loaded = await self._get_run(db, run.id, actor=None)
+        return self._to_detail(loaded)
+
+    async def _resolve_approval_record(
+        self,
+        db: AsyncSession,
+        run: WorkflowRun,
+        approval: WorkflowApproval,
+        *,
+        approved: bool,
+        comment: Optional[str],
+        resolved_output: dict[str, Any],
+        actor: Mapping[str, Any],
+    ) -> None:
+        now = utc_now()
+        approval.status = (
+            WorkflowApprovalStatus.APPROVED.value
+            if approved
+            else WorkflowApprovalStatus.REJECTED.value
+        )
+        approval.resolved_by_user_id = _actor_id(actor)
+        approval.resolution_comment = comment
+        approval.resolved_at = now
+        approval.updated_at = now
+        step_run = _step_run_for_approval(run, approval)
+        if step_run is not None:
+            step_run.status = WorkflowStepRunStatus.SUCCEEDED.value
+            step_run.output_data = resolved_output
+            step_run.completed_at = now
+            step_run.updated_at = now
+            step_run.duration_ms = _duration_ms(step_run.started_at, now)
+        event_type = "approval_approved" if approved else "approval_rejected"
+        await self.append_event(
+            db,
+            run,
+            event_type,
+            "Approval approved" if approved else "Approval rejected",
+            actor=actor,
+            step_run=step_run,
+            data={
+                "approval_id": approval.id,
+                "step_key": approval.step_key,
+                "comment": comment,
+                "resolved_by_user_id": _actor_id(actor),
+            },
+        )
+        await db.flush()
 
     async def _execute_step_with_retries(
         self,
@@ -542,6 +818,7 @@ class WorkflowRuntimeService:
                 raise WorkflowStepExecutionError(last_error) from exc
 
             await self._complete_step_run(db, run, step_run, result)
+            result.step_run_id = step_run.id
             return result
 
         raise WorkflowStepExecutionError(last_error or "workflow step failed")
@@ -745,6 +1022,12 @@ class WorkflowRuntimeService:
             run.completed_at = now
             event_type = "run_cancelled"
             message = "Queued run cancelled"
+        elif status == WorkflowRunStatus.PAUSED:
+            run.status = WorkflowRunStatus.CANCELLED.value
+            run.completed_at = now
+            event_type = "run_cancelled"
+            message = "Paused run cancelled"
+            self._cancel_pending_approvals(run, actor, reason)
         else:
             event_type = "run_cancel_requested"
             message = "Run cancellation requested"
@@ -853,6 +1136,7 @@ class WorkflowRuntimeService:
                 ),
                 selectinload(WorkflowRun.artifacts),
                 selectinload(WorkflowRun.events),
+                selectinload(WorkflowRun.approvals),
             )
             .where(WorkflowRun.id == run_id)
             .execution_options(populate_existing=True)
@@ -887,6 +1171,52 @@ class WorkflowRuntimeService:
         if _has_permission(actor, "workflow.manage"):
             return
         raise WorkflowRunPermissionError("workflow manage permission required")
+
+    def _require_approve(
+        self,
+        run: WorkflowRun,
+        approval: WorkflowApproval,
+        actor: Mapping[str, Any],
+    ) -> None:
+        actor_id = _actor_id(actor)
+        workflow = run.workflow
+        if _is_admin(actor) or workflow.owner_user_id == actor_id:
+            return
+        if _has_permission(actor, "workflow.manage"):
+            return
+
+        allow_requester_approval = bool(
+            (approval.approval_metadata or {}).get("allow_requester_approval")
+        )
+        if (
+            actor_id is not None
+            and actor_id == run.requested_by_user_id
+            and not allow_requester_approval
+        ):
+            raise WorkflowRunPermissionError(
+                "requester self-approval is not allowed for this approval"
+            )
+        if _has_permission(actor, "workflow.approve"):
+            return
+        if actor_id is not None and actor_id in _approval_user_ids(approval):
+            return
+        raise WorkflowRunPermissionError("workflow approval permission required")
+
+    def _cancel_pending_approvals(
+        self,
+        run: WorkflowRun,
+        actor: Mapping[str, Any],
+        reason: Optional[str],
+    ) -> None:
+        now = utc_now()
+        for approval in _loaded_collection(run, "approvals"):
+            if approval.status != WorkflowApprovalStatus.PENDING.value:
+                continue
+            approval.status = WorkflowApprovalStatus.CANCELLED.value
+            approval.resolved_by_user_id = _actor_id(actor)
+            approval.resolution_comment = reason
+            approval.resolved_at = now
+            approval.updated_at = now
 
     async def _record_audit(
         self,
@@ -962,6 +1292,12 @@ class WorkflowRuntimeService:
                 _loaded_collection(run, "events"), key=lambda item: item.created_at
             )
         ]
+        approvals = [
+            self._approval_summary(approval)
+            for approval in sorted(
+                _loaded_collection(run, "approvals"), key=lambda item: item.created_at
+            )
+        ]
         return WorkflowRunDetail(
             **summary.model_dump(),
             trigger_id=run.trigger_id,
@@ -977,6 +1313,7 @@ class WorkflowRuntimeService:
             steps=steps,
             artifacts=artifacts,
             events=events,
+            approvals=approvals,
         )
 
     def _step_summary(
@@ -1017,6 +1354,26 @@ class WorkflowRuntimeService:
             created_at=artifact.created_at,
         )
 
+    def _approval_summary(self, approval: WorkflowApproval) -> WorkflowApprovalSummary:
+        return WorkflowApprovalSummary(
+            id=approval.id,
+            workflow_id=approval.workflow_id,
+            run_id=approval.run_id,
+            step_run_id=approval.step_run_id,
+            step_key=approval.step_key,
+            status=WorkflowApprovalStatus(approval.status),
+            title=approval.title,
+            body=approval.body,
+            approver_user_ids=_approval_user_ids(approval),
+            requested_by_user_id=approval.requested_by_user_id,
+            resolved_by_user_id=approval.resolved_by_user_id,
+            resolution_comment=approval.resolution_comment,
+            metadata=approval.approval_metadata or {},
+            created_at=approval.created_at,
+            updated_at=approval.updated_at,
+            resolved_at=approval.resolved_at,
+        )
+
 
 def _actor_id(actor: Mapping[str, Any]) -> Optional[int]:
     value = actor.get("id")
@@ -1024,6 +1381,76 @@ def _actor_id(actor: Mapping[str, Any]) -> Optional[int]:
         return int(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _pending_approval(run: WorkflowRun) -> Optional[WorkflowApproval]:
+    pending = [
+        approval
+        for approval in _loaded_collection(run, "approvals")
+        if approval.status == WorkflowApprovalStatus.PENDING.value
+    ]
+    if not pending:
+        return None
+    return sorted(pending, key=lambda item: item.created_at)[0]
+
+
+def _approval_user_ids(approval: WorkflowApproval) -> list[int]:
+    values = approval.approver_user_ids or []
+    user_ids: list[int] = []
+    if not isinstance(values, list):
+        return user_ids
+    for value in values:
+        try:
+            user_ids.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return user_ids
+
+
+def _pause_state(run: WorkflowRun) -> dict[str, Any]:
+    output = run.output_data or {}
+    return output if isinstance(output, dict) else {}
+
+
+def _coerce_outputs(value: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(value, dict):
+        return {}
+    outputs: dict[str, dict[str, Any]] = {}
+    for key, output in value.items():
+        if isinstance(key, str) and isinstance(output, dict):
+            outputs[key] = output
+    return outputs
+
+
+def _coerce_targeted_skips(value: Any) -> dict[str, dict[str, str]]:
+    if not isinstance(value, dict):
+        return {}
+    targeted_skips: dict[str, dict[str, str]] = {}
+    for step_key, skip_info in value.items():
+        if not isinstance(step_key, str) or not isinstance(skip_info, dict):
+            continue
+        reason = skip_info.get("reason")
+        source_step_key = skip_info.get("source_step_key")
+        if isinstance(reason, str) and isinstance(source_step_key, str):
+            targeted_skips[step_key] = {
+                "reason": reason,
+                "source_step_key": source_step_key,
+            }
+    return targeted_skips
+
+
+def _step_run_for_approval(
+    run: WorkflowRun, approval: WorkflowApproval
+) -> Optional[WorkflowStepRun]:
+    step_runs = _loaded_collection(run, "step_runs")
+    if approval.step_run_id:
+        for step_run in step_runs:
+            if step_run.id == approval.step_run_id:
+                return step_run
+    candidates = [item for item in step_runs if item.step_key == approval.step_key]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item.created_at)[-1]
 
 
 def _is_admin(actor: Mapping[str, Any]) -> bool:

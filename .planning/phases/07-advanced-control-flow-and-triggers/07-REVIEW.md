@@ -2,7 +2,7 @@
 status: clean
 phase: 07-advanced-control-flow-and-triggers
 depth: standard
-files_reviewed: 11
+files_reviewed: 29
 findings:
   critical: 0
   warning: 0
@@ -49,3 +49,46 @@ No blocking bugs, security issues, or code quality findings remain at standard d
 - Backend formatting and import checks passed.
 - Frontend lint, color guard, plumbing guard, and production build passed.
 - Live containers were rebuilt with `sudo docker compose up -d --build`, nginx was force-recreated, and live health/page/authenticated branch smokes passed after the final UI change.
+
+## Plan 07-02 Approval Pause/Resume Review
+
+### Additional Scope
+
+- `backend/alembic/versions/036_add_workflow_approvals.py`
+- `backend/app/models/workflow.py`
+- `backend/app/schemas/workflow.py`
+- `backend/app/services/workflows/registry.py`
+- `backend/app/services/workflows/service.py`
+- `backend/app/services/workflows/steps.py`
+- `backend/app/services/workflows/runtime.py`
+- `backend/app/api/internal_v1/workflows.py`
+- `backend/tests/unit/services/test_workflow_approval_steps.py`
+- `backend/tests/unit/services/test_workflow_builder_api.py`
+- `backend/tests/unit/services/test_workflow_run_api.py`
+- `frontend/src/app/api/workflows/runs/[runId]/route.ts`
+- `frontend/src/app/workflows/runs/[runId]/page.tsx`
+- `frontend/src/components/workflows/WorkflowBuilder.tsx`
+- `frontend/src/components/workflows/WorkflowRunTimeline.tsx`
+- `frontend/src/components/workflows/WorkflowStepList.tsx`
+- `frontend/src/components/workflows/WorkflowStepProperties.tsx`
+- `frontend/src/lib/api-client.ts`
+
+### Result
+
+No blocking bugs, security issues, or code quality findings remain at standard depth.
+
+### Review Notes
+
+- Approval resolution is guarded by workflow ownership/admin, `workflow.manage`, `workflow.approve`, or explicit approver assignment.
+- Approval records are durable and serialized directly on run detail, avoiding event-scraping in the UI.
+- Approve resumes from a stored next-step index with persisted prior outputs, preventing earlier steps from re-running.
+- Reject completes the workflow as `skipped` and persists skipped step rows for remaining ordered steps.
+- Paused-run cancellation cancels pending approvals so stale approvals are not actionable.
+- Review found one edge case: branch-targeted skips selected before an approval pause were initially in-memory only. Runtime now persists targeted skip state in pause metadata, and `test_approval_resume_preserves_prior_branch_skips` covers the interaction.
+
+### Verification Considered
+
+- Backend approval, runtime, run API, and builder API tests passed: 25 tests.
+- Backend formatting and import checks passed.
+- Frontend lint, color guard, plumbing guard, and production build passed.
+- Live containers were rebuilt with `sudo docker compose up -d --build`, nginx was force-recreated, and live health/page/authenticated approval smokes passed.

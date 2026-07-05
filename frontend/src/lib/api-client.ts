@@ -453,6 +453,12 @@ export type WorkflowStepRunStatus =
   | 'retrying'
   | 'cancelled'
 
+export type WorkflowApprovalStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled'
+
 export type WorkflowConcurrencyPolicy =
   | 'skip_if_running'
   | 'queue_after_current'
@@ -663,6 +669,25 @@ export interface WorkflowEventSummary {
   created_at?: string | null
 }
 
+export interface WorkflowApprovalSummary {
+  id: string
+  workflow_id: string
+  run_id: string
+  step_run_id?: string | null
+  step_key: string
+  status: WorkflowApprovalStatus
+  title: string
+  body?: string | null
+  approver_user_ids: number[]
+  requested_by_user_id?: number | null
+  resolved_by_user_id?: number | null
+  resolution_comment?: string | null
+  metadata: Record<string, any>
+  created_at?: string | null
+  updated_at?: string | null
+  resolved_at?: string | null
+}
+
 export interface WorkflowRunSummary {
   id: string
   workflow_id: string
@@ -865,6 +890,7 @@ export interface WorkflowRunDetail {
   steps: WorkflowStepRunDetail[]
   artifacts: WorkflowArtifactSummary[]
   events: WorkflowEventSummary[]
+  approvals: WorkflowApprovalSummary[]
 }
 
 export interface WorkflowRunResponse {
@@ -1003,6 +1029,18 @@ export const workflowRunApi = {
   executeRun(runId: string) {
     return apiClient.post<WorkflowRunResponse>(`/api/workflows/runs/${encodeURIComponent(runId)}`, {
       action: 'execute',
+    })
+  },
+  approveRun(runId: string, comment?: string) {
+    return apiClient.post<WorkflowRunResponse>(`/api/workflows/runs/${encodeURIComponent(runId)}`, {
+      action: 'approve',
+      comment,
+    })
+  },
+  rejectRun(runId: string, comment?: string) {
+    return apiClient.post<WorkflowRunResponse>(`/api/workflows/runs/${encodeURIComponent(runId)}`, {
+      action: 'reject',
+      comment,
     })
   },
 }

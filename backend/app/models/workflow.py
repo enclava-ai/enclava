@@ -91,6 +91,7 @@ class WorkflowDefinition(Base):
     )
     runs = relationship("WorkflowRun", back_populates="workflow")
     events = relationship("WorkflowEvent", back_populates="workflow")
+    approvals = relationship("WorkflowApproval", back_populates="workflow")
 
     def to_dict(self) -> dict:
         return {
@@ -311,6 +312,9 @@ class WorkflowRun(Base):
     events = relationship(
         "WorkflowEvent", back_populates="run", cascade="all, delete-orphan"
     )
+    approvals = relationship(
+        "WorkflowApproval", back_populates="run", cascade="all, delete-orphan"
+    )
 
 
 class WorkflowStepRun(Base):
@@ -345,6 +349,59 @@ class WorkflowStepRun(Base):
     run = relationship("WorkflowRun", back_populates="step_runs")
     artifacts = relationship("WorkflowArtifact", back_populates="step_run")
     events = relationship("WorkflowEvent", back_populates="step_run")
+    approvals = relationship("WorkflowApproval", back_populates="step_run")
+
+
+class WorkflowApproval(Base):
+    """Human approval request attached to a paused workflow run."""
+
+    __tablename__ = "workflow_approvals"
+    __table_args__ = (
+        Index("ix_workflow_approvals_run_status", "run_id", "status"),
+        Index("ix_workflow_approvals_workflow_status", "workflow_id", "status"),
+    )
+
+    id = Column(String, primary_key=True, default=_uuid)
+    workflow_id = Column(
+        String,
+        ForeignKey("workflow_definitions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    run_id = Column(
+        String,
+        ForeignKey("workflow_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    step_run_id = Column(
+        String,
+        ForeignKey("workflow_step_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    step_key = Column(String(80), nullable=False)
+    status = Column(String(32), nullable=False, default="pending", index=True)
+    title = Column(String(255), nullable=False)
+    body = Column(Text, nullable=True)
+    approver_user_ids = Column(JSON, nullable=False, default=list)
+    requested_by_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    resolved_by_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    resolution_comment = Column(Text, nullable=True)
+    approval_metadata = Column("metadata", JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=utc_now, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    resolved_at = Column(DateTime, nullable=True)
+
+    workflow = relationship("WorkflowDefinition", back_populates="approvals")
+    run = relationship("WorkflowRun", back_populates="approvals")
+    step_run = relationship("WorkflowStepRun", back_populates="approvals")
+    requested_by = relationship("User", foreign_keys=[requested_by_user_id])
+    resolved_by = relationship("User", foreign_keys=[resolved_by_user_id])
 
 
 class WorkflowArtifact(Base):

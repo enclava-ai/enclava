@@ -512,6 +512,8 @@ class WorkflowService:
                 errors.extend(
                     _branch_step_validation_errors(step, index, definition.steps)
                 )
+            if step.type == "approval.request":
+                errors.extend(_approval_step_validation_errors(step, index))
         return errors
 
     def _trigger_for_version(
@@ -924,6 +926,57 @@ def _branch_step_validation_errors(
                     target_path,
                     f'Branch "{step.key}" references an earlier step',
                 )
+    return errors
+
+
+def _approval_step_validation_errors(
+    step: Any, step_index: int
+) -> list[WorkflowValidationErrorItem]:
+    errors: list[WorkflowValidationErrorItem] = []
+    if getattr(step.retry, "max_attempts", 1) != 1:
+        errors.append(
+            WorkflowValidationErrorItem(
+                path=f"steps[{step_index}].retry.max_attempts",
+                message="approval.request steps do not support retry",
+                code="invalid_step_config",
+                step_key=step.key,
+                step_index=step_index,
+            )
+        )
+
+    approver_user_ids = step.config.get("approver_user_ids", [])
+    if approver_user_ids in (None, ""):
+        return errors
+    if not isinstance(approver_user_ids, list):
+        _append_invalid_config_error(
+            errors,
+            step,
+            step_index,
+            "approver_user_ids",
+            "approval.request approver_user_ids must be an array of user ids",
+        )
+        return errors
+
+    for index, user_id in enumerate(approver_user_ids):
+        try:
+            parsed = int(user_id)
+        except (TypeError, ValueError):
+            _append_invalid_config_error(
+                errors,
+                step,
+                step_index,
+                f"approver_user_ids[{index}]",
+                "approval.request approver_user_ids must contain integer user ids",
+            )
+            continue
+        if parsed <= 0:
+            _append_invalid_config_error(
+                errors,
+                step,
+                step_index,
+                f"approver_user_ids[{index}]",
+                "approval.request approver_user_ids must contain positive user ids",
+            )
     return errors
 
 

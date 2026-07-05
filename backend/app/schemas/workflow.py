@@ -71,6 +71,15 @@ class WorkflowStepRunStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class WorkflowApprovalStatus(str, Enum):
+    """Durable approval request state."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+
 class WorkflowConcurrencyPolicy(str, Enum):
     """Controls what happens when a workflow is already running."""
 
@@ -453,6 +462,12 @@ class WorkflowRunAction(BaseModel):
     reason: Optional[str] = Field(default=None, max_length=1000)
 
 
+class WorkflowApprovalAction(BaseModel):
+    """Optional metadata for approval resolution actions."""
+
+    comment: Optional[str] = Field(default=None, max_length=1000)
+
+
 class WorkflowRedactedPayload(BaseModel):
     """Input/output payload wrapper that records redaction state."""
 
@@ -484,6 +499,27 @@ class WorkflowArtifactSummary(BaseModel):
     storage_uri: Optional[str] = None
     redaction_policy: WorkflowRedactionPolicy = WorkflowRedactionPolicy.DEFAULT
     created_at: Optional[datetime] = None
+
+
+class WorkflowApprovalSummary(BaseModel):
+    """Workflow approval request shown in run detail."""
+
+    id: str
+    workflow_id: str
+    run_id: str
+    step_run_id: Optional[str] = None
+    step_key: str
+    status: WorkflowApprovalStatus
+    title: str
+    body: Optional[str] = None
+    approver_user_ids: List[int] = Field(default_factory=list)
+    requested_by_user_id: Optional[int] = None
+    resolved_by_user_id: Optional[int] = None
+    resolution_comment: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
 
 
 class WorkflowStepRunDetail(BaseModel):
@@ -657,3 +693,4 @@ class WorkflowRunDetail(WorkflowRunSummary):
     steps: List[WorkflowStepRunDetail] = Field(default_factory=list)
     artifacts: List[WorkflowArtifactSummary] = Field(default_factory=list)
     events: List[WorkflowEventSummary] = Field(default_factory=list)
+    approvals: List[WorkflowApprovalSummary] = Field(default_factory=list)

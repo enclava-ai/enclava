@@ -197,7 +197,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 07-02: Add approval request step, pause/resume run state, approval permissions, and audit.
+- [x] 07-02: Add approval request step, pause/resume run state, approval permissions, and audit. (completed 2026-07-05)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

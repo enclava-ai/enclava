@@ -123,6 +123,9 @@ async def test_builder_catalog_exposes_enabled_and_disabled_steps(
     assert steps["agent.run"]["required_permissions"] == ["agent:execute"]
     assert steps["condition.branch"]["enabled"] is True
     assert steps["condition.branch"]["supports_retry"] is False
+    assert steps["approval.request"]["enabled"] is True
+    assert steps["approval.request"]["supports_retry"] is False
+    assert steps["approval.request"]["required_permissions"] == ["workflow.approve"]
     assert steps["connector.sync"]["enabled"] is True
     assert steps["connector.sync"]["required_permissions"] == ["connectors:sync"]
     assert steps["extract.run_template"]["enabled"] is True
@@ -278,6 +281,63 @@ async def test_builder_validation_reports_branch_errors(
         and error["code"] == "invalid_step_config"
         for error in errors
     )
+
+
+@pytest.mark.asyncio
+async def test_builder_validation_reports_approval_errors(
+    builder_client: AsyncClient,
+) -> None:
+    base_definition = {
+        "trigger": {"type": "manual"},
+        "steps": [
+            {
+                "key": "approval",
+                "type": "approval.request",
+                "name": "Approval",
+                "config": {
+                    "title_template": "Approve run",
+                    "body_template": "Review before continuing.",
+                    "approver_user_ids": [1],
+                },
+            },
+            {
+                "key": "notify",
+                "type": "notify.in_app",
+                "name": "Notify",
+                "config": {
+                    "recipients": ["1"],
+                    "title_template": "Workflow update",
+                },
+            },
+        ],
+    }
+    valid_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json=base_definition,
+    )
+    invalid_definition = deepcopy(base_definition)
+    invalid_definition["steps"][0]["config"] = {
+        "body_template": "Missing title",
+        "approver_user_ids": ["not-a-user"],
+    }
+    invalid_definition["steps"][0]["retry"] = {"max_attempts": 2}
+    invalid_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json=invalid_definition,
+    )
+
+    assert valid_response.status_code == 200
+    assert valid_response.json()["success"] is True
+    assert invalid_response.status_code == 200
+    assert invalid_response.json()["success"] is False
+    errors = invalid_response.json()["errors"]
+    assert any(error["path"] == "steps[0].config.title_template" for error in errors)
+    assert any(
+        error["path"] == "steps[0].config.approver_user_ids[0]"
+        and error["code"] == "invalid_step_config"
+        for error in errors
+    )
+    assert any(error["path"] == "steps[0].retry.max_attempts" for error in errors)
 
 
 @pytest.mark.asyncio

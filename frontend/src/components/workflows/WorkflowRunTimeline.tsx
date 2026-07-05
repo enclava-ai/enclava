@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import {
+  WorkflowApprovalSummary,
   WorkflowArtifactSummary,
   WorkflowEventSummary,
   WorkflowRedactedPayload,
@@ -46,6 +47,8 @@ export function WorkflowRunTimeline({ run }: WorkflowRunTimelineProps) {
         />
         <Metric label="Actual" value={formatCents(run.actual_cost_cents)} icon={Coins} />
       </section>
+
+      {run.approvals.length ? <ApprovalList approvals={run.approvals} /> : null}
 
       {run.error ? (
         <section className="rounded-lg border border-danger-border bg-danger-soft p-4 text-sm text-danger-soft-foreground">
@@ -87,6 +90,53 @@ export function WorkflowRunTimeline({ run }: WorkflowRunTimelineProps) {
         <ArtifactList artifacts={run.artifacts} />
       </section>
     </div>
+  )
+}
+
+function ApprovalList({ approvals }: { approvals: WorkflowApprovalSummary[] }) {
+  return (
+    <section className="rounded-lg border bg-card">
+      <div className="flex items-center justify-between gap-3 border-b p-4">
+        <h2 className="text-base font-semibold">Approvals</h2>
+        <StatusBadge status={approvalTone(approvals[approvals.length - 1].status)}>
+          {approvals[approvals.length - 1].status}
+        </StatusBadge>
+      </div>
+      <div className="divide-y">
+        {approvals.map((approval) => (
+          <div key={approval.id} className="space-y-3 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="min-w-0 break-words text-sm font-semibold">
+                {approval.title}
+              </h3>
+              <StatusBadge status={approvalTone(approval.status)} showIcon={false}>
+                {approval.status}
+              </StatusBadge>
+            </div>
+            {approval.body ? (
+              <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                {approval.body}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <span>{approval.step_key}</span>
+              <span>{formatDate(approval.created_at)}</span>
+              {approval.resolved_at ? (
+                <span>{formatDate(approval.resolved_at)}</span>
+              ) : null}
+              {approval.resolved_by_user_id ? (
+                <span>User {approval.resolved_by_user_id}</span>
+              ) : null}
+            </div>
+            {approval.resolution_comment ? (
+              <p className="rounded-md border bg-background p-2 text-xs">
+                {approval.resolution_comment}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -310,6 +360,13 @@ function eventTone(severity: string): StatusBadgeStatus {
   if (severity === "error" || severity === "critical") return "danger"
   if (severity === "warning") return "warning"
   if (severity === "info") return "info"
+  return "neutral"
+}
+
+function approvalTone(status: string): StatusBadgeStatus {
+  if (status === "approved") return "success"
+  if (status === "pending") return "warning"
+  if (status === "rejected" || status === "cancelled") return "danger"
   return "neutral"
 }
 

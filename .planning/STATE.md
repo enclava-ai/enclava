@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 Plan 07-01 completed; ready to plan approval request step
-last_updated: "2026-07-05T22:47:31.000Z"
-last_activity: 2026-07-05 - Completed Phase 7 Plan 07-01 branch semantics
+stopped_at: Phase 7 Plan 07-02 completed; ready to plan API/event trigger foundations
+last_updated: "2026-07-05T23:10:00.000Z"
+last_activity: 2026-07-05 - Completed Phase 7 Plan 07-02 approval pause/resume semantics
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 22
-  completed_plans: 17
-  percent: 77
+  completed_plans: 18
+  percent: 82
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 ## Current Position
 
 Phase: 7 (Advanced Control Flow and Triggers) — IN PROGRESS
-Plan: 07-02 (2 of 3)
-Status: Ready to plan Phase 7 Plan 07-02
-Last activity: 2026-07-05 - Completed Phase 7 Plan 07-01 branch semantics
+Plan: 07-03 (3 of 3)
+Status: Ready to plan Phase 7 Plan 07-03
+Last activity: 2026-07-05 - Completed Phase 7 Plan 07-02 approval pause/resume semantics
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-07-05 - Completed Phase 7 Plan 07-01 branch semantics
 
 - Phases planned: 8
 - Plans planned: 22
-- Plans completed: 16
+- Plans completed: 18
 
 ## Accumulated Context
 
@@ -75,10 +75,14 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 6]: Connector sync workflows expose newly indexed records without credentials and keep transaction ownership in workflow runtime.
 - [Phase 6]: Extract template workflow runs persist normal Extract jobs/results and expose validation warnings/errors in workflow artifacts.
 - [Phase 6]: Weekly Extraction Report uses RAG-backed document selection and `last_successful_run` indexed-at cutoffs.
+- [Phase 7]: Branch-targeted skips must be persisted across approval pause/resume boundaries so prior branch decisions are not lost.
+- [Phase 7]: Approval request steps are durable workflow pause points with first-class approval records serialized on run detail.
+- [Phase 7]: Approving a paused run resumes from the stored next-step index; rejecting a paused run skips remaining ordered steps and completes the run as skipped.
+- [Phase 7]: Approval resolution is authorized for admins, workflow owners, `workflow.manage`, `workflow.approve`, or explicitly assigned approvers.
 
 ### Pending Todos
 
-- Phase 7 Plan 07-02 ready for planning.
+- Phase 7 Plan 07-03 ready for planning.
 
 ### Blockers/Concerns
 
@@ -100,16 +104,16 @@ Items intentionally deferred from the first useful workflow release:
 | Workflow UX | Freeform DAG/canvas authoring | Deferred | v1.1 ingest |
 | Workflow runtime | Loops and nested workflows | Deferred | v1.1 ingest |
 | Workflow triggers | External webhooks and API/event triggers beyond foundations | Deferred | v1.1 ingest |
-| Workflow governance | Human approvals until pause/resume and approval permissions exist | Deferred | v1.1 ingest |
+| Workflow governance | Human approvals until pause/resume and approval permissions exist | Completed | 07-02 |
 | Workflow runtime | Dedicated distributed worker pool unless run volume requires it | Deferred | v1.1 ingest |
 
 ## Session Continuity
 
-Last session: 2026-07-05T22:47:31.000Z
-Stopped at: Phase 7 Plan 07-01 completed; ready to plan approval request step
+Last session: 2026-07-05T23:10:00.000Z
+Stopped at: Phase 7 Plan 07-02 completed; ready to plan API/event trigger foundations
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 7 Plan 07-02 approval requests, pause/resume, permissions, and audit.
+- Plan Phase 7 Plan 07-03 API/event trigger foundations with auth and idempotency.
 - Continue autonomous execution with `$gsd-autonomous --auto`.

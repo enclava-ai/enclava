@@ -1170,6 +1170,18 @@ function defaultConfigForType(
       not_matched_skip_step_keys: [],
     }
   }
+  if (stepType === "approval.request") {
+    return {
+      title_template: "Approve workflow run",
+      body_template: existingSteps.length
+        ? `Review {{${existingSteps[existingSteps.length - 1].key}}} before continuing.`
+        : "Review this workflow run before continuing.",
+      approver_user_ids: [],
+      allow_requester_approval: false,
+      approved_label: "Approve",
+      rejected_label: "Reject",
+    }
+  }
   if (stepType === "notify.in_app") {
     return {
       recipients: ["admin"],
@@ -1192,6 +1204,7 @@ function nextStepKey(
     "extract.run_template": "run_extract",
     "condition.no_results_skip": "skip_if_empty",
     "condition.branch": "branch",
+    "approval.request": "approval",
     "notify.in_app": "notify_team",
   }
   const existingKeys = new Set(existingSteps.map((step) => step.key))

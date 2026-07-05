@@ -218,6 +218,14 @@ export function WorkflowStepProperties({
           />
         ) : null}
 
+        {step.type === "approval.request" ? (
+          <ApprovalRequestEditor
+            step={step}
+            errors={validationErrors}
+            onChange={onChange}
+          />
+        ) : null}
+
         {step.type === "notify.in_app" ? (
           <NotificationEditor
             step={step}
@@ -1027,6 +1035,105 @@ function BranchTargetList({
   )
 }
 
+function ApprovalRequestEditor({
+  step,
+  errors,
+  onChange,
+}: {
+  step: WorkflowStepDefinition
+  errors: WorkflowValidationErrorItem[]
+  onChange: (step: WorkflowStepDefinition) => void
+}) {
+  const approverUserIds = formatApproverUserIds(step.config.approver_user_ids)
+
+  return (
+    <div className="space-y-4">
+      <Field
+        label="Title"
+        htmlFor="workflow-approval-title"
+        error={fieldError(errors, "title_template")}
+      >
+        <Input
+          id="workflow-approval-title"
+          value={String(step.config.title_template || "")}
+          onChange={(event) =>
+            updateConfig(step, "title_template", event.target.value, onChange)
+          }
+        />
+      </Field>
+
+      <Field label="Body" htmlFor="workflow-approval-body">
+        <Textarea
+          id="workflow-approval-body"
+          value={String(step.config.body_template || "")}
+          onChange={(event) =>
+            updateConfig(step, "body_template", event.target.value, onChange)
+          }
+          rows={4}
+        />
+      </Field>
+
+      <Field
+        label="Approver user ids"
+        htmlFor="workflow-approval-approvers"
+        error={fieldError(errors, "approver_user_ids")}
+      >
+        <Input
+          id="workflow-approval-approvers"
+          value={approverUserIds}
+          onChange={(event) =>
+            updateConfig(
+              step,
+              "approver_user_ids",
+              parseApproverUserIds(event.target.value),
+              onChange
+            )
+          }
+        />
+      </Field>
+
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="workflow-approval-self"
+          checked={Boolean(step.config.allow_requester_approval)}
+          onCheckedChange={(checked) =>
+            updateConfig(
+              step,
+              "allow_requester_approval",
+              checked === true,
+              onChange
+            )
+          }
+        />
+        <Label htmlFor="workflow-approval-self" className="text-sm font-normal">
+          Allow requester approval
+        </Label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Approve label" htmlFor="workflow-approval-approve-label">
+          <Input
+            id="workflow-approval-approve-label"
+            value={String(step.config.approved_label || "Approve")}
+            onChange={(event) =>
+              updateConfig(step, "approved_label", event.target.value, onChange)
+            }
+          />
+        </Field>
+        <Field label="Reject label" htmlFor="workflow-approval-reject-label">
+          <Input
+            id="workflow-approval-reject-label"
+            value={String(step.config.rejected_label || "Reject")}
+            onChange={(event) =>
+              updateConfig(step, "rejected_label", event.target.value, onChange)
+            }
+          />
+        </Field>
+      </div>
+    </div>
+  )
+}
+
 function NotificationEditor({
   step,
   errors,
@@ -1238,6 +1345,25 @@ function toggleBranchTarget(
     ...config,
     [field]: allowedStepKeys.filter((item) => next.has(item)),
   }
+}
+
+function formatApproverUserIds(value: unknown): string {
+  if (!Array.isArray(value)) return ""
+  return value
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .join(", ")
+}
+
+function parseApproverUserIds(value: string): Array<number | string> {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const parsed = Number(item)
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : item
+    })
 }
 
 function formatContextValue(value: unknown): string {

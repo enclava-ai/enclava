@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import {
   ArrowLeft,
+  CheckCircle2,
   Loader2,
   Play,
   RefreshCcw,
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { PageSkeleton } from "@/components/ui/skeletons"
 import { StatusBadge, StatusBadgeStatus } from "@/components/ui/status-badge"
 import {
+  WorkflowApprovalSummary,
   WorkflowRunDetail,
   WorkflowRunStatus,
   workflowRunApi,
@@ -56,7 +58,7 @@ function WorkflowRunPageContent() {
     loadRun()
   }, [loadRun])
 
-  async function runAction(kind: "cancel" | "retry" | "execute") {
+  async function runAction(kind: "cancel" | "retry" | "execute" | "approve" | "reject") {
     if (!run) return
     setAction(kind)
     setError(null)
@@ -66,7 +68,11 @@ function WorkflowRunPageContent() {
           ? await workflowRunApi.cancelRun(run.id, "Cancelled from run detail")
           : kind === "retry"
             ? await workflowRunApi.retryRun(run.id, "Retried from run detail")
-            : await workflowRunApi.executeRun(run.id)
+            : kind === "approve"
+              ? await workflowRunApi.approveRun(run.id, "Approved from run detail")
+              : kind === "reject"
+                ? await workflowRunApi.rejectRun(run.id, "Rejected from run detail")
+                : await workflowRunApi.executeRun(run.id)
       setRun(response.run)
       if (!response.success && response.error) {
         setError(response.error)
@@ -77,6 +83,8 @@ function WorkflowRunPageContent() {
       setAction(null)
     }
   }
+
+  const pendingApproval = run ? pendingRunApproval(run) : null
 
   if (isLoading) {
     return (
@@ -172,6 +180,40 @@ function WorkflowRunPageContent() {
                 Retry
               </Button>
             ) : null}
+            {pendingApproval ? (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => runAction("approve")}
+                  disabled={action !== null}
+                  title="Approve run"
+                >
+                  {action === "approve" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                  )}
+                  {String(pendingApproval.metadata?.approved_label || "Approve")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runAction("reject")}
+                  disabled={action !== null}
+                  title="Reject run"
+                >
+                  {action === "reject" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <XCircle className="mr-2 h-4 w-4" aria-hidden="true" />
+                  )}
+                  {String(pendingApproval.metadata?.rejected_label || "Reject")}
+                </Button>
+              </>
+            ) : null}
             {canCancel(run.status) ? (
               <Button
                 type="button"
@@ -214,6 +256,11 @@ function canCancel(status: WorkflowRunStatus): boolean {
 
 function canRetry(status: WorkflowRunStatus): boolean {
   return status === "failed" || status === "cancelled" || status === "skipped"
+}
+
+function pendingRunApproval(run: WorkflowRunDetail): WorkflowApprovalSummary | null {
+  if (run.status !== "paused") return null
+  return run.approvals.find((approval) => approval.status === "pending") || null
 }
 
 function runTone(status: WorkflowRunStatus): StatusBadgeStatus {

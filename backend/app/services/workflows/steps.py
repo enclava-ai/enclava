@@ -41,6 +41,19 @@ class WorkflowStepEventSpec:
 
 
 @dataclass
+class WorkflowApprovalRequestSpec:
+    """Approval pause requested by a workflow step handler."""
+
+    title: str
+    body: Optional[str] = None
+    approver_user_ids: list[int] = field(default_factory=list)
+    allow_requester_approval: bool = False
+    approved_label: str = "Approve"
+    rejected_label: str = "Reject"
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class WorkflowStepResult:
     """Structured result returned by a step handler."""
 
@@ -52,6 +65,9 @@ class WorkflowStepResult:
     skip_remaining: bool = False
     skip_step_keys: list[str] = field(default_factory=list)
     skip_reason: Optional[str] = None
+    pause_run: bool = False
+    approval_request: Optional[WorkflowApprovalRequestSpec] = None
+    step_run_id: Optional[str] = None
 
 
 @dataclass
@@ -178,6 +194,63 @@ class BranchConditionHandler(BaseWorkflowStepHandler):
             ],
             skip_step_keys=skipped_step_keys,
             skip_reason=skip_reason,
+        )
+
+
+class ApprovalRequestHandler(BaseWorkflowStepHandler):
+    """Pause the workflow until an authorized user resolves an approval."""
+
+    step_type = "approval.request"
+
+    async def execute(self, context: WorkflowStepContext) -> WorkflowStepResult:
+        title_template = str(context.step.config.get("title_template") or "").strip()
+        if not title_template:
+            raise WorkflowStepExecutionError("title_template is required")
+
+        body_template = str(context.step.config.get("body_template") or "").strip()
+        title = _render_template(title_template, context)
+        body = _render_template(body_template, context) if body_template else None
+        approver_user_ids = _approval_user_ids(
+            context.step.config.get("approver_user_ids")
+        )
+        allow_requester_approval = bool(
+            context.step.config.get("allow_requester_approval")
+        )
+        approved_label = (
+            str(context.step.config.get("approved_label") or "Approve").strip()
+            or "Approve"
+        )
+        rejected_label = (
+            str(context.step.config.get("rejected_label") or "Reject").strip()
+            or "Reject"
+        )
+        output = {
+            "status": "pending",
+            "step_key": context.step.key,
+            "title": title,
+            "body": body,
+            "approver_user_ids": approver_user_ids,
+            "allow_requester_approval": allow_requester_approval,
+            "approved_label": approved_label,
+            "rejected_label": rejected_label,
+        }
+        return WorkflowStepResult(
+            output_data=output,
+            pause_run=True,
+            approval_request=WorkflowApprovalRequestSpec(
+                title=title,
+                body=body,
+                approver_user_ids=approver_user_ids,
+                allow_requester_approval=allow_requester_approval,
+                approved_label=approved_label,
+                rejected_label=rejected_label,
+                metadata={
+                    "step_key": context.step.key,
+                    "approved_label": approved_label,
+                    "rejected_label": rejected_label,
+                    "allow_requester_approval": allow_requester_approval,
+                },
+            ),
         )
 
 
@@ -569,6 +642,7 @@ def create_default_step_handlers(
         NotifyInAppHandler(),
         NoResultsSkipHandler(),
         BranchConditionHandler(),
+        ApprovalRequestHandler(),
     ]
     return {handler.step_type: handler for handler in handlers}
 
@@ -599,6 +673,29 @@ def _branch_target_keys(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str) and item]
+
+
+def _approval_user_ids(value: Any) -> list[int]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, str):
+        raw_items = [item.strip() for item in value.split(",")]
+    elif isinstance(value, list):
+        raw_items = value
+    else:
+        raise WorkflowStepExecutionError("approver_user_ids must be an array")
+
+    user_ids: list[int] = []
+    for item in raw_items:
+        if item in (None, ""):
+            continue
+        try:
+            user_ids.append(int(item))
+        except (TypeError, ValueError) as exc:
+            raise WorkflowStepExecutionError(
+                "approver_user_ids must contain integers"
+            ) from exc
+    return user_ids
 
 
 def _evaluate_branch_condition(value: Any, operator: str, expected: Any) -> bool:

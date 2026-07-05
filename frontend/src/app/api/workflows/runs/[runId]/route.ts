@@ -34,8 +34,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const body = await request.json().catch(() => ({}))
   const action = body?.action
   const reason = typeof body?.reason === 'string' ? body.reason : undefined
+  const comment = typeof body?.comment === 'string' ? body.comment : reason
 
-  if (!['cancel', 'retry', 'execute'].includes(action)) {
+  if (!['cancel', 'retry', 'execute', 'approve', 'reject'].includes(action)) {
     return NextResponse.json({ error: 'Unsupported workflow run action' }, { status: 400 })
   }
 
@@ -44,7 +45,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     `/api-internal/v1/workflows/runs/${encodeURIComponent(runId)}/${action}`,
     {
       method: 'POST',
-      body: action === 'execute' ? undefined : JSON.stringify({ reason }),
+      body:
+        action === 'execute'
+          ? undefined
+          : action === 'approve' || action === 'reject'
+            ? JSON.stringify({ comment })
+            : JSON.stringify({ reason }),
     }
   )
   return forwardResponse(response)

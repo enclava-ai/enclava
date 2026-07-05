@@ -208,6 +208,40 @@ def create_default_step_registry() -> StepRegistry:
                 enabled=True,
             ),
             WorkflowStepCatalogEntry(
+                type="approval.request",
+                display_name="Approval request",
+                description="Pause the run until an authorized user approves or rejects.",
+                category="Control",
+                config_schema={
+                    "type": "object",
+                    "required": ["title_template"],
+                    "properties": {
+                        "title_template": {"type": "string"},
+                        "body_template": {"type": "string"},
+                        "approver_user_ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                        },
+                        "allow_requester_approval": {"type": "boolean"},
+                        "approved_label": {"type": "string"},
+                        "rejected_label": {"type": "string"},
+                    },
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string"},
+                        "title": {"type": "string"},
+                        "approver_user_ids": {"type": "array"},
+                    },
+                },
+                required_permissions=["workflow.approve"],
+                supports_retry=False,
+                supports_test=False,
+                estimated_cost_kind="none",
+                enabled=True,
+            ),
+            WorkflowStepCatalogEntry(
                 type="connector.sync",
                 display_name="Sync connector",
                 description="Sync a connector and expose newly ingested records.",

@@ -17,7 +17,7 @@ created: 2026-07-05
 
 ## Result
 
-Overall: 23/24.
+Overall through Plan 07-01: 23/24.
 
 The branch UI follows the Phase 7 UI-SPEC: it stays inside the current linear Step Builder, uses compact form controls in the existing properties panel, lists only later skip targets, preserves existing semantic tokens, and avoids canvas or graph patterns.
 
@@ -43,3 +43,33 @@ No blocking UI issues found.
 - `cd frontend && npm run check:plumbing`
 - `cd frontend && npm run build`
 - Live `/workflows/new` route returned 200 after the final rebuild.
+
+## Plan 07-02 Approval UI Review
+
+Overall: 23/24.
+
+The approval UI stays in the existing workflow surfaces: authoring remains inside the linear Step Builder properties panel, and operations happen on run detail. No separate approval inbox, graph UI, or canvas was introduced.
+
+## Pillar Scores
+
+| Pillar | Score | Notes |
+|--------|-------|-------|
+| Copywriting | 4/4 | Labels are concise: Title, Body, Approver user ids, Allow requester approval, Approve label, Reject label. |
+| Visuals | 4/4 | Approval rows use the same compact metadata treatment as other workflow steps. |
+| Color | 4/4 | Uses existing semantic tokens and status badges; no hardcoded colors. |
+| Typography | 4/4 | Uses existing `text-sm`, `text-xs`, and panel heading scale. |
+| Spacing | 4/4 | Uses existing grid and `space-y` patterns; no nested page-section cards. |
+| Experience Design | 3/4 | The first approval release avoids a clunky global inbox. Future polish should replace comma-separated approver ids with a shared user picker when one exists. |
+
+## Findings
+
+No blocking UI issues found.
+
+## Verification Considered
+
+- `cd frontend && npm run lint`
+- `cd frontend && npm run check:colors`
+- `cd frontend && npm run check:plumbing`
+- `cd frontend && npm run build`
+- Live `/workflows/new` route returned 200 after the final rebuild.
+- Authenticated live smoke confirmed approval run-detail data and approve/reject action paths through the Next proxy.
