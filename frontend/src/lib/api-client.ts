@@ -513,6 +513,69 @@ export interface WorkflowTemplateCatalogApiResponse {
   templates: WorkflowTemplate[]
 }
 
+export interface WorkflowVersionSummary {
+  id: string
+  version_number: number
+  status: 'draft' | 'published' | 'deprecated'
+  created_at?: string | null
+  published_at?: string | null
+}
+
+export interface WorkflowTriggerSummary {
+  id: string
+  trigger_type: WorkflowTriggerType
+  enabled: boolean
+  cron_expression?: string | null
+  timezone?: string | null
+  misfire_policy?: string | null
+  next_run_at?: string | null
+}
+
+export interface WorkflowDefinitionListItem {
+  id: string
+  name: string
+  description?: string | null
+  status: WorkflowDefinitionStatus
+  owner_user_id?: number | null
+  current_version_id?: string | null
+  latest_version_number: number
+  is_active: boolean
+  trigger_type: WorkflowTriggerType
+  tags: string[]
+  created_at?: string | null
+  updated_at?: string | null
+  last_published_at?: string | null
+  archived_at?: string | null
+}
+
+export interface WorkflowDefinitionDetail extends WorkflowDefinitionListItem {
+  draft_definition: WorkflowDefinitionDocument
+  metadata: Record<string, any>
+  versions: WorkflowVersionSummary[]
+  triggers: WorkflowTriggerSummary[]
+}
+
+export interface WorkflowDefinitionApiResponse {
+  success: boolean
+  workflow: WorkflowDefinitionDetail
+}
+
+export interface WorkflowCreatePayload {
+  name: string
+  description?: string | null
+  definition: WorkflowDefinitionDocument
+  tags?: string[]
+  metadata?: Record<string, any>
+}
+
+export interface WorkflowUpdatePayload {
+  name?: string
+  description?: string | null
+  definition?: WorkflowDefinitionDocument
+  tags?: string[]
+  metadata?: Record<string, any>
+}
+
 export interface WorkflowRedactedPayload {
   redacted: boolean
   policy: WorkflowRedactionPolicy
@@ -751,6 +814,33 @@ export const workflowApi = {
   getOperations() {
     return apiClient.get<WorkflowOperationsApiResponse>('/api/workflows')
   },
+  getWorkflow(workflowId: string) {
+    const query = new URLSearchParams({
+      resource: 'workflow',
+      workflow_id: workflowId,
+    })
+    return apiClient.get<WorkflowDefinitionApiResponse>(`/api/workflows?${query.toString()}`)
+  },
+  createWorkflow(payload: WorkflowCreatePayload) {
+    return apiClient.post<WorkflowDefinitionApiResponse>('/api/workflows', {
+      action: 'create',
+      ...payload,
+    })
+  },
+  updateWorkflow(workflowId: string, payload: WorkflowUpdatePayload) {
+    return apiClient.post<WorkflowDefinitionApiResponse>('/api/workflows', {
+      action: 'update',
+      workflow_id: workflowId,
+      ...payload,
+    })
+  },
+  publishWorkflow(workflowId: string, reason?: string) {
+    return apiClient.post<WorkflowDefinitionApiResponse>('/api/workflows', {
+      action: 'publish',
+      workflow_id: workflowId,
+      reason,
+    })
+  },
   getStepCatalog() {
     return apiClient.get<WorkflowStepCatalogApiResponse>('/api/workflows?resource=catalog')
   },
@@ -777,6 +867,14 @@ export const workflowApi = {
       definition,
     })
   },
+  previewDefinitionSchedule(cron: string, timezone: string, count = 5) {
+    return apiClient.post<WorkflowSchedulePreviewApiResponse>('/api/workflows', {
+      action: 'preview_schedule_definition',
+      cron,
+      timezone,
+      count,
+    })
+  },
   getRecentRuns(params?: {
     workflow_id?: string
     status?: WorkflowRunStatus
@@ -801,14 +899,14 @@ export const workflowApi = {
     })
   },
   enableWorkflow(workflowId: string, reason?: string) {
-    return apiClient.post('/api/workflows', {
+    return apiClient.post<WorkflowDefinitionApiResponse>('/api/workflows', {
       action: 'enable',
       workflow_id: workflowId,
       reason,
     })
   },
   disableWorkflow(workflowId: string, reason?: string) {
-    return apiClient.post('/api/workflows', {
+    return apiClient.post<WorkflowDefinitionApiResponse>('/api/workflows', {
       action: 'disable',
       workflow_id: workflowId,
       reason,

@@ -6,6 +6,7 @@ import {
   Activity,
   CalendarClock,
   CircleDollarSign,
+  Pencil,
   ExternalLink,
   Loader2,
   Play,
@@ -420,6 +421,18 @@ function WorkflowTable({
               </TableCell>
               <TableCell>
                 <div className="flex justify-end gap-1">
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title="Edit workflow"
+                  >
+                    <Link href={`/workflows/${row.id}/edit`}>
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                      <span className="sr-only">Edit workflow</span>
+                    </Link>
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"

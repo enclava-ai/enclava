@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 plan 05-01 complete; next plan is 05-02 builder UI
-last_updated: "2026-07-05T21:16:04.000Z"
-last_activity: 2026-07-05 - Completed Phase 5 Plan 05-01 catalog and validation APIs
+stopped_at: Phase 5 plan 05-02 complete; next plan is 05-03 templates and Nightly RAG Summary path
+last_updated: "2026-07-05T21:33:52.000Z"
+last_activity: 2026-07-05 - Completed Phase 5 Plan 05-02 builder UI and lifecycle actions
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 22
-  completed_plans: 12
-  percent: 55
+  completed_plans: 13
+  percent: 59
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 ## Current Position
 
 Phase: 5 (Builder, Templates, and Validation) — EXECUTING
-Plan: 05-02 (2 of 3)
-Status: Ready to execute Phase 5 Plan 05-02
-Last activity: 2026-07-05 - Completed Phase 5 Plan 05-01 catalog and validation APIs
+Plan: 05-03 (3 of 3)
+Status: Ready to execute Phase 5 Plan 05-03
+Last activity: 2026-07-05 - Completed Phase 5 Plan 05-02 builder UI and lifecycle actions
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-07-05 - Completed Phase 5 Plan 05-01 catalog and validation 
 
 - Phases planned: 8
 - Plans planned: 22
-- Plans completed: 12
+- Plans completed: 13
 
 ## Accumulated Context
 
@@ -69,6 +69,7 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 5]: Builder remains a linear trigger-plus-ordered-steps editor with properties panel and validation summary, not a canvas.
 - [Phase 5]: Backend workflow catalog and validation APIs are authoritative for step availability, permissions, config requirements, and publish blocking.
 - [Phase 5]: Nightly RAG Summary is the first end-to-end authoring template; connector/extract templates remain visible but unavailable until Phase 6 runtime support.
+- [Phase 5]: Builder draft save, publish, enable, and schedule preview actions route through the Next workflow proxy to preserve centralized auth and audit behavior.
 
 ### Pending Todos
 

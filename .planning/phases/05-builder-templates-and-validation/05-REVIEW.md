@@ -2,7 +2,7 @@
 status: clean
 phase: 05-builder-templates-and-validation
 depth: standard
-files_reviewed: 7
+files_reviewed: 15
 findings:
   critical: 0
   warning: 0
@@ -25,6 +25,19 @@ created: 2026-07-05
 - `frontend/src/app/api/workflows/route.ts`
 - `frontend/src/lib/api-client.ts`
 
+### Plan 05-02 Builder UI and Lifecycle Actions
+
+- `frontend/src/app/workflows/page.tsx`
+- `frontend/src/app/workflows/new/page.tsx`
+- `frontend/src/app/workflows/[workflowId]/edit/page.tsx`
+- `frontend/src/app/api/workflows/route.ts`
+- `frontend/src/lib/api-client.ts`
+- `frontend/src/components/workflows/WorkflowOperationsConsole.tsx`
+- `frontend/src/components/workflows/WorkflowBuilder.tsx`
+- `frontend/src/components/workflows/WorkflowStepList.tsx`
+- `frontend/src/components/workflows/WorkflowStepProperties.tsx`
+- `frontend/src/components/workflows/WorkflowValidationSummary.tsx`
+
 ## Result
 
 No blocking bugs, security issues, or code quality findings remain at standard depth.
@@ -35,6 +48,9 @@ No blocking bugs, security issues, or code quality findings remain at standard d
 - Draft definitions may still contain disabled future steps, but `publish_definition` rejects them through registry-aware validation.
 - Connector and Extract catalog entries are visible but disabled until Phase 6 runtime support.
 - New frontend proxy resources preserve existing operations, runs, schedules, and template summary behavior.
+- Builder lifecycle calls route through the existing Next proxy and internal workflow lifecycle APIs.
+- Publish is guarded by backend validation before `publishWorkflow` can be called.
+- Enable uses the existing confirmation dialog and requires an already published workflow version.
 
 ## Verification Considered
 
@@ -46,3 +62,7 @@ No blocking bugs, security issues, or code quality findings remain at standard d
 - `npm run check:plumbing`
 - `npm run build`
 - `git diff --check`
+- `sudo docker compose up -d --build`
+- `curl -fsS http://localhost:1080/health`
+- `curl -fsSI http://localhost:1080/workflows/new`
+- Authenticated workflow proxy smoke checks for catalog, validation, schedule preview, and missing-id publish guard.

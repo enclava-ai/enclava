@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
   const suffix = query.toString() ? `?${query.toString()}` : ''
   const templateId = url.searchParams.get('template_id')
   const stepType = url.searchParams.get('step_type')
+  const workflowId = url.searchParams.get('workflow_id')
 
   if (resource === 'template' && !templateId) {
     return NextResponse.json(
@@ -32,9 +33,17 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     )
   }
+  if (resource === 'workflow' && !workflowId) {
+    return NextResponse.json(
+      { success: false, error: 'workflow_id is required' },
+      { status: 400 }
+    )
+  }
 
   let endpoint = '/api-internal/v1/workflows/operations'
-  if (resource === 'runs') {
+  if (resource === 'workflow') {
+    endpoint = `/api-internal/v1/workflows/${encodeURIComponent(workflowId || '')}`
+  } else if (resource === 'runs') {
     endpoint = `/api-internal/v1/workflows/operations/runs${suffix}`
   } else if (resource === 'schedules') {
     endpoint = '/api-internal/v1/workflows/operations/schedules'
@@ -73,11 +82,77 @@ export async function POST(request: NextRequest) {
     return forwardResponse(response)
   }
 
+  if (body?.action === 'preview_schedule_definition') {
+    const response = await proxyAuthenticatedRequest(
+      request,
+      '/api-internal/v1/workflows/schedule/preview',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          cron: body?.cron,
+          timezone: body?.timezone,
+          count: body?.count,
+          start_at: body?.start_at,
+        }),
+      }
+    )
+    return forwardResponse(response)
+  }
+
+  if (body?.action === 'create') {
+    const response = await proxyAuthenticatedRequest(
+      request,
+      '/api-internal/v1/workflows/',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name: body?.name,
+          description: body?.description,
+          definition: body?.definition,
+          tags: body?.tags || [],
+          metadata: body?.metadata || {},
+        }),
+      }
+    )
+    return forwardResponse(response)
+  }
+
   if (!workflowId) {
     return NextResponse.json(
       { success: false, error: 'workflow_id is required' },
       { status: 400 }
     )
+  }
+
+  if (body?.action === 'update') {
+    const payload: Record<string, unknown> = {}
+    if (body?.name !== undefined) payload.name = body.name
+    if (body?.description !== undefined) payload.description = body.description
+    if (body?.definition !== undefined) payload.definition = body.definition
+    if (body?.tags !== undefined) payload.tags = body.tags
+    if (body?.metadata !== undefined) payload.metadata = body.metadata
+
+    const response = await proxyAuthenticatedRequest(
+      request,
+      `/api-internal/v1/workflows/${encodeURIComponent(workflowId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }
+    )
+    return forwardResponse(response)
+  }
+
+  if (body?.action === 'publish') {
+    const response = await proxyAuthenticatedRequest(
+      request,
+      `/api-internal/v1/workflows/${encodeURIComponent(workflowId)}/publish`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason: body?.reason }),
+      }
+    )
+    return forwardResponse(response)
   }
 
   if (body?.action === 'enable' || body?.action === 'disable') {
