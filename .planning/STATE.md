@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 4 complete; next phase is Phase 5 builder, templates, and validation
-last_updated: "2026-07-05T20:56:04.000Z"
-last_activity: 2026-07-05 - Completed Phase 4 Plan 04-03 schedule board and controls
+stopped_at: Phase 5 planned; next plan is 05-01 step catalog and validation APIs
+last_updated: "2026-07-05T21:07:58.000Z"
+last_activity: 2026-07-05 - Planned Phase 5 builder, templates, and validation
 progress:
   total_phases: 8
   completed_phases: 4
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 
 ## Current Position
 
-Phase: 5 (Builder, Templates, and Validation) — READY
+Phase: 5 (Builder, Templates, and Validation) — PLANNED
 Plan: 05-01 (1 of 3)
-Status: Phase 4 complete; ready to plan Phase 5
-Last activity: 2026-07-05 - Completed Phase 4 Plan 04-03 schedule board and controls
+Status: Ready to execute Phase 5 Plan 05-01
+Last activity: 2026-07-05 - Planned Phase 5 builder, templates, and validation
 
 ## Performance Metrics
 
@@ -66,6 +66,9 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 4]: Scheduler should follow the existing lightweight asyncio task pattern used by connector sync, backed by Postgres locks and idempotency keys.
 - [Phase 4]: Workflows route is operations-first: overview, runs, schedules, and templates are separate tabs before builder authoring arrives.
 - [Phase 4]: Schedule board lifecycle controls reuse workflow enable/disable APIs so audit behavior remains centralized.
+- [Phase 5]: Builder remains a linear trigger-plus-ordered-steps editor with properties panel and validation summary, not a canvas.
+- [Phase 5]: Backend workflow catalog and validation APIs are authoritative for step availability, permissions, config requirements, and publish blocking.
+- [Phase 5]: Nightly RAG Summary is the first end-to-end authoring template; connector/extract templates remain visible but unavailable until Phase 6 runtime support.
 
 ### Pending Todos
 
@@ -102,5 +105,5 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 5 with `$gsd-plan-phase 5 --auto`
+- Execute Phase 5 with `$gsd-execute-phase 5 --auto`
 - Or continue autonomous execution with `$gsd-autonomous --auto`
