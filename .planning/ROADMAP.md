@@ -22,7 +22,7 @@ The first vertical slice is Nightly RAG Summary: a scheduled workflow that finds
 - [x] **Phase 2: Persistence, API, Permissions, and Audit** - Add durable workflow data model, lifecycle service, internal APIs, permissions, and audit hooks. (completed 2026-07-05)
 - [x] **Phase 3: Manual Execution Engine** - Implement persisted manual runs, ordered step execution, MVP step types, run detail, artifacts, retries, cancellation, budget checks, and redaction. (completed 2026-07-05)
 - [x] **Phase 4: Scheduler and Operations Console** - Add timezone-aware scheduling, due-run creation, idempotency, misfire/concurrency policy, operations console, schedule board, and health states. (completed 2026-07-05)
-- [ ] **Phase 5: Builder, Templates, and Validation** - Build the typed step builder, step catalog forms, schedule preview validation, templates, draft/publish flow, and Nightly RAG Summary template. (2/3 plans complete)
+- [x] **Phase 5: Builder, Templates, and Validation** - Build the typed step builder, step catalog forms, schedule preview validation, templates, draft/publish flow, and Nightly RAG Summary template. (completed 2026-07-05)
 - [ ] **Phase 6: Connector and Extract Integration** - Add connector sync and Extract template step types with artifact handling and module-specific run summaries.
 - [ ] **Phase 7: Advanced Control Flow and Triggers** - Add only proven advanced controls: branches, approvals, pause/resume, and API/event trigger foundations.
 - [ ] **Phase 8: Hardening, Observability, and Release** - Add recovery, scale, retention, admin metrics, E2E/UAT coverage, docs, container rebuilds, and release smoke checks.
@@ -153,7 +153,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 05-03: Add templates and complete Nightly RAG Summary authoring and test path.
+- [x] 05-03: Add templates and complete Nightly RAG Summary authoring and test path.
 
 ### Phase 6: Connector and Extract Integration
 

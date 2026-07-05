@@ -2,7 +2,7 @@
 status: clean
 phase: 05-builder-templates-and-validation
 depth: standard
-files_reviewed: 15
+files_reviewed: 19
 findings:
   critical: 0
   warning: 0
@@ -38,6 +38,20 @@ created: 2026-07-05
 - `frontend/src/components/workflows/WorkflowStepProperties.tsx`
 - `frontend/src/components/workflows/WorkflowValidationSummary.tsx`
 
+### Plan 05-03 Template-Assisted Nightly Authoring
+
+- `backend/app/schemas/workflow.py`
+- `backend/app/services/workflows/templates.py`
+- `backend/app/services/workflows/service.py`
+- `backend/app/services/workflows/operations.py`
+- `backend/tests/unit/services/test_workflow_builder_api.py`
+- `frontend/src/components/workflows/WorkflowTemplatePicker.tsx`
+- `frontend/src/components/workflows/WorkflowTemplatesPanel.tsx`
+- `frontend/src/components/workflows/WorkflowBuilder.tsx`
+- `frontend/src/app/workflows/new/page.tsx`
+- `frontend/src/app/workflows/[workflowId]/edit/page.tsx`
+- `frontend/src/lib/api-client.ts`
+
 ## Result
 
 No blocking bugs, security issues, or code quality findings remain at standard depth.
@@ -51,6 +65,9 @@ No blocking bugs, security issues, or code quality findings remain at standard d
 - Builder lifecycle calls route through the existing Next proxy and internal workflow lifecycle APIs.
 - Publish is guarded by backend validation before `publishWorkflow` can be called.
 - Enable uses the existing confirmation dialog and requires an already published workflow version.
+- Template availability is explicit: Nightly is authorable, connector/extract seeds stay visible but unavailable until Phase 6.
+- Required seed placeholders are blocked without rejecting valid runtime prompt templates.
+- The Nightly authoring path now has backend coverage for validation, publish, enable, and manual run creation.
 
 ## Verification Considered
 
@@ -66,3 +83,4 @@ No blocking bugs, security issues, or code quality findings remain at standard d
 - `curl -fsS http://localhost:1080/health`
 - `curl -fsSI http://localhost:1080/workflows/new`
 - Authenticated workflow proxy smoke checks for catalog, validation, schedule preview, and missing-id publish guard.
+- Authenticated template smoke checks for Nightly metadata, unavailable future templates, raw placeholder rejection, filled Nightly validation, and five-run schedule preview.

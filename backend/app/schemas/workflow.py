@@ -267,6 +267,10 @@ class WorkflowTemplate(BaseModel):
     description: str
     definition: WorkflowDefinitionDocument
     tags: List[str] = Field(default_factory=list)
+    required_placeholders: List[str] = Field(default_factory=list)
+    builder_category: Optional[str] = None
+    available_for_authoring: bool = True
+    unavailable_reason: Optional[str] = None
 
 
 class WorkflowDefinitionCreate(BaseModel):
@@ -632,6 +636,9 @@ class WorkflowTemplateSummary(BaseModel):
     trigger_type: WorkflowTriggerType
     step_count: int
     tags: List[str] = Field(default_factory=list)
+    builder_category: Optional[str] = None
+    available_for_authoring: bool = True
+    unavailable_reason: Optional[str] = None
 
 
 class WorkflowRunDetail(WorkflowRunSummary):

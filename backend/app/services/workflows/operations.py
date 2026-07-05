@@ -220,6 +220,9 @@ class WorkflowOperationsService:
                 trigger_type=template.definition.trigger.type,
                 step_count=len(template.definition.steps),
                 tags=template.tags,
+                builder_category=template.builder_category,
+                available_for_authoring=template.available_for_authoring,
+                unavailable_reason=template.unavailable_reason,
             )
             for template in list_workflow_templates()
         ]

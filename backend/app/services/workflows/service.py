@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
@@ -481,12 +482,25 @@ class WorkflowService:
                 if not isinstance(field, str):
                     continue
                 value = step.config.get(field)
-                if value is None or value == "":
+                if value is None or value == "" or value == [] or value == {}:
                     errors.append(
                         WorkflowValidationErrorItem(
                             path=f"steps[{index}].config.{field}",
                             message=f"{step.type} requires config field {field}",
                             code="missing_step_config",
+                            step_key=step.key,
+                            step_index=index,
+                        )
+                    )
+                elif _contains_template_placeholder(value):
+                    errors.append(
+                        WorkflowValidationErrorItem(
+                            path=f"steps[{index}].config.{field}",
+                            message=(
+                                f"{step.type} config field {field} has an "
+                                "unresolved template placeholder"
+                            ),
+                            code="unresolved_placeholder",
                             step_key=step.key,
                             step_index=index,
                         )
@@ -708,6 +722,19 @@ def _has_permission(actor: Mapping[str, Any], permission: str) -> bool:
         permission.replace(".", ":"),
     }
     return "*" in permissions or any(alias in permissions for alias in aliases)
+
+
+_SEED_PLACEHOLDER_RE = re.compile(r"\{\{[a-zA-Z_][a-zA-Z0-9_]*\}\}")
+
+
+def _contains_template_placeholder(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(_SEED_PLACEHOLDER_RE.search(value))
+    if isinstance(value, list):
+        return any(_contains_template_placeholder(item) for item in value)
+    if isinstance(value, dict):
+        return any(_contains_template_placeholder(item) for item in value.values())
+    return False
 
 
 def _checksum(value: dict[str, Any]) -> str:

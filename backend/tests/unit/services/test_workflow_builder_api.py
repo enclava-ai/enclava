@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 import pytest
@@ -57,6 +58,24 @@ def _definition_with_step(step: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _nightly_authoring_definition(
+    definition: dict[str, Any], owner_user_id: int
+) -> dict[str, Any]:
+    authored = deepcopy(definition)
+    steps = {step["key"]: step for step in authored["steps"]}
+    steps["find_new_docs"]["config"]["collection_id"] = "1"
+    steps["find_new_docs"]["config"]["query"] = "recent documents"
+    steps["summarize"]["config"]["agent_id"] = "agent-1"
+    steps["notify_owner"]["config"]["recipients"] = [str(owner_user_id)]
+    authored["runtime"] = {
+        "concurrency_policy": "skip_if_running",
+        "timeout_seconds": 1800,
+        "budget_limit_cents": 100,
+        "redaction_policy": "default",
+    }
+    return authored
+
+
 @pytest.mark.asyncio
 async def test_builder_catalog_exposes_enabled_and_disabled_steps(
     builder_client: AsyncClient,
@@ -93,6 +112,13 @@ async def test_builder_step_detail_and_template_detail(
     template = template_response.json()["template"]
     assert template["id"] == "nightly-rag-summary"
     assert len(template["definition"]["steps"]) == 4
+    assert template["required_placeholders"] == [
+        "collection_id",
+        "agent_id",
+        "owner_user_id",
+    ]
+    assert template["builder_category"] == "RAG"
+    assert template["available_for_authoring"] is True
     assert missing_response.status_code == 404
 
 
@@ -152,7 +178,7 @@ async def test_builder_validation_reports_registry_errors(
 
 
 @pytest.mark.asyncio
-async def test_nightly_template_validates_and_disabled_template_publish_blocks(
+async def test_templates_expose_availability_and_disabled_publish_blocks(
     builder_client: AsyncClient,
 ) -> None:
     nightly_response = await builder_client.get(
@@ -161,8 +187,13 @@ async def test_nightly_template_validates_and_disabled_template_publish_blocks(
     connector_response = await builder_client.get(
         "/api-internal/v1/workflows/templates/connector-intake-triage"
     )
+    weekly_response = await builder_client.get(
+        "/api-internal/v1/workflows/templates/weekly-extraction-report"
+    )
     nightly_definition = nightly_response.json()["template"]["definition"]
-    connector_definition = connector_response.json()["template"]["definition"]
+    connector = connector_response.json()["template"]
+    weekly = weekly_response.json()["template"]
+    connector_definition = connector["definition"]
 
     validate_response = await builder_client.post(
         "/api-internal/v1/workflows/steps/validate",
@@ -182,8 +213,68 @@ async def test_nightly_template_validates_and_disabled_template_publish_blocks(
     )
 
     assert validate_response.status_code == 200
-    assert validate_response.json()["success"] is True
+    assert validate_response.json()["success"] is False
+    assert any(
+        error["code"] == "unresolved_placeholder"
+        for error in validate_response.json()["errors"]
+    )
+    assert connector["available_for_authoring"] is False
+    assert "Phase 6" in connector["unavailable_reason"]
+    assert weekly["available_for_authoring"] is False
+    assert "Phase 6" in weekly["unavailable_reason"]
     assert create_response.status_code == 201
     assert publish_response.status_code == 422
     publish_errors = publish_response.json()["detail"]["errors"]
     assert any(error["code"] == "disabled_step_type" for error in publish_errors)
+
+
+@pytest.mark.asyncio
+async def test_nightly_template_authoring_payload_publishes_enables_and_runs(
+    builder_client: AsyncClient,
+    test_user,
+) -> None:
+    template_response = await builder_client.get(
+        "/api-internal/v1/workflows/templates/nightly-rag-summary"
+    )
+    definition = _nightly_authoring_definition(
+        template_response.json()["template"]["definition"],
+        int(test_user["id"]),
+    )
+
+    validate_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json=definition,
+    )
+    create_response = await builder_client.post(
+        "/api-internal/v1/workflows/",
+        json={
+            "name": "Nightly RAG Summary",
+            "description": "Authoring test",
+            "tags": ["rag", "schedule"],
+            "metadata": {"template_id": "nightly-rag-summary"},
+            "definition": definition,
+        },
+    )
+    workflow_id = create_response.json()["workflow"]["id"]
+    publish_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/publish",
+        json={"reason": "authoring test"},
+    )
+    enable_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/enable",
+        json={"reason": "authoring test"},
+    )
+    run_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/runs",
+        json={"input_data": {"query": "recent documents"}},
+    )
+
+    assert validate_response.status_code == 200
+    assert validate_response.json()["success"] is True
+    assert create_response.status_code == 201
+    assert publish_response.status_code == 200
+    assert publish_response.json()["workflow"]["latest_version_number"] == 1
+    assert enable_response.status_code == 200
+    assert enable_response.json()["workflow"]["status"] == "active"
+    assert run_response.status_code == 201
+    assert run_response.json()["run"]["id"]

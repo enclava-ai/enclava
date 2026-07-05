@@ -113,6 +113,28 @@ export const agentApi = {
   }
 }
 
+export interface RagCollectionSummary {
+  id: string | number
+  name: string
+  description?: string | null
+  status?: string | null
+  document_count?: number
+  vector_count?: number
+  is_managed?: boolean
+  source?: string | null
+}
+
+export interface RagCollectionsApiResponse {
+  success?: boolean
+  collections: RagCollectionSummary[]
+}
+
+export const ragApi = {
+  listCollections() {
+    return apiClient.get<RagCollectionsApiResponse>('/api/rag/collections')
+  },
+}
+
 export const toolApi = {
   listTools() {
     return apiClient.get('/api/v1/tool-calling/available')
@@ -501,6 +523,10 @@ export interface WorkflowTemplate {
   description: string
   definition: WorkflowDefinitionDocument
   tags: string[]
+  required_placeholders: string[]
+  builder_category?: string | null
+  available_for_authoring: boolean
+  unavailable_reason?: string | null
 }
 
 export interface WorkflowTemplateApiResponse {
@@ -739,6 +765,9 @@ export interface WorkflowTemplateSummary {
   trigger_type: WorkflowTriggerType
   step_count: number
   tags: string[]
+  builder_category?: string | null
+  available_for_authoring: boolean
+  unavailable_reason?: string | null
 }
 
 export interface WorkflowTemplatesApiResponse {

@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useParams } from "next/navigation"
 
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
@@ -10,7 +11,9 @@ export default function EditWorkflowPage() {
 
   return (
     <ProtectedRoute>
-      <WorkflowBuilder mode="edit" workflowId={params.workflowId} />
+      <Suspense fallback={null}>
+        <WorkflowBuilder mode="edit" workflowId={params.workflowId} />
+      </Suspense>
     </ProtectedRoute>
   )
 }

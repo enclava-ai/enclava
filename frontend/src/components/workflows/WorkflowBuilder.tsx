@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import {
   ArrowLeft,
   CalendarClock,
   CheckCircle2,
+  ExternalLink,
   Loader2,
   Play,
   Rocket,
@@ -15,7 +16,7 @@ import {
 } from "lucide-react"
 
 import { useToast } from "@/hooks/use-toast"
-import { agentApi, apiClient, workflowApi } from "@/lib/api-client"
+import { agentApi, ragApi, workflowApi } from "@/lib/api-client"
 import type {
   WorkflowConcurrencyPolicy,
   WorkflowDefinitionDetail,
@@ -27,6 +28,7 @@ import type {
   WorkflowSchedulePreviewItem,
   WorkflowStepCatalogEntry,
   WorkflowStepDefinition,
+  WorkflowTemplate,
   WorkflowTriggerDefinition,
   WorkflowTriggerType,
   WorkflowValidationErrorItem,
@@ -75,8 +77,11 @@ const COMMON_TIMEZONES = [
 
 export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const requestConfirmation = useConfirm()
+  const requestedTemplateId =
+    mode === "create" ? searchParams.get("template") : null
   const [catalog, setCatalog] = useState<WorkflowStepCatalogEntry[]>([])
   const [agents, setAgents] = useState<WorkflowBuilderAgentOption[]>([])
   const [collections, setCollections] = useState<WorkflowBuilderCollectionOption[]>([])
@@ -84,6 +89,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
   const [status, setStatus] = useState<WorkflowDefinitionStatus>("draft")
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null)
   const [latestVersionNumber, setLatestVersionNumber] = useState(0)
+  const [sourceTemplateId, setSourceTemplateId] = useState<string | null>(null)
   const [name, setName] = useState("New workflow")
   const [description, setDescription] = useState("")
   const [tagsInput, setTagsInput] = useState("")
@@ -108,6 +114,46 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
     setTagsInput((workflow.tags || []).join(", "))
     setDefinition(workflow.draft_definition)
     setSelectedStepKey(workflow.draft_definition.steps[0]?.key || "")
+    setSourceTemplateId(
+      String(
+        workflow.metadata?.template_id ||
+          workflow.draft_definition.metadata?.template ||
+          ""
+      ) || null
+    )
+  }, [])
+
+  const applyTemplate = useCallback((template: WorkflowTemplate) => {
+    if (!template.available_for_authoring) {
+      const freshDefinition = createDefaultDefinition()
+      setWorkflowIdState("")
+      setStatus("draft")
+      setCurrentVersionId(null)
+      setLatestVersionNumber(0)
+      setSourceTemplateId(null)
+      setName("New workflow")
+      setDescription("")
+      setTagsInput("")
+      setDefinition(freshDefinition)
+      setSelectedStepKey(freshDefinition.steps[0]?.key || "")
+      setError(template.unavailable_reason || "Template is not available.")
+      return
+    }
+
+    const seededDefinition = createDefinitionFromTemplate(template)
+    setWorkflowIdState("")
+    setStatus("draft")
+    setCurrentVersionId(null)
+    setLatestVersionNumber(0)
+    setSourceTemplateId(template.id)
+    setName(template.name)
+    setDescription(template.description)
+    setTagsInput(template.tags.join(", "))
+    setDefinition(seededDefinition)
+    setSelectedStepKey(seededDefinition.steps[0]?.key || "")
+    setValidation(null)
+    setHasValidated(false)
+    setSchedulePreview([])
   }, [])
 
   const loadBuilder = useCallback(async () => {
@@ -118,15 +164,25 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
         mode === "edit" && workflowId
           ? workflowApi.getWorkflow(workflowId)
           : Promise.resolve(null)
-      const [catalogResponse, agentResponse, collectionResponse, workflowResponse] =
-        await Promise.all([
-          workflowApi.getStepCatalog(),
-          agentApi.listAgents().catch(() => ({ configs: [] })),
-          apiClient.get("/api-internal/v1/rag/collections").catch(() => ({
-            collections: [],
-          })),
-          workflowPromise,
-        ])
+      const templatePromise =
+        requestedTemplateId && mode === "create"
+          ? workflowApi.getTemplate(requestedTemplateId)
+          : Promise.resolve(null)
+      const [
+        catalogResponse,
+        agentResponse,
+        collectionResponse,
+        workflowResponse,
+        templateResponse,
+      ] = await Promise.all([
+        workflowApi.getStepCatalog(),
+        agentApi.listAgents().catch(() => ({ configs: [] })),
+        ragApi.listCollections().catch(() => ({
+          collections: [],
+        })),
+        workflowPromise,
+        templatePromise,
+      ])
 
       setCatalog(catalogResponse.steps)
       setAgents(normalizeAgents(agentResponse))
@@ -134,8 +190,11 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
 
       if (workflowResponse?.workflow) {
         applyWorkflow(workflowResponse.workflow)
+      } else if (templateResponse?.template) {
+        applyTemplate(templateResponse.template)
       } else if (mode === "create") {
         const freshDefinition = createDefaultDefinition()
+        setSourceTemplateId(null)
         setDefinition(freshDefinition)
         setSelectedStepKey(freshDefinition.steps[0]?.key || "")
       }
@@ -144,7 +203,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [applyWorkflow, mode, workflowId])
+  }, [applyTemplate, applyWorkflow, mode, requestedTemplateId, workflowId])
 
   useEffect(() => {
     loadBuilder()
@@ -288,7 +347,10 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
       name: name.trim(),
       description: description.trim() || null,
       tags: parseTags(tagsInput),
-      metadata: { source: "workflow_builder" },
+      metadata: {
+        source: "workflow_builder",
+        ...(sourceTemplateId ? { template_id: sourceTemplateId } : {}),
+      },
       definition,
     }
 
@@ -844,21 +906,31 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
                 )}
                 Enable
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={runTest}
-                disabled={isBusy || !workflowIdState || status !== "active"}
-                title="Run test"
-              >
-                {action === "run" ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Play className="mr-2 h-4 w-4" aria-hidden="true" />
-                )}
-                Run test
-              </Button>
+              {currentVersionId ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/workflows">
+                    <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Operations
+                  </Link>
+                </Button>
+              ) : null}
+              {status === "active" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={runTest}
+                  disabled={isBusy || !workflowIdState}
+                  title="Run test"
+                >
+                  {action === "run" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Play className="mr-2 h-4 w-4" aria-hidden="true" />
+                  )}
+                  Run test
+                </Button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -882,6 +954,68 @@ function Field({
       {children}
     </div>
   )
+}
+
+function createDefinitionFromTemplate(
+  template: WorkflowTemplate
+): WorkflowDefinitionDocument {
+  const definition = cloneDefinition(template.definition)
+  return {
+    ...definition,
+    metadata: {
+      ...(definition.metadata || {}),
+      template: template.id,
+      template_seeded: true,
+    },
+    runtime: {
+      ...defaultRuntimePolicy(),
+      ...(definition.runtime || {}),
+    },
+    steps: definition.steps.map((step) => seedStepFromTemplate(step)),
+  }
+}
+
+function seedStepFromTemplate(
+  step: WorkflowStepDefinition
+): WorkflowStepDefinition {
+  if (step.type === "rag.query") {
+    return {
+      ...step,
+      config: {
+        ...step.config,
+        collection_id: "",
+        query:
+          String(step.config.query || "").includes("{{")
+            ? "Summarize documents added since the last successful run."
+            : step.config.query,
+      },
+    }
+  }
+  if (step.type === "agent.run") {
+    return {
+      ...step,
+      config: {
+        ...step.config,
+        agent_id: "",
+      },
+    }
+  }
+  if (step.type === "notify.in_app") {
+    return {
+      ...step,
+      config: {
+        ...step.config,
+        recipients: [],
+      },
+    }
+  }
+  return step
+}
+
+function cloneDefinition(
+  definition: WorkflowDefinitionDocument
+): WorkflowDefinitionDocument {
+  return JSON.parse(JSON.stringify(definition)) as WorkflowDefinitionDocument
 }
 
 function createDefaultDefinition(): WorkflowDefinitionDocument {

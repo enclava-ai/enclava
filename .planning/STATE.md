@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 plan 05-02 complete; next plan is 05-03 templates and Nightly RAG Summary path
-last_updated: "2026-07-05T21:33:52.000Z"
-last_activity: 2026-07-05 - Completed Phase 5 Plan 05-02 builder UI and lifecycle actions
+stopped_at: Phase 5 complete; next phase is Phase 6 Connector and Extract Integration
+last_updated: "2026-07-05T21:44:22.000Z"
+last_activity: 2026-07-05 - Completed Phase 5 Plan 05-03 template-assisted Nightly authoring
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 22
-  completed_plans: 13
-  percent: 59
+  completed_plans: 14
+  percent: 64
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-05)
 
 **Core value:** Users can run confidential AI automations that are scheduled, auditable, observable, budget-aware, and clear to operate.
-**Current focus:** Phase 5 — Builder, Templates, and Validation
+**Current focus:** Phase 6 — Connector and Extract Integration
 
 ## Current Position
 
-Phase: 5 (Builder, Templates, and Validation) — EXECUTING
-Plan: 05-03 (3 of 3)
-Status: Ready to execute Phase 5 Plan 05-03
-Last activity: 2026-07-05 - Completed Phase 5 Plan 05-02 builder UI and lifecycle actions
+Phase: 6 (Connector and Extract Integration) — READY
+Plan: 06-01 (1 of 2)
+Status: Ready to execute Phase 6 Plan 06-01
+Last activity: 2026-07-05 - Completed Phase 5 Plan 05-03 template-assisted Nightly authoring
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-07-05 - Completed Phase 5 Plan 05-02 builder UI and lifecycl
 
 - Phases planned: 8
 - Plans planned: 22
-- Plans completed: 13
+- Plans completed: 14
 
 ## Accumulated Context
 
@@ -70,6 +70,8 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 5]: Backend workflow catalog and validation APIs are authoritative for step availability, permissions, config requirements, and publish blocking.
 - [Phase 5]: Nightly RAG Summary is the first end-to-end authoring template; connector/extract templates remain visible but unavailable until Phase 6 runtime support.
 - [Phase 5]: Builder draft save, publish, enable, and schedule preview actions route through the Next workflow proxy to preserve centralized auth and audit behavior.
+- [Phase 5]: Template seed placeholders are blocked in required config fields, while runtime prompt templates remain valid.
+- [Phase 5]: Connector and Extract template availability is intentionally false until Phase 6 step handlers land.
 
 ### Pending Todos
 
@@ -106,5 +108,5 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Execute Phase 5 with `$gsd-execute-phase 5 --auto`
+- Execute Phase 6 with `$gsd-execute-phase 6 --auto`
 - Or continue autonomous execution with `$gsd-autonomous --auto`
