@@ -242,7 +242,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 4. Scheduler and Operations Console | 3/3 | Complete | 2026-07-05 |
 | 5. Builder, Templates, and Validation | 3/3 | Complete | 2026-07-05 |
 | 6. Connector and Extract Integration | 2/2 | Complete | 2026-07-05 |
-| 7. Advanced Control Flow and Triggers | 0/3 | Planned | - |
+| 7. Advanced Control Flow and Triggers | 0/3 | In Progress | - |
 | 8. Hardening, Observability, and Release | 0/3 | Planned | - |
 
 ## Archives
