@@ -1,52 +1,59 @@
-# Ingest Synthesis: Frontend UX Overhaul
+# Ingest Synthesis: Workflow Automation
 
-**Synthesized:** 2026-07-01
-**Mode:** bootstrap-with-existing-intel
+**Synthesized:** 2026-07-05
+**Mode:** merge-into-existing-planning
 **Docs ingested:** 1
 
 ## Summary
 
-`design-proposal/IMPLEMENTATION_PLAN.md` defines a frontend UX milestone for Enclava. It is implementation-ready: it provides work packages, dependency waves, binding design decisions, verification requirements, and explicit exclusions. Existing `.planning/codebase/` intel confirms the plan fits the repository's stack and file layout.
+`.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md` defines a complete product and engineering milestone for implementing Enclava workflows. The plan fits the current project state because v1.0 has shipped, the root roadmap was awaiting the next milestone, and the existing codebase already contains a thin workflow module stub that can become the adapter for a real workflow service.
 
-Because `.planning/` existed only as codebase intelligence and did not contain `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, or `STATE.md`, this ingest bootstraps the core GSD project artifacts instead of attempting a merge into absent milestone files.
+The milestone should implement workflows as a durable automation layer around platform modules. Agents remain reasoning/action workers. Workflows own orchestration concerns: schedule state, run state, retries, artifacts, permissions, audit, cost controls, and operational visibility.
 
 ## Scope To Carry Forward
 
-- UX visual system migration to Slate Mono semantic tokens.
-- Shared UI primitives that unblock all downstream UX work.
-- Desktop sidebar and mobile drawer navigation.
-- LLM route move under Settings with compatibility redirects.
-- Full frontend color literal and legacy palette cleanup.
-- Dashboard IA rework.
-- SPA navigation and client API-client cleanup.
-- Toast and confirmation UX consolidation.
-- Loading, empty, accessibility, and guardrail improvements.
+- A new `Workflows` product surface in the app navigation.
+- Operations Console as the default workflow UX.
+- Step Builder as the workflow authoring/editing mode.
+- Schedule Board as the recurring automation view.
+- Dedicated workflow backend services, models, migrations, and internal APIs.
+- Manual and scheduled workflow triggers.
+- Typed linear steps for the first implementation.
+- MVP steps for RAG query, agent run, in-app notification, and simple no-results skip logic.
+- Run history, run detail, timeline events, artifacts, retries, cancellation, and redacted IO.
+- Timezone-aware scheduling with preview, idempotency, locking, and misfire policy.
+- Permissions, audit hooks, budget caps, usage attribution, and secret redaction.
+- Connector and Extract steps after the core engine is working.
+- Advanced control flow, approvals, API/event triggers, and hardening after MVP.
 
 ## Requirements Created
 
 Requirements are grouped into:
 
-- Cleanup and route hygiene.
-- Design system.
-- Navigation and information architecture.
-- Color migration and dashboard.
-- Client plumbing.
-- Feedback and confirmation UX.
-- Loading and empty states.
-- Accessibility and guardrails.
+- Product model and UX.
+- Definition lifecycle and persistence.
+- Execution engine.
+- Scheduling and operations.
+- Builder and templates.
+- Step integrations.
+- Security, governance, and observability.
+- Testing and release readiness.
 
 ## Phase Strategy
 
-The roadmap preserves the proposal's sequencing while collapsing work packages into executable GSD phases:
+The roadmap converts the implementation plan into eight executable GSD phases:
 
-- Phase 1 maps to WP-D.
-- Phase 2 maps to WP0 and WP1.
-- Phase 3 maps to WP2.
-- Phase 4 maps to WP3 and color guardrails/WP0-cleanup.
-- Phase 5 maps to WP4 and fetch/navigation guardrails.
-- Phase 6 maps to WP5 and WP6.
-- Phase 7 maps to WP7, WP8, WP9, and final guardrail verification.
+1. Product Contract and Scaffold.
+2. Persistence, API, Permissions, and Audit.
+3. Manual Execution Engine.
+4. Scheduler and Operations Console.
+5. Builder, Templates, and Validation.
+6. Connector and Extract Integration.
+7. Advanced Control Flow and Triggers.
+8. Hardening, Observability, and Release.
+
+The first end-to-end user outcome is Nightly RAG Summary because it proves scheduling, checkpointing, agent/RAG execution, artifacts, budget controls, and operations visibility.
 
 ## Conflict Outcome
 
-No blockers were detected. No warnings were detected. The only notable routing condition is that `.planning/` existed without core project files; this was handled as a bootstrap from existing codebase intel rather than a merge.
+No blockers were detected. No warnings were detected. The ingest updates the root planning files from "awaiting next milestone" to active milestone v1.1 Workflow Automation.

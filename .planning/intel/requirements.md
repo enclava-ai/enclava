@@ -1,33 +1,20 @@
-# Ingested Requirements
+# Ingest Requirements: Workflow Automation
 
-**Source:** `design-proposal/IMPLEMENTATION_PLAN.md`
-**Synthesized:** 2026-07-01
+Source: `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`
+Ingested: 2026-07-05
 
-## Functional Requirements
+## Requirements
 
-- The frontend uses a semantic Slate Mono token layer in both light and dark mode.
-- Status colors use a consistent semantic role model with solid and soft pairs.
-- Shared UI primitives exist for status badges, confirmation dialogs, page headers, empty states, and skeleton loaders.
-- Deprecated routes and route-specific components are removed before downstream styling work.
-- The LLM settings page lives at `/settings/llm`, with `/llm` redirect compatibility.
-- Desktop users can navigate through a sidebar; mobile users can navigate through a drawer.
-- Color literals and legacy `empire-*`/`enclava-*` styling are removed across `frontend/src`.
-- The dashboard presents the new information architecture from the proposal.
-- Internal navigation remains within the SPA.
-- Client components use `apiClient` for backend calls.
-- Toasts use a single provider and API.
-- Destructive actions use themed confirmation dialogs.
-- Full-page spinners are replaced with layout-preserving skeletons where appropriate.
-- Key empty states explain value and provide a primary action.
-- Status and icon-only UI meets the accessibility expectations in the plan.
-- Guardrails prevent reintroduction of disallowed styling, dialog, navigation, and fetch patterns.
-
-## Verification Requirements
-
-- `cd frontend && npm run lint` passes.
-- TypeScript type checking passes for the frontend.
-- Both light and dark themes are visually verified on touched screens.
-- Desktop and mobile widths are visually verified for touched workflows.
-- `/llm?tab=providers` redirects to `/settings/llm?tab=providers`.
-- Root greps over `frontend/src` return zero for legacy color tokens after the sweep is complete.
-- CI/editor guardrails fail on deliberate examples of banned hardcoded colors, legacy palette names, native dialogs, and disallowed client fetch calls.
+- Workflows must expose a navigable product route when the module is enabled.
+- Workflow UX must default to operations visibility and include run status, last run, next run, failures, and primary actions.
+- Workflow builder must support trigger configuration, ordered typed steps, validation, save draft, publish, enable, and test/run actions.
+- Workflow definitions must be versioned so historical runs remain tied to immutable published versions.
+- Workflow data must persist in Postgres with migrations and SQLAlchemy models.
+- Workflow services must support CRUD, validation, publish, enable, disable, archive, manual run creation, run query, events, and artifacts.
+- Workflow runner must claim queued runs safely, execute steps, persist state transitions, enforce retries/timeouts/cancellation checks, and redact sensitive IO.
+- Workflow scheduler must create due runs from cron/timezone triggers without duplicates and recover after restart according to misfire policy.
+- Workflow step registry must expose step schemas to the UI and validate step config before publish.
+- MVP step types must include RAG query, agent run, in-app notification, and no-results skip behavior.
+- Later step types must include connector sync, Extract template execution, artifacts, approvals, webhooks, API triggers, and nested workflows only when safety requirements are met.
+- Workflow actions must enforce permissions, audit lifecycle/run actions, respect budget caps, and attribute usage to workflow runs and steps where possible.
+- Workflow tests must cover validation, state transitions, scheduling, idempotency, retries, permissions, budget caps, redaction, API behavior, frontend states, and end-to-end user flows.

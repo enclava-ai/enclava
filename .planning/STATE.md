@@ -1,90 +1,62 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: Frontend UX Overhaul
-status: Awaiting next milestone
-stopped_at: Milestone v1.0 archived; ready to define next milestone
-last_updated: "2026-07-01T15:21:03.000Z"
-last_activity: 2026-07-01 — Milestone v1.0 completed and archived
+milestone: v1.1
+milestone_name: Workflow Automation
+status: Active
+stopped_at: Milestone v1.1 created from workflow implementation plan; ready to discuss Phase 1
+last_updated: "2026-07-05T00:00:00.000Z"
+last_activity: 2026-07-05 - Ingested workflow implementation plan and created v1.1 milestone
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 20
-  completed_plans: 20
-  percent: 100
+  total_phases: 8
+  completed_phases: 0
+  total_plans: 22
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-01)
+See: .planning/PROJECT.md (updated 2026-07-05)
 
-**Core value:** Users can manage confidential AI workflows through a trustworthy, coherent, accessible interface that preserves privacy, cost, and operational clarity.
-**Current focus:** Planning next milestone
+**Core value:** Users can run confidential AI automations that are scheduled, auditable, observable, budget-aware, and clear to operate.
+**Current focus:** v1.1 Workflow Automation
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-01 — Milestone v1.0 completed and archived
+Phase: 1 - Product Contract and Scaffold
+Plan: Not planned yet
+Status: Active
+Last activity: 2026-07-05 - Ingested `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md` and created v1.1 milestone
 
 ## Performance Metrics
 
-**Velocity:**
+**Velocity from previous milestone:**
 
+- Previous milestone: v1.0 Frontend UX Overhaul
 - Total plans completed: 20
 - Average duration: 4.0 min
 - Total execution time: 79 min
 
-**By Phase:**
+**Current milestone:**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 1 | 2 | 7 min | 3.5 min |
-| 2 | 3 | 11 min | 3.7 min |
-| 3 | 3 | 11 min | 3.7 min |
-| 4 | 5 | 20 min | 4.0 min |
-| 5 | 2 | 7 min | 3.5 min |
-| 6 | 2 | 11 min | 5.5 min |
-| 7 | 3 | 12 min | 4.0 min |
-
-**Recent Trend:**
-
-- Last 5 plans: 06-01 (6 min), 06-02 (5 min), 07-01 (4 min), 07-02 (3 min), 07-03 (5 min)
-- Trend: n/a
-
-| Phase 1 P1 | 5 min | 2 tasks | 5 files |
-| Phase 1 P2 | 2 min | 2 tasks | 0 files |
-| Phase 2 P1 | 4 min | 2 tasks | 2 files |
-| Phase 2 P2 | 5 min | 2 tasks | 6 files |
-| Phase 2 P3 | 2 min | 2 tasks | 0 files |
-| Phase 3 P1 | 4 min | 2 tasks | 2 files |
-| Phase 3 P2 | 3 min | 2 tasks | 4 files |
-| Phase 3 P3 | 4 min | 2 tasks | 1 files |
-| Phase 4 P1 | 3 min | 2 tasks | 10 files |
-| Phase 4 P2 | 3 min | 2 tasks | 7 files |
-| Phase 4 P3 | 5 min | 2 tasks | 8 files |
-| Phase 4 P4 | 4 min | 2 tasks | 19 files |
-| Phase 4 P5 | 5 min | 2 tasks | 5 files |
-| Phase 5 P1 | 3 min | 2 tasks | 3 files |
-| Phase 5 P2 | 4 min | 2 tasks | 6 files |
-| Phase 6 P1 | 6 min | 2 tasks | 9 files |
-| Phase 6 P2 | 5 min | 2 tasks | 9 files |
-| Phase 7 P1 | 4 min | 2 tasks | 8 files |
-| Phase 7 P2 | 3 min | 2 tasks | 7 files |
-| Phase 7 P3 | 5 min | 2 tasks | 11 files |
+- Phases planned: 8
+- Plans planned: 22
+- Plans completed: 0
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecting current work:
+Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 
-- [Milestone v1.0]: Use Slate Mono semantic tokens for the frontend UX overhaul.
-- [Milestone v1.0]: Treat `design-proposal/palette-explorer.html` as visual-only; current navigation logic remains authoritative.
-- [Milestone v1.0]: Move LLM from `/llm` to `/settings/llm` with query-preserving compatibility redirect.
+- [Milestone v1.1]: Workflows are durable orchestration; agents are executable workers inside workflows.
+- [Milestone v1.1]: Operations Console is the default Workflows UX.
+- [Milestone v1.1]: Step Builder starts as a typed linear sequence, not a canvas.
+- [Milestone v1.1]: Workflow production behavior uses dedicated internal APIs, not the generic module execute endpoint.
+- [Milestone v1.1]: Postgres is the workflow source of truth.
+- [Milestone v1.1]: Start with an in-process scheduler/runner backed by Postgres and escalate only if scale requires it.
 
 ### Pending Todos
 
@@ -92,7 +64,7 @@ None yet.
 
 ### Blockers/Concerns
 
-None currently. The worktree already contains many unrelated user changes; implementation phases must avoid reverting them.
+None currently. The worktree already contains unrelated user changes; implementation phases must avoid reverting them.
 
 ## Deferred Items
 
@@ -103,13 +75,23 @@ Items acknowledged and carried forward from previous milestone close:
 | Frontend testing | Configure component or E2E test runner | Deferred | v1.0 planning |
 | Visual regression | Add automated screenshots for high-traffic routes | Deferred | v1.0 planning |
 
+Items intentionally deferred from the first useful workflow release:
+
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| Workflow UX | Freeform DAG/canvas authoring | Deferred | v1.1 ingest |
+| Workflow runtime | Loops and nested workflows | Deferred | v1.1 ingest |
+| Workflow triggers | External webhooks and API/event triggers beyond foundations | Deferred | v1.1 ingest |
+| Workflow governance | Human approvals until pause/resume and approval permissions exist | Deferred | v1.1 ingest |
+| Workflow runtime | Dedicated distributed worker pool unless run volume requires it | Deferred | v1.1 ingest |
+
 ## Session Continuity
 
-Last session: 2026-07-01T15:21:03.000Z
-Stopped at: Milestone v1.0 archived; ready to define next milestone
+Last session: 2026-07-05T00:00:00.000Z
+Stopped at: Milestone v1.1 created; ready to discuss Phase 1
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
-- Archived phase history lives in `.planning/milestones/v1.0-phases/`.
+- Start Phase 1 with `$gsd-discuss-phase 1`
+- Or skip discussion and plan directly with `$gsd-plan-phase 1`

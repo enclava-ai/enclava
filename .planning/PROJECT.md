@@ -2,17 +2,19 @@
 
 ## What This Is
 
-Enclava is a confidential AI platform with a FastAPI backend, Next.js frontend, dynamic modules, RAG, LLM provider orchestration, plugin support, connectors, usage tracking, and admin controls. The frontend now has a coherent enterprise product surface built on semantic tokens, shared UI primitives, a responsive app shell, centralized client API plumbing, themed feedback flows, and UX guardrails.
+Enclava is a confidential AI platform with a FastAPI backend, Next.js frontend, dynamic modules, RAG, LLM provider orchestration, plugin support, connectors, usage tracking, admin controls, and a polished enterprise frontend foundation. The next milestone turns workflows into a first-class automation capability for scheduled and manual confidential AI operations.
 
 ## Core Value
 
-Users can manage confidential AI workflows through a trustworthy, coherent, accessible interface that preserves privacy, cost, and operational clarity.
+Users can run confidential AI automations that are scheduled, auditable, observable, budget-aware, and clear to operate.
 
 ## Current State
 
 **Shipped milestone:** v1.0 Frontend UX Overhaul, completed 2026-07-01.
 
-**Delivered:**
+**Active milestone:** v1.1 Workflow Automation, created 2026-07-05 from `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`.
+
+**Delivered in v1.0:**
 - Deprecated frontend routes and sole-use proxies were removed.
 - Slate Mono semantic tokens, status roles, and shared primitives are available.
 - The authenticated app uses a desktop sidebar and mobile drawer from one nav model.
@@ -24,18 +26,32 @@ Users can manage confidential AI workflows through a trustworthy, coherent, acce
 - Major loading and empty states use shared skeleton and `EmptyState` primitives.
 - Accessibility labels, live-region feedback, and frontend UX guardrail documentation are in place.
 
+**Current workflow baseline:**
+- `backend/app/modules/workflow/main.py` exists as a module stub with basic status and echo-style execute behavior.
+- Workflow module metadata and permissions exist, but there is no real workflow engine, persistence, scheduling, dedicated UI route, or production run API yet.
+- Workflow UX sketches and a full implementation plan exist under `.planning/`.
+
 **Archive references:**
 - `.planning/milestones/v1.0-ROADMAP.md`
 - `.planning/milestones/v1.0-REQUIREMENTS.md`
 - `.planning/milestones/v1.0-MILESTONE-AUDIT.md`
 
-## Next Milestone Goals
+## Active Milestone Goals
 
-No next milestone is defined yet. Candidate follow-up areas from v1.0 deferred items:
-- Modernize `frontend/tsconfig.json` for TypeScript 6 so `npx tsc --noEmit` can become a hard gate.
-- Add frontend component or E2E test infrastructure for authenticated workflows.
-- Add visual regression screenshots for high-traffic routes.
-- Connect dashboard spend to a reliable frontend cost source.
+v1.1 Workflow Automation should deliver workflows as a governed automation layer around existing Enclava capabilities.
+
+Primary goals:
+
+- Add a Workflows product route with Operations Console as the default view.
+- Add durable workflow definitions, versions, triggers, runs, step runs, artifacts, and events.
+- Add dedicated authenticated internal workflow APIs.
+- Add manual workflow execution and persisted run detail.
+- Add timezone-aware scheduling with preview, idempotency, misfire policy, and concurrency policy.
+- Add typed workflow builder, step catalog, validation, and templates.
+- Prove the first end-to-end use case: Nightly RAG Summary.
+- Add connector and Extract workflow steps after the core engine is reliable.
+- Add advanced controls only after core use cases justify them.
+- Harden with tests, observability, recovery, docs, container rebuild, and smoke checks.
 
 ## Requirements
 
@@ -54,32 +70,54 @@ No next milestone is defined yet. Candidate follow-up areas from v1.0 deferred i
 
 ### Active
 
-None. Start the next requirements cycle with `$gsd-new-milestone`.
+See `.planning/REQUIREMENTS.md` for v1.1 requirements.
+
+Primary active requirement groups:
+
+- Product model and UX.
+- Definition lifecycle and persistence.
+- Execution engine.
+- Scheduling and operations.
+- Builder and templates.
+- Connector and Extract integrations.
+- Security, governance, observability, and release readiness.
 
 ### Out of Scope
 
-- New backend product capabilities - v1.0 was a frontend UX and client integration cleanup.
-- New information architecture from the visual mock beyond the explicit LLM move - the current nav model remains authoritative.
-- Replacing Tailwind, Radix, or shadcn-style primitives - the current stack is adequate and now better standardized.
-- Full frontend test-stack adoption - deferred to a future milestone because v1.0 used lint, build, and grep guardrails.
+- Building a general-purpose Airflow, Temporal, Zapier, or n8n replacement.
+- Making a freeform workflow canvas part of the first useful workflow release.
+- Arbitrary user code execution.
+- Raw secret storage inside workflow definitions.
+- Nested workflows, loops, human approvals, external webhooks, and broad API/event triggers before the core engine is proven.
+- Replacing Tailwind, Radix, shadcn-style primitives, or the existing v1.0 frontend foundation.
 
 ## Context
 
 The frontend now has a stronger foundation for future work: semantic Tailwind tokens, shared status/confirmation/header/empty/skeleton primitives, one shell navigation model, one toast path, themed confirmation flows, `apiClient` enforcement for planned client calls, and scripts for color/plumbing guardrails.
 
-Known deferred items:
+Known deferred items from v1.0:
 - Standalone `npx tsc --noEmit` fails on TypeScript 6 deprecation diagnostics for `target=ES5` and `baseUrl`.
 - Authenticated runtime keyboard and screen-reader checks need credentials or E2E fixtures.
 - Visual regression coverage needs a screenshot harness.
 - Dashboard spend still needs a reliable frontend cost source.
 
+Workflow context:
+- Workflows should be the orchestration and governance unit.
+- Agents should remain reasoning/action workers.
+- The first vertical slice should be Nightly RAG Summary.
+- Production workflow behavior should not depend on the generic module execute endpoint.
+
 ## Constraints
 
-- **Stack:** Continue using Next.js App Router, React, Tailwind, Radix/shadcn-style primitives, lucide-react, and existing project utilities.
+- **Stack:** Continue using FastAPI, SQLAlchemy/Alembic, Postgres, Next.js App Router, React, Tailwind, Radix/shadcn-style primitives, lucide-react, and existing project utilities.
 - **Theme system:** Preserve the `hsl(var(--x) / <alpha-value>)` Tailwind token pattern.
 - **Routing:** Keep the existing nav model authoritative unless a future milestone explicitly changes IA.
 - **Frontend UX:** Use shared primitives and guardrails documented in `CLAUDE.md`.
+- **Workflow storage:** Persist workflow state in Postgres; in-memory state is not sufficient for production runs.
+- **Scheduling:** Store run timestamps in UTC and trigger timezones as IANA strings.
+- **Security:** Do not support arbitrary user code or raw secret storage in workflow definitions.
 - **Verification:** Frontend UX changes should run `npm run check:colors`, `npm run check:plumbing`, `npm run lint`, and `npm run build` from `frontend/`.
+- **Containers:** Rebuild containers and smoke-check the running version after app implementation changes.
 - **Safety:** Do not read or commit `.env` secret values; do not revert unrelated dirty worktree changes.
 
 ## Key Decisions
@@ -95,6 +133,12 @@ Known deferred items:
 | Add grep/script guardrails | The cleanup should fail fast if legacy patterns return. | Good - `check:colors` and `check:plumbing` pass |
 | Keep spinners for inline busy states only | Page-level loads need structure, but action-level loading benefits from compact busy affordances. | Good - applied in Phase 7 |
 | Use themed confirmations instead of native dialogs | Destructive actions need brand-consistent, accessible, consequence-aware confirmation. | Good - guardrail-backed |
+| Workflows orchestrate; agents execute | Scheduling, retries, checkpoints, artifacts, budget, and audit are workflow concerns. | Active - v1.1 |
+| Default Workflows UX is Operations Console | Operators need status, failures, last run, and next run before authoring tools. | Active - v1.1 |
+| Step Builder starts linear and typed | Typed ordered steps cover the core use cases without a clunky canvas. | Active - v1.1 |
+| Workflow production APIs are dedicated internal APIs | Generic module execute lacks real user context, schedule state, run state, and audit semantics. | Active - v1.1 |
+| Postgres is workflow source of truth | Scheduled and long-running automations must survive process restarts. | Active - v1.1 |
+| Start with in-process scheduler/runner | It keeps operational complexity lower while durable state lives in Postgres. | Active - v1.1 |
 
 ## Evolution
 
@@ -107,4 +151,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Define the next Active requirements when a new milestone starts.
 
 ---
-*Last updated: 2026-07-01 after v1.0 milestone completion*
+*Last updated: 2026-07-05 after ingesting `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`*

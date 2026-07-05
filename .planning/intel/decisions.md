@@ -1,30 +1,38 @@
-# Ingested Decisions
+# Ingest Decisions: Workflow Automation
 
-**Source:** `design-proposal/IMPLEMENTATION_PLAN.md`
-**Synthesized:** 2026-07-01
+Source: `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`
+Ingested: 2026-07-05
 
-## Locked For This Milestone
+## Decisions
 
-- Use the Slate Mono palette as the frontend visual direction.
-- Preserve the existing shadcn-style token architecture and extend it with semantic status tokens rather than replacing the styling stack.
-- Split status roles into solid and soft token pairs. Solid pairs are for filled actions such as destructive buttons; soft pairs are for badges and subtle tints.
-- Preserve existing `--chart-*` and `--font-*` CSS variables while editing color tokens.
-- Keep the legacy `empire` and `enclava` Tailwind/CSS definitions only until color sweep phases report zero usages, then remove them.
-- Build shared primitives before consumers: `StatusBadge`, `ConfirmDialog`, `PageHeader`, `EmptyState`, and composed skeleton loaders.
-- Treat `StatusBadge` as the canonical severity indicator and keep category labels visually neutral.
-- Delete deprecated frontend routes before sweeping colors.
-- Move LLM under Settings at `/settings/llm`; preserve `/llm` as a query-preserving compatibility redirect.
-- Repoint existing inbound redirects to `/settings/llm?...` rather than double-hopping through `/llm`.
-- Use the current navigation model as authoritative; use the visual mock only for styling.
-- Desktop navigation becomes a left sidebar; mobile navigation must use a working drawer.
-- Replace raw client fetches with `apiClient`; exclude server route handlers and documentation examples.
-- Replace native browser confirms/alerts with themed confirmation dialogs and toasts.
-- Consolidate toast usage to the existing shadcn-style `@/hooks/use-toast` system.
-- Add guardrails so hardcoded color classes, legacy palette names, native dialogs, and disallowed client fetches do not return.
+### WF-DEC-01: Workflows are orchestration, agents are workers
 
-## Flexible During Implementation
+Workflows own durable automation state: triggers, schedules, runs, retries, artifacts, budget policy, and audit. Agents remain executable reasoning/action steps inside workflows.
 
-- Exact dashboard chart implementation may follow available data and current component patterns as long as the proposed IA is preserved.
-- The exact visual treatment of skeletons and empty states can use local UI conventions if they satisfy the stated UX requirements.
-- Guardrails may combine ESLint and script-based checks, with CI grep acting as the authoritative backstop.
-- Phase-level plan split can be adjusted by downstream planning as long as dependency order remains intact.
+### WF-DEC-02: Operations Console is the default UX
+
+The Workflows route should open on operational visibility rather than a builder. Users should immediately see running workflows, failures, last run, next run, and health.
+
+### WF-DEC-03: Step Builder is linear and typed in v1
+
+The first workflow authoring experience should use a trigger plus ordered typed steps with a properties panel. Freeform visual DAG/canvas behavior is deferred.
+
+### WF-DEC-04: Dedicated workflow APIs are required
+
+Production workflow behavior should use authenticated internal APIs under `/api-internal/v1/workflows`. The generic module execute endpoint is not sufficient for scheduled, auditable, permissioned runs.
+
+### WF-DEC-05: Postgres is the source of truth
+
+Workflow definitions, versions, triggers, runs, step runs, artifacts, and events should be persisted. In-memory workflow state is only acceptable for transient worker-local behavior.
+
+### WF-DEC-06: Start with in-process scheduler and runner
+
+Use a Postgres-backed in-process scheduler and runner first. Escalate to Redis/Celery/RQ or a dedicated worker process only when run volume or horizontal scaling requires it.
+
+### WF-DEC-07: Scheduling is timezone-aware and idempotent
+
+Store run timestamps in UTC, store trigger timezone as an IANA string, preview upcoming run times, and use idempotency keys plus DB locks to prevent duplicate scheduled runs.
+
+### WF-DEC-08: No arbitrary code execution in v1
+
+Workflow steps must be platform-defined and typed. Users should not be able to execute arbitrary code or paste raw secrets into workflow definitions.

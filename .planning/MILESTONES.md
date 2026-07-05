@@ -1,5 +1,23 @@
 # Milestones
 
+## v1.1 Workflow Automation (Active: 2026-07-05)
+
+**Source:** `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`
+**Phases planned:** 8 phases, 22 plans
+
+**Primary goals:**
+
+- Turn workflows into a durable automation layer around Enclava modules and agents.
+- Add Operations Console, Step Builder, and Schedule Board workflow UX.
+- Persist workflow definitions, versions, triggers, runs, step runs, artifacts, and events.
+- Add manual execution, scheduled execution, run detail, retries, cancellation, budget caps, audit, and redaction.
+- Prove Nightly RAG Summary as the first end-to-end workflow.
+- Integrate connector sync and Extract template execution as workflow steps.
+- Add advanced controls only after the core engine is proven.
+- Harden with observability, tests, docs, container rebuilds, and smoke checks.
+
+**Status:** Active. Start with `$gsd-discuss-phase 1`.
+
 ## v1.0 Frontend UX Overhaul (Shipped: 2026-07-01)
 
 **Phases completed:** 7 phases, 20 plans, 32 tasks

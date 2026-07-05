@@ -8,12 +8,16 @@ None.
 
 None.
 
-### INFO (2)
-
-[INFO] Existing planning directory has only codebase intel
-  Found: `.planning/` exists with `.planning/codebase/*` but no `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, or `STATE.md`.
-  Note: The ingest bootstrapped core project artifacts while preserving the existing codebase intelligence.
+### INFO (3)
 
 [INFO] Single explicit document classified as SPEC
-  Found: `design-proposal/IMPLEMENTATION_PLAN.md` contains implementation work packages, binding decisions, dependencies, and definitions of done.
-  Note: Supporting proposal context remains referenced, but only the implementation plan was ingested as the approved source document.
+  Found: `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md` defines implementation architecture, APIs, data models, UX direction, security constraints, testing, and phases.
+  Note: The document is treated as the approved source for milestone v1.1 Workflow Automation.
+
+[INFO] Existing project was between milestones
+  Found: `.planning/STATE.md` and `.planning/ROADMAP.md` indicated that v1.0 was archived and the next milestone was not defined.
+  Note: Ingest can safely create a new active milestone instead of appending to an in-flight phase.
+
+[INFO] Existing workflow code is a stub
+  Found: `backend/app/modules/workflow/main.py` currently registers a basic workflow module and echo-style execute behavior.
+  Note: The new milestone should replace stub behavior with persisted workflow services while preserving the module adapter.

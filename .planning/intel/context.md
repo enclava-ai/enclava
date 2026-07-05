@@ -1,34 +1,55 @@
-# Ingested Context
+# Ingest Context: Workflow Automation
 
-**Source:** `design-proposal/IMPLEMENTATION_PLAN.md`
-**Supporting docs:** `design-proposal/PROPOSAL.md`, `design-proposal/palette-explorer.html`
-**Synthesized:** 2026-07-01
+Source: `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`
+Ingested: 2026-07-05
 
-## Problem Statement
+## Product Context
 
-The frontend has a token system, but much of the UI bypasses it with legacy `empire-*` classes and raw Tailwind palette utilities. This causes poor light-mode behavior, inconsistent status semantics, theme-blind surfaces, and a visual style that reads less professional than the product's confidential AI positioning.
+Enclava currently has a frontend UX foundation from v1.0 and a backend workflow module stub. The next milestone should turn workflows into a product capability for confidential AI automation.
 
-The UX audit also found broader usability issues: missing mobile navigation, internal navigation that leaves the SPA, multiple toast systems, native browser dialogs, full-page spinners, weak empty states, and insufficient accessibility coverage.
+The key distinction is:
+
+- Agents are configured AI workers with model, tools, knowledge, and behavior.
+- Workflows are durable orchestration definitions with triggers, steps, policies, run state, audit, and artifacts.
+
+The core user examples are:
+
+- Every night at 2am, summarize new RAG data.
+- Sync connector intake, triage new items, and notify the owner.
+- Run a weekly extraction report over selected documents.
+- Generate an admin operations digest.
+- Later, pause for human approval before sensitive actions.
 
 ## Current Codebase Fit
 
-Existing codebase intelligence confirms:
+Current known implementation surface:
 
-- The frontend is a Next.js App Router application under `frontend/src/app`.
-- Shared UI primitives live under `frontend/src/components/ui`.
-- Shared browser API behavior is centralized in `frontend/src/lib/api-client.ts`.
-- Frontend styling uses Tailwind with a tokenized shadcn-style theme.
-- Radix UI and lucide-react are already available for dialogs, drawer/sheet-style primitives, and icons.
-- `npm run lint` is available as the frontend quality gate.
+- `backend/app/modules/workflow/main.py` is a stub module with in-memory counters and echo-style execution.
+- `backend/app/modules/workflow/module.yaml` advertises workflow capabilities and permissions.
+- `backend/app/modules/factory.py` wires the workflow module after RAG and Agent.
+- `frontend/src/components/ui/navigation.tsx` maps module navigation for RAG and Extract, but not Workflows.
 
-## Milestone Shape
+The milestone should keep the module as an adapter, move real behavior into workflow services, and add a dedicated authenticated internal API under `/api-internal/v1/workflows`.
 
-The incoming plan is best represented as a single UX-improvement milestone with seven dependency-aware phases:
+## UX Direction
 
-1. Delete deprecated routes.
-2. Build the design-system foundation.
-3. Rebuild app shell navigation and move LLM IA.
-4. Sweep hardcoded colors and rework dashboard.
-5. Fix client navigation and API plumbing.
-6. Consolidate toasts and confirmation flows.
-7. Polish loading, empty, and accessibility states.
+The workflow product should combine the sketch variants:
+
+- Default: Operations Console.
+- Edit mode: Step Builder.
+- Secondary view: Schedule Board.
+
+The first screen should answer "what is running, what failed, and what runs next." Authoring should use a typed linear step list before any canvas or DAG experience.
+
+## First Vertical Slice
+
+Nightly RAG Summary is the recommended first user-visible slice:
+
+1. Scheduled trigger at 02:00 in a selected timezone.
+2. Query documents added since the last successful run.
+3. Skip cleanly if there is no new data.
+4. Run an agent or summarizer.
+5. Save a summary artifact.
+6. Notify configured users or expose the artifact in run detail.
+
+This slice proves the core workflow value without requiring advanced branching, webhooks, or approvals.
