@@ -9,6 +9,12 @@ from .runtime import (
     WorkflowRuntimeService,
     WorkflowRunValidationError,
 )
+from .scheduler import (
+    WorkflowSchedulerError,
+    WorkflowSchedulerService,
+    WorkflowScheduleValidationError,
+    calculate_next_run_at,
+)
 from .service import (
     WorkflowNotFoundError,
     WorkflowPermissionError,
@@ -28,6 +34,10 @@ __all__ = [
     "WorkflowRunValidationError",
     "WorkflowRunConflictError",
     "WorkflowRuntimeDependencies",
+    "WorkflowSchedulerService",
+    "WorkflowSchedulerError",
+    "WorkflowScheduleValidationError",
+    "calculate_next_run_at",
     "WorkflowService",
     "WorkflowServiceError",
     "WorkflowNotFoundError",

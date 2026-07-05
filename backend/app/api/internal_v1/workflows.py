@@ -17,6 +17,7 @@ from app.schemas.workflow import (
     WorkflowLifecycleAction,
     WorkflowManualRunRequest,
     WorkflowRunAction,
+    WorkflowSchedulePreviewRequest,
 )
 from app.services.workflows import (
     WorkflowNotFoundError,
@@ -26,6 +27,8 @@ from app.services.workflows import (
     WorkflowRunPermissionError,
     WorkflowRuntimeService,
     WorkflowRunValidationError,
+    WorkflowSchedulerService,
+    WorkflowScheduleValidationError,
     WorkflowService,
     WorkflowValidationError,
 )
@@ -34,6 +37,7 @@ from app.services.workflows.steps import WorkflowStepExecutionError
 router = APIRouter(tags=["Workflows"])
 workflow_service = WorkflowService()
 runtime_service = WorkflowRuntimeService()
+scheduler_service = WorkflowSchedulerService(runtime_service)
 
 
 def _map_service_error(exc: Exception) -> HTTPException:
@@ -41,7 +45,14 @@ def _map_service_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, (WorkflowPermissionError, WorkflowRunPermissionError)):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
-    if isinstance(exc, (WorkflowValidationError, WorkflowRunValidationError)):
+    if isinstance(
+        exc,
+        (
+            WorkflowValidationError,
+            WorkflowRunValidationError,
+            WorkflowScheduleValidationError,
+        ),
+    ):
         return HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
@@ -55,6 +66,18 @@ def _map_service_error(exc: Exception) -> HTTPException:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="workflow operation failed",
     )
+
+
+def _has_workflow_manage_access(actor: dict) -> bool:
+    if actor.get("is_superuser") or actor.get("role") in {"admin", "super_admin"}:
+        return True
+    permissions = actor.get("permissions") or []
+    if permissions == "*":
+        return True
+    if isinstance(permissions, dict):
+        permissions = permissions.get("granted", [])
+    aliases = {"workflow.manage", "workflow:manage", "*"}
+    return any(permission in aliases for permission in permissions)
 
 
 @router.get("/catalog")
@@ -116,6 +139,59 @@ async def list_workflows(
         "workflows": [workflow.model_dump(mode="json") for workflow in workflows],
         "total": len(workflows),
     }
+
+
+@router.post("/schedule/preview")
+async def preview_workflow_schedule(
+    payload: WorkflowSchedulePreviewRequest,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Preview a workflow cron schedule."""
+    try:
+        preview = scheduler_service.preview_schedule(payload)
+        return {"success": True, "preview": preview.model_dump(mode="json")}
+    except WorkflowScheduleValidationError as exc:
+        raise _map_service_error(exc) from exc
+
+
+@router.get("/scheduler/status")
+async def get_workflow_scheduler_status(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Get in-process workflow scheduler status."""
+    from app.tasks.workflow_scheduler import workflow_scheduler
+
+    return {
+        "success": True,
+        "scheduler": workflow_scheduler.status().model_dump(mode="json"),
+    }
+
+
+@router.post("/scheduler/tick")
+async def run_workflow_scheduler_tick(
+    create_limit: int = Query(default=50, ge=1, le=200),
+    execute_limit: int = Query(default=5, ge=0, le=50),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Run one scheduler tick for operators and tests."""
+    if not _has_workflow_manage_access(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="workflow manage permission required",
+        )
+    try:
+        result = await scheduler_service.run_tick(
+            db,
+            create_limit=create_limit,
+            execute_limit=execute_limit,
+            worker_id=f"scheduler-api-{current_user.get('id')}",
+        )
+        await db.commit()
+        return {"success": True, "scheduler": result.model_dump(mode="json")}
+    except WorkflowScheduleValidationError as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
 
 
 @router.get("/runs/{run_id}")

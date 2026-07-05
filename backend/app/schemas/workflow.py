@@ -132,6 +132,18 @@ class WorkflowTriggerDefinition(BaseModel):
                 raise ValueError("schedule triggers require cron")
             if not self.timezone:
                 raise ValueError("schedule triggers require timezone")
+            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+            from croniter import croniter
+
+            if not croniter.is_valid(self.cron):
+                raise ValueError("schedule triggers require a valid cron")
+            try:
+                ZoneInfo(self.timezone)
+            except ZoneInfoNotFoundError as exc:
+                raise ValueError(
+                    "schedule triggers require a valid IANA timezone"
+                ) from exc
 
         if self.type == WorkflowTriggerType.EVENT and not self.event_name:
             raise ValueError("event triggers require event_name")
@@ -293,6 +305,73 @@ class WorkflowTriggerSummary(BaseModel):
     timezone: Optional[str] = None
     misfire_policy: Optional[str] = None
     next_run_at: Optional[datetime] = None
+
+
+class WorkflowSchedulePreviewRequest(BaseModel):
+    """Request body for cron/timezone schedule preview."""
+
+    cron: str = Field(min_length=1, max_length=120)
+    timezone: str = Field(min_length=1, max_length=80)
+    count: int = Field(default=5, ge=1, le=20)
+    start_at: Optional[datetime] = None
+
+    @field_validator("cron", "timezone")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        """Normalize required string fields."""
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("value cannot be empty")
+        return normalized
+
+
+class WorkflowSchedulePreviewItem(BaseModel):
+    """One schedule preview fire time."""
+
+    run_at: datetime
+    local_time: str
+    timezone: str
+
+
+class WorkflowSchedulePreviewResponse(BaseModel):
+    """Schedule preview response."""
+
+    cron: str
+    timezone: str
+    next_runs: List[WorkflowSchedulePreviewItem]
+
+
+class WorkflowScheduledRunSummary(BaseModel):
+    """Run created or skipped by a scheduler tick."""
+
+    workflow_id: str
+    trigger_id: str
+    scheduled_fire_at: datetime
+    run_id: Optional[str] = None
+    status: str
+    reason: Optional[str] = None
+
+
+class WorkflowSchedulerTickResponse(BaseModel):
+    """Scheduler tick summary."""
+
+    created_runs: int = 0
+    skipped_triggers: int = 0
+    duplicate_runs: int = 0
+    executed_runs: int = 0
+    failed_runs: int = 0
+    next_tick_at: Optional[datetime] = None
+    runs: List[WorkflowScheduledRunSummary] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
+
+
+class WorkflowSchedulerStatusResponse(BaseModel):
+    """In-process scheduler status."""
+
+    running: bool
+    tick_seconds: int
+    last_tick_at: Optional[datetime] = None
+    last_result: Optional[WorkflowSchedulerTickResponse] = None
 
 
 class WorkflowDefinitionListItem(BaseModel):

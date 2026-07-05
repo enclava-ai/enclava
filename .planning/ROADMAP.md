@@ -119,7 +119,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 04-01: Implement scheduler service, schedule preview, due-run polling, idempotency, locks, and misfire policy.
+- [x] 04-01: Implement scheduler service, schedule preview, due-run polling, idempotency, locks, and misfire policy.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -239,7 +239,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 1. Product Contract and Scaffold | 2/2 | Complete | 2026-07-05 |
 | 2. Persistence, API, Permissions, and Audit | 3/3 | Complete | 2026-07-05 |
 | 3. Manual Execution Engine | 3/3 | Complete | 2026-07-05 |
-| 4. Scheduler and Operations Console | 0/3 | Planned | - |
+| 4. Scheduler and Operations Console | 1/3 | In Progress | - |
 | 5. Builder, Templates, and Validation | 0/3 | Planned | - |
 | 6. Connector and Extract Integration | 0/2 | Planned | - |
 | 7. Advanced Control Flow and Triggers | 0/3 | Planned | - |

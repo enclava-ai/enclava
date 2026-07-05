@@ -37,6 +37,7 @@ flower==2.0.1
 # Validation & Serialization
 email-validator==2.3.0
 python-dateutil==2.9.0.post0
+croniter==6.0.0
 jsonschema==4.26.0
 
 # Logging & Monitoring

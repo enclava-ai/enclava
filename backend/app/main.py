@@ -227,12 +227,19 @@ async def lifespan(app: FastAPI):
 
     # Start connector sync scheduler
     from app.tasks.connector_sync import connector_sync_scheduler
+    from app.tasks.workflow_scheduler import workflow_scheduler
 
     try:
         await connector_sync_scheduler.start()
         logger.info("Connector sync scheduler started")
     except Exception as exc:
         logger.warning(f"Connector sync scheduler failed to start: {exc}")
+
+    try:
+        await workflow_scheduler.start()
+        logger.info("Workflow scheduler started")
+    except Exception as exc:
+        logger.warning(f"Workflow scheduler failed to start: {exc}")
 
     logger.info("Platform started successfully")
 
@@ -247,6 +254,11 @@ async def lifespan(app: FastAPI):
             await connector_sync_scheduler.stop()
         except Exception as exc:
             logger.warning(f"Error stopping connector sync scheduler: {exc}")
+
+        try:
+            await workflow_scheduler.stop()
+        except Exception as exc:
+            logger.warning(f"Error stopping workflow scheduler: {exc}")
 
         # Cleanup embedding service HTTP sessions
         from app.services.embedding_service import embedding_service

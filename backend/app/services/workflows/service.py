@@ -425,6 +425,16 @@ class WorkflowService:
         definition: WorkflowDefinitionDocument,
     ) -> WorkflowTrigger:
         trigger = definition.trigger
+        next_run_at = None
+        if (
+            trigger.type == WorkflowTriggerType.SCHEDULE
+            and trigger.cron
+            and trigger.timezone
+        ):
+            from .scheduler import calculate_next_run_at
+
+            next_run_at = calculate_next_run_at(trigger.cron, trigger.timezone)
+
         return WorkflowTrigger(
             workflow_id=workflow.id,
             version_id=version.id,
@@ -434,6 +444,7 @@ class WorkflowService:
             timezone=trigger.timezone,
             misfire_policy=trigger.misfire_policy.value,
             enabled=workflow.status == WorkflowDefinitionStatus.ACTIVE.value,
+            next_run_at=next_run_at,
             created_at=utc_now(),
             updated_at=utc_now(),
         )
@@ -451,6 +462,19 @@ class WorkflowService:
         )
         for trigger in result.scalars().all():
             trigger.enabled = enabled
+            if (
+                enabled
+                and trigger.trigger_type == WorkflowTriggerType.SCHEDULE.value
+                and trigger.cron_expression
+                and trigger.timezone
+            ):
+                from .scheduler import calculate_next_run_at
+
+                trigger.next_run_at = calculate_next_run_at(
+                    trigger.cron_expression,
+                    trigger.timezone,
+                    after=utc_now(),
+                )
             trigger.updated_at = utc_now()
 
     def _can_read(self, workflow: WorkflowDefinition, actor: Mapping[str, Any]) -> bool:
