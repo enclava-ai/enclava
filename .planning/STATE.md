@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3 complete; ready for Phase 4
-last_updated: "2026-07-05T20:00:00Z"
-last_activity: 2026-07-05 - Completed Phase 3 Manual Execution Engine
+stopped_at: Phase 4 planned; ready to execute
+last_updated: "2026-07-05T20:10:00Z"
+last_activity: 2026-07-05 - Planned Phase 4 Scheduler and Operations Console
 progress:
   total_phases: 8
   completed_phases: 3
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 
 Phase: 4 - Scheduler and Operations Console
 Plan: 04-01
-Status: Ready to plan
-Last activity: 2026-07-05 - Completed Phase 3 Manual Execution Engine
+Status: Planned
+Last activity: 2026-07-05 - Planned Phase 4 Scheduler and Operations Console
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 3]: Manual execution will add one additive runtime migration for lock, cancel, retry, redaction, and budget metadata before wiring runner behavior.
 - [Phase 3]: Manual workflow execution is synchronous/in-process for the MVP, with persisted run, step, event, artifact, retry, cancellation, budget, and redaction history.
 - [Phase 3]: Run detail UI is direct-linked only until Phase 4 introduces the Workflows operations console and navigation entry.
+- [Phase 4]: Scheduler should follow the existing lightweight asyncio task pattern used by connector sync, backed by Postgres locks and idempotency keys.
 
 ### Pending Todos
 
@@ -93,11 +94,11 @@ Items intentionally deferred from the first useful workflow release:
 
 ## Session Continuity
 
-Last session: 2026-07-05T20:00:00.000Z
-Stopped at: Phase 3 complete; ready for Phase 4
+Last session: 2026-07-05T20:10:00.000Z
+Stopped at: Phase 4 planned; ready to execute
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 4 with `$gsd-plan-phase 4 --auto`
+- Execute Phase 4 with `$gsd-execute-phase 4`
 - Or continue autonomous execution with `$gsd-autonomous --auto`
