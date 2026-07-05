@@ -358,3 +358,126 @@ export const extractApi = {
     return apiClient.get('/api/v1/extract/health')
   }
 }
+
+export type WorkflowRunStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
+  | 'paused'
+  | 'skipped'
+
+export type WorkflowStepRunStatus =
+  | 'pending'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'skipped'
+  | 'retrying'
+  | 'cancelled'
+
+export interface WorkflowRedactedPayload {
+  redacted: boolean
+  policy: 'default' | 'strict' | 'none'
+  value: any
+}
+
+export interface WorkflowArtifactSummary {
+  id: string
+  step_run_id?: string | null
+  artifact_type: string
+  name: string
+  data?: WorkflowRedactedPayload | null
+  storage_uri?: string | null
+  redaction_policy: 'default' | 'strict' | 'none'
+  created_at?: string | null
+}
+
+export interface WorkflowEventSummary {
+  id: string
+  event_type: string
+  severity: string
+  message: string
+  data: Record<string, any>
+  created_by_user_id?: number | null
+  created_at?: string | null
+}
+
+export interface WorkflowStepRunDetail {
+  id: string
+  step_key: string
+  step_type: string
+  status: WorkflowStepRunStatus
+  attempt: number
+  input_data: WorkflowRedactedPayload
+  output_data: WorkflowRedactedPayload
+  error?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  duration_ms?: number | null
+  artifacts: WorkflowArtifactSummary[]
+}
+
+export interface WorkflowRunDetail {
+  id: string
+  workflow_id: string
+  workflow_name?: string | null
+  version_id: string
+  version_number?: number | null
+  status: WorkflowRunStatus
+  trigger_type: string
+  requested_by_user_id?: number | null
+  retry_of_run_id?: string | null
+  queued_at?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  duration_ms?: number | null
+  budget_limit_cents?: number | null
+  estimated_cost_cents: number
+  actual_cost_cents: number
+  trigger_id?: string | null
+  idempotency_key?: string | null
+  input_data: WorkflowRedactedPayload
+  output_data: WorkflowRedactedPayload
+  error?: string | null
+  locked_by?: string | null
+  lock_expires_at?: string | null
+  cancel_requested_at?: string | null
+  cancelled_by_user_id?: number | null
+  redaction_policy: 'default' | 'strict' | 'none'
+  steps: WorkflowStepRunDetail[]
+  artifacts: WorkflowArtifactSummary[]
+  events: WorkflowEventSummary[]
+}
+
+export interface WorkflowRunResponse {
+  success: boolean
+  run: WorkflowRunDetail
+  error?: string
+}
+
+export const workflowRunApi = {
+  getRun(runId: string) {
+    return apiClient.get<WorkflowRunResponse>(`/api/workflows/runs/${encodeURIComponent(runId)}`)
+  },
+  cancelRun(runId: string, reason?: string) {
+    return apiClient.post<WorkflowRunResponse>(`/api/workflows/runs/${encodeURIComponent(runId)}`, {
+      action: 'cancel',
+      reason,
+    })
+  },
+  retryRun(runId: string, reason?: string) {
+    return apiClient.post<WorkflowRunResponse>(`/api/workflows/runs/${encodeURIComponent(runId)}`, {
+      action: 'retry',
+      reason,
+    })
+  },
+  executeRun(runId: string) {
+    return apiClient.post<WorkflowRunResponse>(`/api/workflows/runs/${encodeURIComponent(runId)}`, {
+      action: 'execute',
+    })
+  },
+}

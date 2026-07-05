@@ -241,6 +241,7 @@ class WorkflowRun(Base):
     __table_args__ = (
         Index("ix_workflow_runs_workflow_status", "workflow_id", "status"),
         Index("ix_workflow_runs_version_created", "version_id", "created_at"),
+        Index("ix_workflow_runs_status_lock", "status", "lock_expires_at"),
     )
 
     id = Column(String, primary_key=True, default=_uuid)
@@ -271,6 +272,22 @@ class WorkflowRun(Base):
     requested_by_user_id = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    retry_of_run_id = Column(
+        String,
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    locked_by = Column(String(120), nullable=True)
+    lock_expires_at = Column(DateTime, nullable=True)
+    cancel_requested_at = Column(DateTime, nullable=True)
+    cancelled_by_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    redaction_policy = Column(String(32), nullable=False, default="default")
+    budget_limit_cents = Column(Integer, nullable=True)
+    estimated_cost_cents = Column(Integer, nullable=False, default=0)
+    actual_cost_cents = Column(Integer, nullable=False, default=0)
     queued_at = Column(DateTime, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
@@ -281,6 +298,10 @@ class WorkflowRun(Base):
     version = relationship("WorkflowVersion", back_populates="runs")
     trigger = relationship("WorkflowTrigger", back_populates="runs")
     requested_by = relationship("User", foreign_keys=[requested_by_user_id])
+    retry_of = relationship(
+        "WorkflowRun", remote_side=[id], foreign_keys=[retry_of_run_id]
+    )
+    cancelled_by = relationship("User", foreign_keys=[cancelled_by_user_id])
     step_runs = relationship(
         "WorkflowStepRun", back_populates="run", cascade="all, delete-orphan"
     )

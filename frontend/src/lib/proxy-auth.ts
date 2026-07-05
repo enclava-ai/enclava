@@ -17,6 +17,28 @@ export async function proxyRequest(path: string, init?: RequestInit): Promise<Re
   return fetch(url, { ...init, headers })
 }
 
+export async function proxyAuthenticatedRequest(
+  incomingRequest: Request,
+  path: string,
+  init?: RequestInit
+): Promise<Response> {
+  const url = `${BACKEND_URL}${path}`
+  const headers = new Headers(init?.headers)
+  headers.set('Content-Type', 'application/json')
+
+  const authorization = incomingRequest.headers.get('authorization')
+  if (authorization && !headers.has('authorization')) {
+    headers.set('authorization', authorization)
+  }
+
+  const cookie = incomingRequest.headers.get('cookie')
+  if (cookie && !headers.has('cookie')) {
+    headers.set('cookie', cookie)
+  }
+
+  return fetch(url, { ...init, headers })
+}
+
 export async function handleProxyResponse<T = any>(response: Response, defaultMessage = 'Request failed'): Promise<T> {
   if (!response.ok) {
     // Read the body once to avoid "Body has already been consumed" when the upstream returns HTML errors

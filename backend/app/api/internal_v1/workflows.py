@@ -15,28 +15,42 @@ from app.schemas.workflow import (
     WorkflowDefinitionStatus,
     WorkflowDefinitionUpdate,
     WorkflowLifecycleAction,
+    WorkflowManualRunRequest,
+    WorkflowRunAction,
 )
 from app.services.workflows import (
     WorkflowNotFoundError,
     WorkflowPermissionError,
+    WorkflowRunConflictError,
+    WorkflowRunNotFoundError,
+    WorkflowRunPermissionError,
+    WorkflowRuntimeService,
+    WorkflowRunValidationError,
     WorkflowService,
     WorkflowValidationError,
 )
+from app.services.workflows.steps import WorkflowStepExecutionError
 
 router = APIRouter(tags=["Workflows"])
 workflow_service = WorkflowService()
+runtime_service = WorkflowRuntimeService()
 
 
 def _map_service_error(exc: Exception) -> HTTPException:
-    if isinstance(exc, WorkflowNotFoundError):
+    if isinstance(exc, (WorkflowNotFoundError, WorkflowRunNotFoundError)):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    if isinstance(exc, WorkflowPermissionError):
+    if isinstance(exc, (WorkflowPermissionError, WorkflowRunPermissionError)):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
-    if isinstance(exc, WorkflowValidationError):
+    if isinstance(exc, (WorkflowValidationError, WorkflowRunValidationError)):
         return HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"message": str(exc), "errors": exc.details},
+            detail={
+                "message": str(exc),
+                "errors": getattr(exc, "details", []),
+            },
         )
+    if isinstance(exc, WorkflowRunConflictError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="workflow operation failed",
@@ -102,6 +116,179 @@ async def list_workflows(
         "workflows": [workflow.model_dump(mode="json") for workflow in workflows],
         "total": len(workflows),
     }
+
+
+@router.get("/runs/{run_id}")
+async def get_workflow_run(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Get workflow run detail."""
+    try:
+        run = await runtime_service.get_run_detail(db, run_id, current_user)
+        return {"success": True, "run": run.model_dump(mode="json")}
+    except (
+        WorkflowRunNotFoundError,
+        WorkflowRunPermissionError,
+        WorkflowRunValidationError,
+        WorkflowRunConflictError,
+    ) as exc:
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/runs/{run_id}/execute")
+async def execute_workflow_run(
+    run_id: str,
+    worker_id: str = Query(default="manual-api", min_length=1, max_length=120),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Execute a queued workflow run synchronously."""
+    try:
+        try:
+            run = await runtime_service.execute_run(
+                db, run_id, worker_id=worker_id, actor=current_user
+            )
+        except WorkflowStepExecutionError as exc:
+            await db.commit()
+            failed = await runtime_service.get_run_detail(db, run_id, current_user)
+            return {
+                "success": False,
+                "error": str(exc),
+                "run": failed.model_dump(mode="json"),
+            }
+        await db.commit()
+        return {"success": True, "run": run.model_dump(mode="json")}
+    except (
+        WorkflowRunNotFoundError,
+        WorkflowRunPermissionError,
+        WorkflowRunValidationError,
+        WorkflowRunConflictError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/runs/{run_id}/retry", status_code=status.HTTP_201_CREATED)
+async def retry_workflow_run(
+    run_id: str,
+    action: Optional[WorkflowRunAction] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Queue a retry for a terminal workflow run."""
+    try:
+        run = await runtime_service.retry_run(
+            db,
+            run_id,
+            current_user,
+            reason=(action.reason if action else None),
+        )
+        await db.commit()
+        return {"success": True, "run": run.model_dump(mode="json")}
+    except (
+        WorkflowRunNotFoundError,
+        WorkflowRunPermissionError,
+        WorkflowRunValidationError,
+        WorkflowRunConflictError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/runs/{run_id}/cancel")
+async def cancel_workflow_run(
+    run_id: str,
+    action: Optional[WorkflowRunAction] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Cancel or request cancellation for a workflow run."""
+    try:
+        run = await runtime_service.request_cancel_run(
+            db,
+            run_id,
+            current_user,
+            reason=(action.reason if action else None),
+        )
+        await db.commit()
+        return {"success": True, "run": run.model_dump(mode="json")}
+    except (
+        WorkflowRunNotFoundError,
+        WorkflowRunPermissionError,
+        WorkflowRunValidationError,
+        WorkflowRunConflictError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.get("/{workflow_id}/runs")
+async def list_workflow_runs(
+    workflow_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List recent runs for a workflow."""
+    try:
+        runs = await runtime_service.list_workflow_runs(
+            db, workflow_id, current_user, limit=limit
+        )
+        return {
+            "success": True,
+            "runs": [run.model_dump(mode="json") for run in runs],
+            "total": len(runs),
+        }
+    except (
+        WorkflowRunNotFoundError,
+        WorkflowRunPermissionError,
+        WorkflowRunValidationError,
+        WorkflowRunConflictError,
+    ) as exc:
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/{workflow_id}/runs", status_code=status.HTTP_201_CREATED)
+async def create_workflow_run(
+    workflow_id: str,
+    payload: WorkflowManualRunRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Create a manual workflow run and optionally execute it immediately."""
+    try:
+        run = await runtime_service.create_manual_run(
+            db, workflow_id, payload, current_user
+        )
+        if payload.execute_now:
+            try:
+                run = await runtime_service.execute_run(
+                    db,
+                    run.id,
+                    worker_id=f"manual-user-{current_user.get('id')}",
+                    actor=current_user,
+                )
+            except WorkflowStepExecutionError as exc:
+                await db.commit()
+                failed = await runtime_service.get_run_detail(db, run.id, current_user)
+                return {
+                    "success": False,
+                    "error": str(exc),
+                    "run": failed.model_dump(mode="json"),
+                }
+
+        await db.commit()
+        return {"success": True, "run": run.model_dump(mode="json")}
+    except (
+        WorkflowRunNotFoundError,
+        WorkflowRunPermissionError,
+        WorkflowRunValidationError,
+        WorkflowRunConflictError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)

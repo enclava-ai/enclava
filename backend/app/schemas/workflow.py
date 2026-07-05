@@ -329,3 +329,108 @@ class WorkflowValidationResponse(BaseModel):
     valid: bool
     definition: Optional[WorkflowDefinitionDocument] = None
     errors: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class WorkflowManualRunRequest(BaseModel):
+    """Request body for creating a manual workflow run."""
+
+    input_data: Dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: Optional[str] = Field(default=None, max_length=160)
+    execute_now: bool = False
+
+
+class WorkflowRunAction(BaseModel):
+    """Optional metadata for run actions such as cancel or retry."""
+
+    reason: Optional[str] = Field(default=None, max_length=1000)
+
+
+class WorkflowRedactedPayload(BaseModel):
+    """Input/output payload wrapper that records redaction state."""
+
+    redacted: bool
+    policy: WorkflowRedactionPolicy
+    value: Optional[Any] = None
+
+
+class WorkflowEventSummary(BaseModel):
+    """Workflow run event shown in timelines."""
+
+    id: str
+    event_type: str
+    severity: str
+    message: str
+    data: Dict[str, Any] = Field(default_factory=dict)
+    created_by_user_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+
+class WorkflowArtifactSummary(BaseModel):
+    """Workflow artifact metadata shown in run detail."""
+
+    id: str
+    step_run_id: Optional[str] = None
+    artifact_type: str
+    name: str
+    data: Optional[WorkflowRedactedPayload] = None
+    storage_uri: Optional[str] = None
+    redaction_policy: WorkflowRedactionPolicy = WorkflowRedactionPolicy.DEFAULT
+    created_at: Optional[datetime] = None
+
+
+class WorkflowStepRunDetail(BaseModel):
+    """Persisted workflow step run detail."""
+
+    id: str
+    step_key: str
+    step_type: str
+    status: WorkflowStepRunStatus
+    attempt: int
+    input_data: WorkflowRedactedPayload
+    output_data: WorkflowRedactedPayload
+    error: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    duration_ms: Optional[int] = None
+    artifacts: List[WorkflowArtifactSummary] = Field(default_factory=list)
+
+
+class WorkflowRunSummary(BaseModel):
+    """Workflow run summary returned from list/create endpoints."""
+
+    id: str
+    workflow_id: str
+    workflow_name: Optional[str] = None
+    version_id: str
+    version_number: Optional[int] = None
+    status: WorkflowRunStatus
+    trigger_type: WorkflowTriggerType
+    requested_by_user_id: Optional[int] = None
+    retry_of_run_id: Optional[str] = None
+    queued_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    duration_ms: Optional[int] = None
+    budget_limit_cents: Optional[int] = None
+    estimated_cost_cents: int = 0
+    actual_cost_cents: int = 0
+
+
+class WorkflowRunDetail(WorkflowRunSummary):
+    """Workflow run detail returned by runtime APIs."""
+
+    trigger_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+    input_data: WorkflowRedactedPayload
+    output_data: WorkflowRedactedPayload
+    error: Optional[str] = None
+    locked_by: Optional[str] = None
+    lock_expires_at: Optional[datetime] = None
+    cancel_requested_at: Optional[datetime] = None
+    cancelled_by_user_id: Optional[int] = None
+    redaction_policy: WorkflowRedactionPolicy = WorkflowRedactionPolicy.DEFAULT
+    steps: List[WorkflowStepRunDetail] = Field(default_factory=list)
+    artifacts: List[WorkflowArtifactSummary] = Field(default_factory=list)
+    events: List[WorkflowEventSummary] = Field(default_factory=list)
