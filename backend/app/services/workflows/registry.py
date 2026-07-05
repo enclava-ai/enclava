@@ -162,7 +162,15 @@ def create_default_step_registry() -> StepRegistry:
                     "required": ["connector_id"],
                     "properties": {
                         "connector_id": {"type": "string"},
-                        "since": {"type": "object"},
+                        "since": {
+                            "type": "string",
+                            "enum": [
+                                "connector_checkpoint",
+                                "last_successful_run",
+                                "full_sync",
+                            ],
+                        },
+                        "max_records": {"type": "integer", "minimum": 1},
                     },
                 },
                 output_schema={
@@ -176,8 +184,7 @@ def create_default_step_registry() -> StepRegistry:
                 supports_retry=True,
                 supports_test=False,
                 estimated_cost_kind="connector",
-                enabled=False,
-                disabled_reason="Connector workflow steps are scheduled for Phase 6.",
+                enabled=True,
             ),
             WorkflowStepCatalogEntry(
                 type="extract.run_template",

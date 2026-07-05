@@ -16,6 +16,7 @@ import hashlib
 import io
 import logging
 import os
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -33,6 +34,33 @@ from app.models.rag_collection import RagCollection
 from app.models.rag_document import RagDocument
 
 logger = logging.getLogger(__name__)
+
+MAX_WORKFLOW_SYNC_DOCUMENTS = 100
+
+
+@dataclass
+class ConnectorWorkflowSyncResult:
+    """Connector sync result shaped for workflow step output."""
+
+    job: ConnectorSyncJob
+    connector: ConnectorSource
+    documents: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_workflow_output(self) -> dict[str, Any]:
+        """Serialize connector sync result without credentials."""
+        return {
+            "job_id": self.job.id,
+            "connector_id": self.connector.id,
+            "connector_name": self.connector.name,
+            "connector_type": self.connector.connector_type,
+            "collection_id": self.connector.collection_id,
+            "status": _string_value(self.job.status),
+            "docs_indexed": self.job.docs_indexed,
+            "docs_failed": self.job.docs_failed,
+            "error_message": self.job.error_message,
+            "documents": self.documents,
+        }
+
 
 # ---------------------------------------------------------------------------
 # Credential encryption helpers
@@ -123,6 +151,40 @@ class ConnectorSyncService:
 
         Returns the completed ConnectorSyncJob row.
         """
+        result = await self._run_sync(
+            connector_id,
+            collect_documents=False,
+            max_records=0,
+            commit=True,
+        )
+        return result.job
+
+    async def run_sync_for_workflow(
+        self, connector_id: int, max_records: int = 50
+    ) -> ConnectorWorkflowSyncResult:
+        """
+        Execute a connector sync and return workflow-safe output.
+
+        Unlike ``run_sync()``, this method does not commit the session. The
+        workflow runtime owns the enclosing transaction so step state,
+        artifacts, and connector changes commit together.
+        """
+        return await self._run_sync(
+            connector_id,
+            collect_documents=True,
+            max_records=max_records,
+            commit=False,
+        )
+
+    async def _run_sync(
+        self,
+        connector_id: int,
+        *,
+        collect_documents: bool,
+        max_records: int,
+        commit: bool,
+    ) -> ConnectorWorkflowSyncResult:
+        """Shared sync implementation for scheduler/API and workflow callers."""
         # Load connector row
         connector: Optional[ConnectorSource] = await self.db.get(
             ConnectorSource, connector_id
@@ -140,9 +202,14 @@ class ConnectorSyncService:
         )
         self.db.add(job)
         await self.db.flush()  # get job.id
+        created_documents: list[RagDocument] = []
 
         try:
-            docs_indexed, docs_failed = await self._do_sync(connector, job)
+            docs_indexed, docs_failed = await self._do_sync(
+                connector,
+                job,
+                created_documents=created_documents if collect_documents else None,
+            )
             job.status = ConnectorSyncStatus.SUCCESS
             job.docs_indexed = docs_indexed
             job.docs_failed = docs_failed
@@ -166,13 +233,27 @@ class ConnectorSyncService:
         finally:
             job.finished_at = datetime.now(timezone.utc)
             connector.last_synced_at = datetime.now(timezone.utc)
-            await self.db.commit()
-            await self.db.refresh(job)
+            if commit:
+                await self.db.commit()
+                await self.db.refresh(job)
+            else:
+                await self.db.flush()
 
-        return job
+        return ConnectorWorkflowSyncResult(
+            job=job,
+            connector=connector,
+            documents=[
+                _document_summary(document)
+                for document in created_documents[: _workflow_record_limit(max_records)]
+            ],
+        )
 
     async def _do_sync(
-        self, connector: ConnectorSource, job: ConnectorSyncJob
+        self,
+        connector: ConnectorSource,
+        job: ConnectorSyncJob,
+        *,
+        created_documents: Optional[list[RagDocument]] = None,
     ) -> tuple[int, int]:
         """
         Core sync logic.  Returns (docs_indexed, docs_failed).
@@ -213,9 +294,11 @@ class ConnectorSyncService:
         for batch in doc_iterator:
             for doc in batch:
                 try:
-                    indexed = await self._upsert_document(connector, doc)
-                    if indexed:
+                    indexed_document = await self._upsert_document(connector, doc)
+                    if indexed_document is not None:
                         docs_indexed += 1
+                        if created_documents is not None:
+                            created_documents.append(indexed_document)
                 except Exception as exc:
                     logger.warning(
                         "Failed to index document %s from connector %d: %s",
@@ -234,12 +317,12 @@ class ConnectorSyncService:
 
     async def _upsert_document(
         self, connector: ConnectorSource, doc: "ConnectorDocument"  # noqa: F821
-    ) -> bool:
+    ) -> Optional[RagDocument]:
         """
         Insert or update a RagDocument for *doc*.
 
-        Returns True if the document was actually (re-)indexed, False if it
-        was skipped due to dedup.
+        Returns the new document row if the document was actually
+        (re-)indexed, or None if it was skipped due to dedup.
         """
         from app.models.rag_collection import RagCollection
 
@@ -259,7 +342,7 @@ class ConnectorSyncService:
                 existing.external_updated_at is not None
                 and doc.updated_at <= existing.external_updated_at
             ):
-                return False
+                return None
             # Mark old vectors for replacement by deleting and re-creating below
             existing.is_deleted = True
             existing.deleted_at = datetime.now(timezone.utc)
@@ -326,7 +409,48 @@ class ConnectorSyncService:
         )
         self.db.add(rag_doc)
         await self.db.flush()
-        return True
+        return rag_doc
+
+
+def _workflow_record_limit(max_records: int) -> int:
+    """Clamp workflow connector output to a safe bounded size."""
+    try:
+        requested = int(max_records)
+    except (TypeError, ValueError):
+        requested = 50
+    return max(0, min(MAX_WORKFLOW_SYNC_DOCUMENTS, requested))
+
+
+def _string_value(value: Any) -> str:
+    """Return a JSON-safe string for enum-like values."""
+    return str(getattr(value, "value", value))
+
+
+def _document_summary(document: RagDocument) -> dict[str, Any]:
+    """Return workflow-safe connector document metadata."""
+    metadata = document.document_metadata or {}
+    content = document.converted_content or ""
+    return {
+        "document_id": document.id,
+        "collection_id": document.collection_id,
+        "title": metadata.get("title")
+        or document.original_filename
+        or document.filename,
+        "filename": document.filename,
+        "original_filename": document.original_filename,
+        "source_url": document.source_url,
+        "external_id": document.external_id,
+        "external_updated_at": (
+            document.external_updated_at.isoformat()
+            if document.external_updated_at
+            else None
+        ),
+        "indexed_at": document.indexed_at.isoformat() if document.indexed_at else None,
+        "word_count": document.word_count,
+        "character_count": document.character_count,
+        "content_preview": content[:4000],
+        "metadata": metadata,
+    }
 
 
 # ---------------------------------------------------------------------------

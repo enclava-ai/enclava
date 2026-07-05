@@ -171,7 +171,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 06-01: Add connector sync step type, UI config, errors, and artifact outputs.
+- [x] 06-01: Add connector sync step type, UI config, errors, and artifact outputs. (completed 2026-07-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

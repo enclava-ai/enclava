@@ -30,6 +30,13 @@ export interface WorkflowBuilderCollectionOption {
   name: string
 }
 
+export interface WorkflowBuilderConnectorOption {
+  id: string
+  name: string
+  connector_type?: string
+  status?: string | null
+}
+
 interface WorkflowStepPropertiesProps {
   step: WorkflowStepDefinition | null
   stepIndex: number
@@ -38,6 +45,7 @@ interface WorkflowStepPropertiesProps {
   allSteps: WorkflowStepDefinition[]
   agents: WorkflowBuilderAgentOption[]
   collections: WorkflowBuilderCollectionOption[]
+  connectors: WorkflowBuilderConnectorOption[]
   onChange: (step: WorkflowStepDefinition) => void
 }
 
@@ -51,6 +59,7 @@ export function WorkflowStepProperties({
   allSteps,
   agents,
   collections,
+  connectors,
   onChange,
 }: WorkflowStepPropertiesProps) {
   if (!step) {
@@ -128,6 +137,16 @@ export function WorkflowStepProperties({
           <AgentRunEditor
             step={step}
             agents={agents}
+            errors={validationErrors}
+            catalogEntry={catalogEntry}
+            onChange={onChange}
+          />
+        ) : null}
+
+        {step.type === "connector.sync" ? (
+          <ConnectorSyncEditor
+            step={step}
+            connectors={connectors}
             errors={validationErrors}
             catalogEntry={catalogEntry}
             onChange={onChange}
@@ -321,6 +340,96 @@ function AgentRunEditor({
           <RetryField step={step} onChange={onChange} />
         ) : null}
       </div>
+    </div>
+  )
+}
+
+function ConnectorSyncEditor({
+  step,
+  connectors,
+  errors,
+  catalogEntry,
+  onChange,
+}: {
+  step: WorkflowStepDefinition
+  connectors: WorkflowBuilderConnectorOption[]
+  errors: WorkflowValidationErrorItem[]
+  catalogEntry: WorkflowStepCatalogEntry
+  onChange: (step: WorkflowStepDefinition) => void
+}) {
+  const connectorOptions = ensureOption(
+    connectors,
+    String(step.config.connector_id || ""),
+    "Current connector"
+  )
+
+  return (
+    <div className="space-y-4">
+      <Field
+        label="Connector"
+        htmlFor="workflow-connector"
+        error={fieldError(errors, "connector_id")}
+      >
+        <Select
+          value={selectValue(step.config.connector_id)}
+          onValueChange={(value) =>
+            updateConfig(step, "connector_id", selectOutput(value), onChange)
+          }
+        >
+          <SelectTrigger id="workflow-connector">
+            <SelectValue placeholder="Select connector" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={EMPTY_SELECT_VALUE}>Select connector</SelectItem>
+            {connectorOptions.map((connector) => (
+              <SelectItem key={connector.id} value={connector.id}>
+                {connector.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Since" htmlFor="workflow-connector-since">
+          <Select
+            value={String(step.config.since || "connector_checkpoint")}
+            onValueChange={(value) =>
+              updateConfig(step, "since", value, onChange)
+            }
+          >
+            <SelectTrigger id="workflow-connector-since">
+              <SelectValue placeholder="Since" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="connector_checkpoint">Connector checkpoint</SelectItem>
+              <SelectItem value="last_successful_run">
+                Last successful run
+              </SelectItem>
+              <SelectItem value="full_sync">Full sync</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Max records" htmlFor="workflow-connector-max-records">
+          <Input
+            id="workflow-connector-max-records"
+            type="number"
+            min={1}
+            max={100}
+            value={inputNumber(step.config.max_records ?? 50)}
+            onChange={(event) =>
+              updateOptionalNumberConfig(
+                step,
+                "max_records",
+                event.target.value,
+                onChange
+              )
+            }
+          />
+        </Field>
+      </div>
+      {catalogEntry.supports_retry ? (
+        <RetryField step={step} onChange={onChange} />
+      ) : null}
     </div>
   )
 }

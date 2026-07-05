@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 
 import { useToast } from "@/hooks/use-toast"
-import { agentApi, ragApi, workflowApi } from "@/lib/api-client"
+import { agentApi, connectorApi, ragApi, workflowApi } from "@/lib/api-client"
 import type {
   WorkflowConcurrencyPolicy,
   WorkflowDefinitionDetail,
@@ -51,6 +51,7 @@ import { WorkflowStepList } from "@/components/workflows/WorkflowStepList"
 import {
   WorkflowBuilderAgentOption,
   WorkflowBuilderCollectionOption,
+  WorkflowBuilderConnectorOption,
   WorkflowStepProperties,
 } from "@/components/workflows/WorkflowStepProperties"
 import { WorkflowValidationSummary } from "@/components/workflows/WorkflowValidationSummary"
@@ -85,6 +86,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
   const [catalog, setCatalog] = useState<WorkflowStepCatalogEntry[]>([])
   const [agents, setAgents] = useState<WorkflowBuilderAgentOption[]>([])
   const [collections, setCollections] = useState<WorkflowBuilderCollectionOption[]>([])
+  const [connectors, setConnectors] = useState<WorkflowBuilderConnectorOption[]>([])
   const [workflowIdState, setWorkflowIdState] = useState(workflowId || "")
   const [status, setStatus] = useState<WorkflowDefinitionStatus>("draft")
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null)
@@ -172,6 +174,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
         catalogResponse,
         agentResponse,
         collectionResponse,
+        connectorResponse,
         workflowResponse,
         templateResponse,
       ] = await Promise.all([
@@ -180,6 +183,9 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
         ragApi.listCollections().catch(() => ({
           collections: [],
         })),
+        connectorApi.listConnectors().catch(() => ({
+          connectors: [],
+        })),
         workflowPromise,
         templatePromise,
       ])
@@ -187,6 +193,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
       setCatalog(catalogResponse.steps)
       setAgents(normalizeAgents(agentResponse))
       setCollections(normalizeCollections(collectionResponse))
+      setConnectors(normalizeConnectors(connectorResponse))
 
       if (workflowResponse?.workflow) {
         applyWorkflow(workflowResponse.workflow)
@@ -848,6 +855,7 @@ export function WorkflowBuilder({ mode, workflowId }: WorkflowBuilderProps) {
               allSteps={definition.steps}
               agents={agents}
               collections={collections}
+              connectors={connectors}
               onChange={updateSelectedStep}
             />
           </div>
@@ -1000,6 +1008,17 @@ function seedStepFromTemplate(
       },
     }
   }
+  if (step.type === "connector.sync") {
+    return {
+      ...step,
+      config: {
+        ...step.config,
+        connector_id: "",
+        since: step.config.since || "connector_checkpoint",
+        max_records: step.config.max_records || 50,
+      },
+    }
+  }
   if (step.type === "notify.in_app") {
     return {
       ...step,
@@ -1092,6 +1111,13 @@ function defaultConfigForType(
       prompt_template: "Summarize the workflow input.",
     }
   }
+  if (stepType === "connector.sync") {
+    return {
+      connector_id: "",
+      since: "connector_checkpoint",
+      max_records: 50,
+    }
+  }
   if (stepType === "condition.no_results_skip") {
     return {
       input_step_key: existingSteps[existingSteps.length - 1]?.key || "",
@@ -1116,6 +1142,7 @@ function nextStepKey(
   const bases: Record<string, string> = {
     "rag.query": "query_context",
     "agent.run": "run_agent",
+    "connector.sync": "sync_connector",
     "condition.no_results_skip": "skip_if_empty",
     "notify.in_app": "notify_team",
   }
@@ -1164,6 +1191,22 @@ function normalizeCollections(data: any): WorkflowBuilderCollectionOption[] {
       name: String(item.name || item.display_name || `Collection ${item.id}`),
     }))
     .filter((item: WorkflowBuilderCollectionOption) => item.id && item.name)
+}
+
+function normalizeConnectors(data: any): WorkflowBuilderConnectorOption[] {
+  const items = Array.isArray(data?.connectors)
+    ? data.connectors
+    : Array.isArray(data)
+      ? data
+      : []
+  return items
+    .map((item: any) => ({
+      id: String(item.id),
+      name: String(item.name || item.display_name || `Connector ${item.id}`),
+      connector_type: item.connector_type,
+      status: item.status,
+    }))
+    .filter((item: WorkflowBuilderConnectorOption) => item.id && item.name)
 }
 
 function parseTags(value: string): string[] {

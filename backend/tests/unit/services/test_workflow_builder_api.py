@@ -76,6 +76,23 @@ def _nightly_authoring_definition(
     return authored
 
 
+def _connector_authoring_definition(
+    definition: dict[str, Any], owner_user_id: int
+) -> dict[str, Any]:
+    authored = deepcopy(definition)
+    steps = {step["key"]: step for step in authored["steps"]}
+    steps["sync_connector"]["config"]["connector_id"] = "1"
+    steps["triage_items"]["config"]["agent_id"] = "agent-1"
+    steps["notify_owner"]["config"]["recipients"] = [str(owner_user_id)]
+    authored["runtime"] = {
+        "concurrency_policy": "skip_if_running",
+        "timeout_seconds": 1800,
+        "budget_limit_cents": 100,
+        "redaction_policy": "default",
+    }
+    return authored
+
+
 @pytest.mark.asyncio
 async def test_builder_catalog_exposes_enabled_and_disabled_steps(
     builder_client: AsyncClient,
@@ -87,8 +104,8 @@ async def test_builder_catalog_exposes_enabled_and_disabled_steps(
     assert len(steps) >= 6
     assert steps["rag.query"]["enabled"] is True
     assert steps["agent.run"]["required_permissions"] == ["agent:execute"]
-    assert steps["connector.sync"]["enabled"] is False
-    assert "Phase 6" in steps["connector.sync"]["disabled_reason"]
+    assert steps["connector.sync"]["enabled"] is True
+    assert steps["connector.sync"]["required_permissions"] == ["connectors:sync"]
     assert steps["extract.run_template"]["enabled"] is False
 
 
@@ -152,10 +169,10 @@ async def test_builder_validation_reports_registry_errors(
         "/api-internal/v1/workflows/steps/validate",
         json=_definition_with_step(
             {
-                "key": "sync",
-                "type": "connector.sync",
-                "name": "Sync",
-                "config": {"connector_id": "connector-1"},
+                "key": "extract",
+                "type": "extract.run_template",
+                "name": "Extract",
+                "config": {"template_id": "template-1"},
             }
         ),
     )
@@ -178,7 +195,7 @@ async def test_builder_validation_reports_registry_errors(
 
 
 @pytest.mark.asyncio
-async def test_templates_expose_availability_and_disabled_publish_blocks(
+async def test_templates_expose_availability_and_raw_placeholder_publish_blocks(
     builder_client: AsyncClient,
 ) -> None:
     nightly_response = await builder_client.get(
@@ -218,14 +235,13 @@ async def test_templates_expose_availability_and_disabled_publish_blocks(
         error["code"] == "unresolved_placeholder"
         for error in validate_response.json()["errors"]
     )
-    assert connector["available_for_authoring"] is False
-    assert "Phase 6" in connector["unavailable_reason"]
+    assert connector["available_for_authoring"] is True
     assert weekly["available_for_authoring"] is False
     assert "Phase 6" in weekly["unavailable_reason"]
     assert create_response.status_code == 201
     assert publish_response.status_code == 422
     publish_errors = publish_response.json()["detail"]["errors"]
-    assert any(error["code"] == "disabled_step_type" for error in publish_errors)
+    assert any(error["code"] == "unresolved_placeholder" for error in publish_errors)
 
 
 @pytest.mark.asyncio
@@ -267,6 +283,58 @@ async def test_nightly_template_authoring_payload_publishes_enables_and_runs(
     run_response = await builder_client.post(
         f"/api-internal/v1/workflows/{workflow_id}/runs",
         json={"input_data": {"query": "recent documents"}},
+    )
+
+    assert validate_response.status_code == 200
+    assert validate_response.json()["success"] is True
+    assert create_response.status_code == 201
+    assert publish_response.status_code == 200
+    assert publish_response.json()["workflow"]["latest_version_number"] == 1
+    assert enable_response.status_code == 200
+    assert enable_response.json()["workflow"]["status"] == "active"
+    assert run_response.status_code == 201
+    assert run_response.json()["run"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_connector_template_authoring_payload_publishes_enables_and_runs(
+    builder_client: AsyncClient,
+    test_user,
+) -> None:
+    template_response = await builder_client.get(
+        "/api-internal/v1/workflows/templates/connector-intake-triage"
+    )
+    definition = _connector_authoring_definition(
+        template_response.json()["template"]["definition"],
+        int(test_user["id"]),
+    )
+
+    validate_response = await builder_client.post(
+        "/api-internal/v1/workflows/steps/validate",
+        json=definition,
+    )
+    create_response = await builder_client.post(
+        "/api-internal/v1/workflows/",
+        json={
+            "name": "Connector Intake Triage",
+            "description": "Authoring test",
+            "tags": ["connector", "agent"],
+            "metadata": {"template_id": "connector-intake-triage"},
+            "definition": definition,
+        },
+    )
+    workflow_id = create_response.json()["workflow"]["id"]
+    publish_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/publish",
+        json={"reason": "authoring test"},
+    )
+    enable_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/enable",
+        json={"reason": "authoring test"},
+    )
+    run_response = await builder_client.post(
+        f"/api-internal/v1/workflows/{workflow_id}/runs",
+        json={},
     )
 
     assert validate_response.status_code == 200

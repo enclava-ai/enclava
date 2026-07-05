@@ -135,6 +135,29 @@ export const ragApi = {
   },
 }
 
+export interface ConnectorSummary {
+  id: string | number
+  name: string
+  connector_type: string
+  collection_id?: string | number
+  status?: string | null
+  last_sync_status?: string | null
+  last_sync_error?: string | null
+  last_sync_docs_indexed?: number | null
+  last_sync_docs_failed?: number | null
+}
+
+export interface ConnectorsApiResponse {
+  success?: boolean
+  connectors: ConnectorSummary[]
+}
+
+export const connectorApi = {
+  listConnectors() {
+    return apiClient.get<ConnectorsApiResponse>('/api-internal/v1/connectors')
+  },
+}
+
 export const toolApi = {
   listTools() {
     return apiClient.get('/api/v1/tool-calling/available')

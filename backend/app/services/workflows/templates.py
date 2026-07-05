@@ -83,8 +83,7 @@ CONNECTOR_INTAKE_TRIAGE_TEMPLATE = WorkflowTemplate(
     tags=["connector", "rag", "agent"],
     required_placeholders=["connector_id", "agent_id", "owner_user_id"],
     builder_category="Connector",
-    available_for_authoring=False,
-    unavailable_reason="Connector workflow steps are scheduled for Phase 6.",
+    available_for_authoring=True,
     definition=WorkflowDefinitionDocument(
         trigger=WorkflowTriggerDefinition(type=WorkflowTriggerType.MANUAL),
         metadata={"template": "connector-intake-triage"},
@@ -93,7 +92,11 @@ CONNECTOR_INTAKE_TRIAGE_TEMPLATE = WorkflowTemplate(
                 "key": "sync_connector",
                 "type": "connector.sync",
                 "name": "Sync connector",
-                "config": {"connector_id": "{{connector_id}}"},
+                "config": {
+                    "connector_id": "{{connector_id}}",
+                    "since": "connector_checkpoint",
+                    "max_records": 50,
+                },
                 "retry": {"max_attempts": 2, "backoff_seconds": 120},
             },
             {

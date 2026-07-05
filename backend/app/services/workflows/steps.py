@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Mapping, Optional, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -120,6 +120,94 @@ class NoResultsSkipHandler(BaseWorkflowStepHandler):
                 )
             ],
             skip_remaining=matched,
+        )
+
+
+class ConnectorSyncHandler(BaseWorkflowStepHandler):
+    """Run a connector sync and expose newly indexed records."""
+
+    step_type = "connector.sync"
+
+    async def execute(self, context: WorkflowStepContext) -> WorkflowStepResult:
+        connector_id = _render_value(context.step.config.get("connector_id"), context)
+        if connector_id in (None, ""):
+            raise WorkflowStepExecutionError("connector_id is required")
+
+        resolved_connector_id = _coerce_int(connector_id, "connector_id")
+        max_records = _bounded_int(
+            context.step.config.get("max_records"),
+            default=50,
+            minimum=1,
+            maximum=100,
+        )
+        since = context.step.config.get("since") or "connector_checkpoint"
+
+        service = context.dependencies.connector_service
+        if service is None:
+            from app.services.connector_sync_service import ConnectorSyncService
+
+            service = ConnectorSyncService(context.db)
+
+        runner = getattr(service, "run_sync_for_workflow", None)
+        if runner is None:
+            runner = getattr(service, "sync_for_workflow", None)
+        if runner is None:
+            fallback = getattr(service, "run_sync", None)
+            if fallback is None:
+                raise WorkflowStepExecutionError(
+                    "connector service does not support workflow sync"
+                )
+            result = await _maybe_await(fallback(resolved_connector_id))
+        else:
+            result = await _maybe_await(
+                runner(connector_id=resolved_connector_id, max_records=max_records)
+            )
+
+        data = _connector_result_mapping(result)
+        status = _status_key(data.get("status"))
+        if status in {"failed", "error"}:
+            root_cause = data.get("error_message") or "sync job failed"
+            raise WorkflowStepExecutionError(
+                f"connector sync failed for connector {resolved_connector_id}: {root_cause}"
+            )
+
+        items = data.get("documents") or data.get("items") or []
+        if not isinstance(items, list):
+            items = []
+        output = {
+            "connector_id": str(data.get("connector_id") or resolved_connector_id),
+            "connector_name": data.get("connector_name"),
+            "connector_type": data.get("connector_type"),
+            "collection_id": data.get("collection_id"),
+            "job_id": data.get("job_id") or data.get("id"),
+            "status": status or "success",
+            "docs_indexed": int(data.get("docs_indexed") or len(items) or 0),
+            "docs_failed": int(data.get("docs_failed") or 0),
+            "count": len(items),
+            "items": items[:max_records],
+            "since": since,
+        }
+        return WorkflowStepResult(
+            output_data=output,
+            artifacts=[
+                WorkflowStepArtifactSpec(
+                    artifact_type="json",
+                    name=f"{context.step.key}-connector-sync",
+                    data=output,
+                )
+            ],
+            events=[
+                WorkflowStepEventSpec(
+                    event_type="connector_sync_completed",
+                    message=f"Connector sync returned {len(items[:max_records])} records",
+                    data={
+                        "connector_id": output["connector_id"],
+                        "job_id": output["job_id"],
+                        "docs_indexed": output["docs_indexed"],
+                        "docs_failed": output["docs_failed"],
+                    },
+                )
+            ],
         )
 
 
@@ -322,6 +410,7 @@ def create_default_step_handlers(
     """Create default MVP workflow step handlers."""
     handlers: list[WorkflowStepHandler] = [
         RAGQueryHandler(),
+        ConnectorSyncHandler(),
         AgentRunHandler(),
         NotifyInAppHandler(),
         NoResultsSkipHandler(),
@@ -386,6 +475,34 @@ def _render_value(value: Any, context: WorkflowStepContext) -> Any:
     return value
 
 
+def _coerce_int(value: Any, field_name: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise WorkflowStepExecutionError(f"{field_name} must be an integer") from exc
+
+
+def _bounded_int(
+    value: Any,
+    *,
+    default: int,
+    minimum: int,
+    maximum: int,
+) -> int:
+    if value in (None, ""):
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return min(maximum, max(minimum, parsed))
+
+
+def _status_key(value: Any) -> str:
+    raw = str(getattr(value, "value", value) or "")
+    return raw.rsplit(".", 1)[-1].lower()
+
+
 def _resolve_template_value(
     path: str, context: WorkflowStepContext, extra_values: dict[str, Any]
 ) -> Any:
@@ -432,6 +549,25 @@ def _response_mapping(response: Any) -> dict[str, Any]:
         return response.model_dump()
     if hasattr(response, "dict"):
         return response.dict()
+    return {}
+
+
+def _connector_result_mapping(response: Any) -> dict[str, Any]:
+    if hasattr(response, "to_workflow_output"):
+        return dict(response.to_workflow_output())
+    if isinstance(response, Mapping):
+        return dict(response)
+    if is_dataclass(response):
+        return asdict(response)
+    if hasattr(response, "model_dump"):
+        return response.model_dump()
+    if hasattr(response, "dict"):
+        return response.dict()
+    if hasattr(response, "to_dict"):
+        data = response.to_dict()
+        if "id" in data and "job_id" not in data:
+            data["job_id"] = data["id"]
+        return data
     return {}
 
 
