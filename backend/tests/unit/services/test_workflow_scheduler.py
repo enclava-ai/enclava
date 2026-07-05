@@ -317,3 +317,41 @@ async def test_scheduler_tick_executes_created_runs(test_db, test_user) -> None:
     assert result.created_runs == 1
     assert result.executed_runs == 1
     assert run.status == WorkflowRunStatus.SUCCEEDED.value
+
+
+@pytest.mark.asyncio
+async def test_scheduler_tick_recovers_stale_locks_before_execution(
+    test_db, test_user
+) -> None:
+    actor = _actor(int(test_user["id"]))
+    workflow = await _active_scheduled_workflow(test_db, actor)
+    runtime = WorkflowRuntimeService()
+    queued = await runtime.create_manual_run(
+        test_db,
+        workflow.id,
+        WorkflowManualRunRequest(input_data={}),
+        actor=actor,
+    )
+    await runtime.claim_next_run(test_db, worker_id="crashed-worker")
+    run_result = await test_db.execute(
+        select(WorkflowRun).where(WorkflowRun.id == queued.id)
+    )
+    run = run_result.scalar_one()
+    run.lock_expires_at = datetime(2026, 1, 1, 1, 30)
+    await test_db.commit()
+    scheduler = WorkflowSchedulerService(runtime)
+
+    result = await scheduler.run_tick(
+        test_db,
+        now=datetime(2026, 1, 1, 2, 0),
+        create_limit=10,
+        execute_limit=0,
+    )
+    await test_db.commit()
+
+    refreshed = await test_db.get(WorkflowRun, queued.id)
+
+    assert result.stale_locks_recovered == 1
+    assert refreshed.status == WorkflowRunStatus.FAILED.value
+    assert refreshed.locked_by is None
+    assert refreshed.lock_expires_at is None

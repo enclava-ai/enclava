@@ -219,7 +219,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 08-01: Add recovery, stale-lock handling, retention policy, admin metrics, and operational docs.
+- [x] 08-01: Add recovery, stale-lock handling, retention policy, admin metrics, and operational docs. (completed 2026-07-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -243,7 +243,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Builder, Templates, and Validation | 3/3 | Complete | 2026-07-05 |
 | 6. Connector and Extract Integration | 2/2 | Complete | 2026-07-05 |
 | 7. Advanced Control Flow and Triggers | 3/3 | Complete | 2026-07-05 |
-| 8. Hardening, Observability, and Release | 0/3 | Planned | - |
+| 8. Hardening, Observability, and Release | 1/3 | In Progress | - |
 
 ## Archives
 

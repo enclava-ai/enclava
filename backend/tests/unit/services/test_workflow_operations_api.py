@@ -250,3 +250,108 @@ async def test_operations_reports_failed_and_missed_health(
     assert operations_response.json()["operations"]["totals"]["failed"] == 1
     assert operations_response.json()["operations"]["totals"]["missed"] == 1
     assert failures_response.json()["runs"][0]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_admin_metrics_and_maintenance_endpoints_are_manage_only(
+    operations_client, test_db
+) -> None:
+    client, state, owner = operations_client
+    scheduled_workflow_id = await _create_publish_enable(
+        client,
+        payload=_workflow_payload(
+            name="Admin metrics schedule",
+            trigger={
+                "type": "schedule",
+                "cron": "0 2 * * *",
+                "timezone": "UTC",
+            },
+        ),
+    )
+    version_result = await test_db.execute(
+        select(WorkflowVersion).where(
+            WorkflowVersion.workflow_id == scheduled_workflow_id
+        )
+    )
+    version = version_result.scalar_one()
+    now = datetime.utcnow()
+    test_db.add_all(
+        [
+            WorkflowRun(
+                workflow_id=scheduled_workflow_id,
+                version_id=version.id,
+                trigger_type="manual",
+                status="failed",
+                error="admin metrics failure",
+                requested_by_user_id=int(owner["id"]),
+                created_at=now - timedelta(hours=1),
+                updated_at=now - timedelta(minutes=55),
+                queued_at=now - timedelta(hours=1),
+                started_at=now - timedelta(hours=1),
+                completed_at=now - timedelta(minutes=55),
+                actual_cost_cents=17,
+            ),
+            WorkflowRun(
+                workflow_id=scheduled_workflow_id,
+                version_id=version.id,
+                trigger_type="manual",
+                status="running",
+                requested_by_user_id=int(owner["id"]),
+                created_at=now - timedelta(hours=2),
+                updated_at=now - timedelta(hours=2),
+                queued_at=now - timedelta(hours=2),
+                started_at=now - timedelta(hours=2),
+                locked_by="stale-worker",
+                lock_expires_at=now - timedelta(minutes=5),
+                actual_cost_cents=3,
+            ),
+        ]
+    )
+    trigger_result = await test_db.execute(
+        select(WorkflowTrigger).where(
+            WorkflowTrigger.workflow_id == scheduled_workflow_id
+        )
+    )
+    trigger = trigger_result.scalar_one()
+    trigger.next_run_at = now - timedelta(minutes=10)
+    await test_db.commit()
+
+    metrics_forbidden = await client.get(
+        "/api-internal/v1/workflows/operations/admin-metrics"
+    )
+    recovery_forbidden = await client.post(
+        "/api-internal/v1/workflows/operations/recover-stale-locks"
+    )
+    retention_forbidden = await client.post(
+        "/api-internal/v1/workflows/operations/retention",
+        json={"dry_run": True},
+    )
+    state["actor"] = {**owner, "permissions": ["workflow.manage"]}
+
+    metrics_response = await client.get(
+        "/api-internal/v1/workflows/operations/admin-metrics"
+    )
+    recovery_response = await client.post(
+        "/api-internal/v1/workflows/operations/recover-stale-locks",
+        json={"reason": "api test"},
+    )
+    retention_response = await client.post(
+        "/api-internal/v1/workflows/operations/retention",
+        json={"dry_run": True},
+    )
+
+    metrics = metrics_response.json()["metrics"]
+
+    assert metrics_forbidden.status_code == 403
+    assert recovery_forbidden.status_code == 403
+    assert retention_forbidden.status_code == 403
+    assert metrics_response.status_code == 200
+    assert metrics["scheduler_lag_seconds"] >= 600
+    assert metrics["stale_lock_count"] == 1
+    assert metrics["long_running_count"] == 1
+    assert metrics["failed_runs_24h"] == 1
+    assert metrics["top_workflows_by_cost"][0]["actual_cost_cents"] == 20
+    assert recovery_response.status_code == 200
+    assert recovery_response.json()["recovery"]["recovered_count"] == 1
+    assert retention_response.status_code == 200
+    assert retention_response.json()["retention"]["dry_run"] is True

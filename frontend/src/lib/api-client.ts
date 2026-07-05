@@ -877,6 +877,94 @@ export interface WorkflowTriggerFireApiResponse {
   trigger_fire: WorkflowTriggerFireResponse
 }
 
+export interface WorkflowStaleLockRecoveryRequest {
+  older_than_seconds?: number
+  limit?: number
+  reason?: string | null
+  now?: string | null
+}
+
+export interface WorkflowStaleLockRecoveredRun {
+  run_id: string
+  workflow_id: string
+  previous_locked_by?: string | null
+  previous_lock_expires_at?: string | null
+  status: WorkflowRunStatus
+  reason: string
+}
+
+export interface WorkflowStaleLockRecoveryResult {
+  checked_at: string
+  recovered_count: number
+  runs: WorkflowStaleLockRecoveredRun[]
+}
+
+export interface WorkflowRetentionPolicy {
+  event_retention_days?: number | null
+  artifact_retention_days?: number | null
+  dry_run?: boolean
+  limit?: number
+  now?: string | null
+}
+
+export interface WorkflowRetentionResult {
+  dry_run: boolean
+  checked_at: string
+  event_cutoff?: string | null
+  artifact_cutoff?: string | null
+  events_pruned: number
+  artifact_payloads_pruned: number
+}
+
+export interface WorkflowAdminTopWorkflow {
+  workflow_id: string
+  workflow_name: string
+  run_count: number
+  actual_cost_cents: number
+  estimated_cost_cents: number
+}
+
+export interface WorkflowAdminFailedRun {
+  run_id: string
+  workflow_id: string
+  workflow_name: string
+  trigger_type: WorkflowTriggerType
+  error?: string | null
+  completed_at?: string | null
+  actual_cost_cents: number
+}
+
+export interface WorkflowAdminMetricsResponse {
+  generated_at: string
+  window_hours: number
+  scheduler_lag_seconds: number
+  stale_lock_count: number
+  long_running_count: number
+  queued_runs: number
+  running_runs: number
+  paused_runs: number
+  failed_runs_24h: number
+  total_runs_24h: number
+  failure_rate_24h: number
+  failed_workflows: WorkflowAdminFailedRun[]
+  top_workflows_by_cost: WorkflowAdminTopWorkflow[]
+}
+
+export interface WorkflowAdminMetricsApiResponse {
+  success: boolean
+  metrics: WorkflowAdminMetricsResponse
+}
+
+export interface WorkflowStaleLockRecoveryApiResponse {
+  success: boolean
+  recovery: WorkflowStaleLockRecoveryResult
+}
+
+export interface WorkflowRetentionApiResponse {
+  success: boolean
+  retention: WorkflowRetentionResult
+}
+
 export interface WorkflowStepRunDetail {
   id: string
   step_key: string
@@ -936,6 +1024,9 @@ export interface WorkflowRunResponse {
 export const workflowApi = {
   getOperations() {
     return apiClient.get<WorkflowOperationsApiResponse>('/api/workflows')
+  },
+  getAdminMetrics() {
+    return apiClient.get<WorkflowAdminMetricsApiResponse>('/api/workflows?resource=admin_metrics')
   },
   getWorkflow(workflowId: string) {
     const query = new URLSearchParams({
@@ -1031,6 +1122,18 @@ export const workflowApi = {
       input_data: payload.input_data || {},
       idempotency_key: payload.idempotency_key,
       execute_now: Boolean(payload.execute_now),
+    })
+  },
+  recoverStaleLocks(payload: WorkflowStaleLockRecoveryRequest = {}) {
+    return apiClient.post<WorkflowStaleLockRecoveryApiResponse>('/api/workflows', {
+      action: 'recover_stale_locks',
+      ...payload,
+    })
+  },
+  applyRetentionPolicy(payload: WorkflowRetentionPolicy = {}) {
+    return apiClient.post<WorkflowRetentionApiResponse>('/api/workflows', {
+      action: 'apply_retention',
+      ...payload,
     })
   },
   runNow(workflowId: string, inputData: Record<string, any> = {}) {

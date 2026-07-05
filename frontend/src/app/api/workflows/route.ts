@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
     endpoint = `/api-internal/v1/workflows/operations/runs${suffix}`
   } else if (resource === 'schedules') {
     endpoint = '/api-internal/v1/workflows/operations/schedules'
+  } else if (resource === 'admin_metrics') {
+    endpoint = '/api-internal/v1/workflows/operations/admin-metrics'
   } else if (resource === 'templates') {
     endpoint = '/api-internal/v1/workflows/operations/templates'
   } else if (resource === 'template_catalog') {
@@ -141,6 +143,41 @@ export async function POST(request: NextRequest) {
           input_data: body?.input_data || {},
           idempotency_key: body?.idempotency_key,
           execute_now: Boolean(body?.execute_now),
+        }),
+      }
+    )
+    return forwardResponse(response)
+  }
+
+  if (body?.action === 'recover_stale_locks') {
+    const response = await proxyAuthenticatedRequest(
+      request,
+      '/api-internal/v1/workflows/operations/recover-stale-locks',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          older_than_seconds: body?.older_than_seconds,
+          limit: body?.limit,
+          reason: body?.reason,
+          now: body?.now,
+        }),
+      }
+    )
+    return forwardResponse(response)
+  }
+
+  if (body?.action === 'apply_retention') {
+    const response = await proxyAuthenticatedRequest(
+      request,
+      '/api-internal/v1/workflows/operations/retention',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          event_retention_days: body?.event_retention_days,
+          artifact_retention_days: body?.artifact_retention_days,
+          dry_run: body?.dry_run,
+          limit: body?.limit,
+          now: body?.now,
         }),
       }
     )

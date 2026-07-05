@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table"
 import {
   WorkflowHealthState,
+  WorkflowAdminMetricsResponse,
   WorkflowOperationsResponse,
   WorkflowOperationsRow,
   WorkflowRunStatus,
@@ -68,6 +69,7 @@ const templateSeeds = [
 export function WorkflowOperationsConsole() {
   const { toast } = useToast()
   const [data, setData] = useState<WorkflowOperationsResponse | null>(null)
+  const [adminMetrics, setAdminMetrics] = useState<WorkflowAdminMetricsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterKey>("all")
@@ -79,6 +81,12 @@ export function WorkflowOperationsConsole() {
     try {
       const response = await workflowApi.getOperations()
       setData(response.operations)
+      try {
+        const metricsResponse = await workflowApi.getAdminMetrics()
+        setAdminMetrics(metricsResponse.metrics)
+      } catch {
+        setAdminMetrics(null)
+      }
     } catch (err: any) {
       setError(errorMessage(err))
     } finally {
@@ -213,6 +221,8 @@ export function WorkflowOperationsConsole() {
         />
       </section>
 
+      {adminMetrics ? <OperationalMetricsStrip metrics={adminMetrics} /> : null}
+
       <section className="space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex max-w-full gap-1 overflow-x-auto rounded-md border bg-card p-1">
@@ -320,6 +330,93 @@ function MetricCard({
         </span>
       </CardContent>
     </Card>
+  )
+}
+
+function OperationalMetricsStrip({
+  metrics,
+}: {
+  metrics: WorkflowAdminMetricsResponse
+}) {
+  const topWorkflow = metrics.top_workflows_by_cost[0]
+  return (
+    <section className="grid gap-3 rounded-md border bg-card p-3 md:grid-cols-5">
+      <OperationalMetric
+        label="Scheduler Lag"
+        value={formatSeconds(metrics.scheduler_lag_seconds)}
+        detail={`${metrics.queued_runs} queued`}
+        tone={metrics.scheduler_lag_seconds > 300 ? "warning" : "neutral"}
+        icon={CalendarClock}
+      />
+      <OperationalMetric
+        label="Stale Locks"
+        value={metrics.stale_lock_count}
+        detail="expired running locks"
+        tone={metrics.stale_lock_count > 0 ? "danger" : "neutral"}
+        icon={TimerReset}
+      />
+      <OperationalMetric
+        label="Long Running"
+        value={metrics.long_running_count}
+        detail={`${metrics.running_runs} running`}
+        tone={metrics.long_running_count > 0 ? "warning" : "neutral"}
+        icon={Workflow}
+      />
+      <OperationalMetric
+        label="Failure Rate"
+        value={formatPercent(metrics.failure_rate_24h)}
+        detail={`${metrics.failed_runs_24h}/${metrics.total_runs_24h} in 24h`}
+        tone={metrics.failure_rate_24h > 0 ? "danger" : "neutral"}
+        icon={Activity}
+      />
+      <OperationalMetric
+        label="Top Cost"
+        value={topWorkflow ? formatCents(topWorkflow.actual_cost_cents) : "$0.00"}
+        detail={topWorkflow?.workflow_name || "No workflow cost"}
+        tone={topWorkflow && topWorkflow.actual_cost_cents > 0 ? "info" : "neutral"}
+        icon={CircleDollarSign}
+      />
+    </section>
+  )
+}
+
+function OperationalMetric({
+  label,
+  value,
+  detail,
+  tone,
+  icon: Icon,
+}: {
+  label: string
+  value: string | number
+  detail: string
+  tone: StatusBadgeStatus
+  icon: typeof Activity
+}) {
+  return (
+    <div className="flex min-h-20 items-center gap-3 rounded-sm bg-background p-3">
+      <span
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-md border",
+          tone === "info" && "border-info-border bg-info-soft",
+          tone === "warning" && "border-warning-border bg-warning-soft",
+          tone === "danger" && "border-danger-border bg-danger-soft",
+          tone === "success" && "border-success-border bg-success-soft",
+          tone === "neutral" && "border-border bg-muted"
+        )}
+      >
+        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase text-muted-foreground">
+          {label}
+        </p>
+        <p className="mt-1 truncate text-lg font-semibold leading-tight">
+          {value}
+        </p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
+      </div>
+    </div>
   )
 }
 
@@ -539,6 +636,22 @@ function formatCents(value?: number | null): string {
     style: "currency",
     currency: "USD",
   }).format(value / 100)
+}
+
+function formatPercent(value: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: "percent",
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+function formatSeconds(value: number): string {
+  if (value < 60) return `${value}s`
+  const minutes = Math.floor(value / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const remainder = minutes % 60
+  return remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`
 }
 
 function shortId(value: string): string {

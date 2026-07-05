@@ -17,6 +17,9 @@ from app.models.workflow import (
     WorkflowVersion,
 )
 from app.schemas.workflow import (
+    WorkflowAdminFailedRun,
+    WorkflowAdminMetricsResponse,
+    WorkflowAdminTopWorkflow,
     WorkflowDefinitionStatus,
     WorkflowHealthState,
     WorkflowOperationsResponse,
@@ -43,6 +46,7 @@ class WorkflowOperationsService:
     """Builds compact workflow operations console payloads."""
 
     MISSED_GRACE_SECONDS = 300
+    LONG_RUNNING_SECONDS = 3600
     ACTIVE_RUN_STATUSES = {
         WorkflowRunStatus.QUEUED.value,
         WorkflowRunStatus.RUNNING.value,
@@ -227,6 +231,45 @@ class WorkflowOperationsService:
             for template in list_workflow_templates()
         ]
 
+    async def get_admin_metrics(
+        self,
+        db: AsyncSession,
+        *,
+        now: Optional[datetime] = None,
+        window_hours: int = 24,
+        long_running_seconds: int = LONG_RUNNING_SECONDS,
+    ) -> WorkflowAdminMetricsResponse:
+        """Return global workflow operator metrics for admins."""
+        checked_at = _naive_utc(now or utc_now())
+        window_start = checked_at - timedelta(hours=window_hours)
+        long_running_before = checked_at - timedelta(seconds=long_running_seconds)
+        status_counts = await self._status_counts(db)
+        total_window, failed_window = await self._window_counts(db, window_start)
+        scheduler_lag_seconds = await self._scheduler_lag_seconds(db, checked_at)
+        stale_lock_count = await self._stale_lock_count(db, checked_at)
+        long_running_count = await self._long_running_count(db, long_running_before)
+        failed_workflows = await self._failed_workflows(db, window_start)
+        top_workflows = await self._top_workflows_by_cost(db, window_start)
+        failure_rate = (
+            round(failed_window / total_window, 4) if total_window > 0 else 0.0
+        )
+
+        return WorkflowAdminMetricsResponse(
+            generated_at=checked_at,
+            window_hours=window_hours,
+            scheduler_lag_seconds=scheduler_lag_seconds,
+            stale_lock_count=stale_lock_count,
+            long_running_count=long_running_count,
+            queued_runs=status_counts.get(WorkflowRunStatus.QUEUED.value, 0),
+            running_runs=status_counts.get(WorkflowRunStatus.RUNNING.value, 0),
+            paused_runs=status_counts.get(WorkflowRunStatus.PAUSED.value, 0),
+            failed_runs_24h=failed_window,
+            total_runs_24h=total_window,
+            failure_rate_24h=failure_rate,
+            failed_workflows=failed_workflows,
+            top_workflows_by_cost=top_workflows,
+        )
+
     async def _list_visible_workflows(
         self,
         db: AsyncSession,
@@ -315,6 +358,146 @@ class WorkflowOperationsService:
             }
             for row in result.all()
         }
+
+    async def _status_counts(self, db: AsyncSession) -> dict[str, int]:
+        result = await db.execute(
+            select(WorkflowRun.status, func.count(WorkflowRun.id)).group_by(
+                WorkflowRun.status
+            )
+        )
+        return {str(row[0]): int(row[1] or 0) for row in result.all()}
+
+    async def _window_counts(
+        self, db: AsyncSession, window_start: datetime
+    ) -> tuple[int, int]:
+        result = await db.execute(
+            select(
+                func.count(WorkflowRun.id),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (WorkflowRun.status == WorkflowRunStatus.FAILED.value, 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+            ).where(WorkflowRun.created_at >= window_start)
+        )
+        row = result.one()
+        return int(row[0] or 0), int(row[1] or 0)
+
+    async def _scheduler_lag_seconds(
+        self, db: AsyncSession, checked_at: datetime
+    ) -> int:
+        result = await db.execute(
+            select(func.min(WorkflowTrigger.next_run_at)).where(
+                WorkflowTrigger.enabled.is_(True),
+                WorkflowTrigger.trigger_type == WorkflowTriggerType.SCHEDULE.value,
+                WorkflowTrigger.next_run_at.is_not(None),
+                WorkflowTrigger.next_run_at < checked_at,
+            )
+        )
+        oldest_due_at = result.scalar_one_or_none()
+        if oldest_due_at is None:
+            return 0
+        return max(0, int((checked_at - oldest_due_at).total_seconds()))
+
+    async def _stale_lock_count(self, db: AsyncSession, checked_at: datetime) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(WorkflowRun)
+            .where(
+                WorkflowRun.status == WorkflowRunStatus.RUNNING.value,
+                WorkflowRun.lock_expires_at.is_not(None),
+                WorkflowRun.lock_expires_at <= checked_at,
+            )
+        )
+        return int(result.scalar_one() or 0)
+
+    async def _long_running_count(
+        self, db: AsyncSession, long_running_before: datetime
+    ) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(WorkflowRun)
+            .where(
+                WorkflowRun.status == WorkflowRunStatus.RUNNING.value,
+                WorkflowRun.started_at.is_not(None),
+                WorkflowRun.started_at <= long_running_before,
+            )
+        )
+        return int(result.scalar_one() or 0)
+
+    async def _failed_workflows(
+        self,
+        db: AsyncSession,
+        window_start: datetime,
+        limit: int = 10,
+    ) -> list[WorkflowAdminFailedRun]:
+        result = await db.execute(
+            select(WorkflowRun, WorkflowDefinition.name)
+            .join(WorkflowDefinition, WorkflowDefinition.id == WorkflowRun.workflow_id)
+            .where(
+                WorkflowRun.status == WorkflowRunStatus.FAILED.value,
+                WorkflowRun.created_at >= window_start,
+            )
+            .order_by(
+                WorkflowRun.completed_at.desc().nulls_last(),
+                WorkflowRun.created_at.desc(),
+            )
+            .limit(limit)
+        )
+        return [
+            WorkflowAdminFailedRun(
+                run_id=run.id,
+                workflow_id=run.workflow_id,
+                workflow_name=workflow_name,
+                trigger_type=WorkflowTriggerType(run.trigger_type),
+                error=run.error,
+                completed_at=run.completed_at,
+                actual_cost_cents=run.actual_cost_cents or 0,
+            )
+            for run, workflow_name in result.all()
+        ]
+
+    async def _top_workflows_by_cost(
+        self,
+        db: AsyncSession,
+        window_start: datetime,
+        limit: int = 5,
+    ) -> list[WorkflowAdminTopWorkflow]:
+        result = await db.execute(
+            select(
+                WorkflowRun.workflow_id,
+                WorkflowDefinition.name,
+                func.count(WorkflowRun.id).label("run_count"),
+                func.coalesce(func.sum(WorkflowRun.actual_cost_cents), 0).label(
+                    "actual_cost_cents"
+                ),
+                func.coalesce(func.sum(WorkflowRun.estimated_cost_cents), 0).label(
+                    "estimated_cost_cents"
+                ),
+            )
+            .join(WorkflowDefinition, WorkflowDefinition.id == WorkflowRun.workflow_id)
+            .where(WorkflowRun.created_at >= window_start)
+            .group_by(WorkflowRun.workflow_id, WorkflowDefinition.name)
+            .order_by(
+                func.coalesce(func.sum(WorkflowRun.actual_cost_cents), 0).desc(),
+                func.count(WorkflowRun.id).desc(),
+            )
+            .limit(limit)
+        )
+        return [
+            WorkflowAdminTopWorkflow(
+                workflow_id=row.workflow_id,
+                workflow_name=row.name,
+                run_count=int(row.run_count or 0),
+                actual_cost_cents=int(row.actual_cost_cents or 0),
+                estimated_cost_cents=int(row.estimated_cost_cents or 0),
+            )
+            for row in result.all()
+        ]
 
     def _to_row(
         self,
@@ -577,3 +760,9 @@ def _aware_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _naive_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)

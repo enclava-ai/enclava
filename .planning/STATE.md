@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 Plan 08-01 planned; ready to execute workflow hardening
-last_updated: "2026-07-05T23:45:00.000Z"
-last_activity: 2026-07-05 - Planned Phase 8 Plan 08-01 workflow hardening
+stopped_at: Phase 8 Plan 08-01 completed; ready to plan Phase 8 Plan 08-02 release coverage
+last_updated: "2026-07-05T23:54:00.000Z"
+last_activity: 2026-07-05 - Completed Phase 8 Plan 08-01 workflow hardening
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 22
-  completed_plans: 19
-  percent: 86
+  completed_plans: 20
+  percent: 91
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 ## Current Position
 
 Phase: 8 (Hardening, Observability, and Release) — READY
-Plan: 08-01 (1 of 3)
-Status: Ready to execute Phase 8 Plan 08-01
-Last activity: 2026-07-05 - Planned Phase 8 Plan 08-01 workflow hardening
+Plan: 08-02 (2 of 3)
+Status: Ready to plan Phase 8 Plan 08-02
+Last activity: 2026-07-05 - Completed Phase 8 Plan 08-01 workflow hardening
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-07-05 - Planned Phase 8 Plan 08-01 workflow hardening
 
 - Phases planned: 8
 - Plans planned: 22
-- Plans completed: 19
+- Plans completed: 20
 
 ## Accumulated Context
 
@@ -82,10 +82,13 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 7]: API/event trigger foundations are authenticated internal fire paths, not public unauthenticated webhooks.
 - [Phase 7]: API/event trigger requests require caller-supplied idempotency keys with per-trigger run idempotency.
 - [Phase 7]: API/event trigger authoring stays in the existing compact trigger selector; external webhook/event-bus UX remains deferred.
+- [Phase 8]: Stale workflow lock recovery marks expired running runs failed instead of replaying partially completed workflows.
+- [Phase 8]: Workflow retention removes only verbose events and artifact payload/storage URI data; durable definitions, versions, runs, step runs, approvals, and audit logs remain.
+- [Phase 8]: Admin workflow metrics and maintenance actions are manage-only and load opportunistically in the Operations Console.
 
 ### Pending Todos
 
-- Phase 8 Plan 08-01 planned and ready for execution.
+- Phase 8 Plan 08-02 ready for planning.
 
 ### Blockers/Concerns
 
@@ -112,11 +115,11 @@ Items intentionally deferred from the first useful workflow release:
 
 ## Session Continuity
 
-Last session: 2026-07-05T23:45:00.000Z
-Stopped at: Phase 8 Plan 08-01 planned; ready to execute workflow hardening
+Last session: 2026-07-05T23:54:00.000Z
+Stopped at: Phase 8 Plan 08-01 completed; ready to plan Phase 8 Plan 08-02 release coverage
 Resume file: None
 
 ## Operator Next Steps
 
-- Execute Phase 8 Plan 08-01 recovery/retention/stale-lock hardening.
+- Plan Phase 8 Plan 08-02 release coverage.
 - Continue autonomous execution with `$gsd-autonomous --auto`.

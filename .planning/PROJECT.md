@@ -139,6 +139,9 @@ Workflow context:
 | Workflow production APIs are dedicated internal APIs | Generic module execute lacks real user context, schedule state, run state, and audit semantics. | Active - v1.1 |
 | Postgres is workflow source of truth | Scheduled and long-running automations must survive process restarts. | Active - v1.1 |
 | Start with in-process scheduler/runner | It keeps operational complexity lower while durable state lives in Postgres. | Active - v1.1 |
+| Recover stale workflow locks conservatively | Current runtime cannot safely resume arbitrary partially completed side-effecting steps. | Active - stale locks fail the run and require normal retry |
+| Retain durable workflow history indefinitely | Definitions, versions, runs, step runs, approvals, and audit logs are the production record. | Active - retention only prunes verbose events and artifact payloads |
+| Keep admin metrics in Operations Console | Operators need lag, stale lock, failure, duration, and cost signals without a separate dashboard. | Active - metrics load only for workflow managers |
 
 ## Evolution
 
@@ -151,4 +154,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Define the next Active requirements when a new milestone starts.
 
 ---
-*Last updated: 2026-07-05 after ingesting `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`*
+*Last updated: 2026-07-05 after completing Phase 8 Plan 08-01*

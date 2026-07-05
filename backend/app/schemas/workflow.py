@@ -387,6 +387,7 @@ class WorkflowSchedulerTickResponse(BaseModel):
     duplicate_runs: int = 0
     executed_runs: int = 0
     failed_runs: int = 0
+    stale_locks_recovered: int = 0
     next_tick_at: Optional[datetime] = None
     runs: List[WorkflowScheduledRunSummary] = Field(default_factory=list)
     errors: List[str] = Field(default_factory=list)
@@ -443,6 +444,95 @@ class WorkflowTriggerFireResponse(BaseModel):
     failed_runs: int = 0
     runs: List[WorkflowTriggerFireRunResult] = Field(default_factory=list)
     errors: List[str] = Field(default_factory=list)
+
+
+class WorkflowStaleLockRecoveryRequest(BaseModel):
+    """Request body for recovering expired running workflow locks."""
+
+    older_than_seconds: int = Field(default=0, ge=0, le=86400)
+    limit: int = Field(default=100, ge=1, le=1000)
+    reason: Optional[str] = Field(default=None, max_length=1000)
+    now: Optional[datetime] = None
+
+
+class WorkflowStaleLockRecoveredRun(BaseModel):
+    """One workflow run recovered from an expired lock."""
+
+    run_id: str
+    workflow_id: str
+    previous_locked_by: Optional[str] = None
+    previous_lock_expires_at: Optional[datetime] = None
+    status: WorkflowRunStatus
+    reason: str
+
+
+class WorkflowStaleLockRecoveryResult(BaseModel):
+    """Summary returned after stale lock recovery."""
+
+    checked_at: datetime
+    recovered_count: int = 0
+    runs: List[WorkflowStaleLockRecoveredRun] = Field(default_factory=list)
+
+
+class WorkflowRetentionPolicy(BaseModel):
+    """Workflow verbose-data retention policy."""
+
+    event_retention_days: Optional[int] = Field(default=90, ge=1, le=3650)
+    artifact_retention_days: Optional[int] = Field(default=90, ge=1, le=3650)
+    dry_run: bool = True
+    limit: int = Field(default=1000, ge=1, le=10000)
+    now: Optional[datetime] = None
+
+
+class WorkflowRetentionResult(BaseModel):
+    """Summary returned after retention maintenance."""
+
+    dry_run: bool
+    checked_at: datetime
+    event_cutoff: Optional[datetime] = None
+    artifact_cutoff: Optional[datetime] = None
+    events_pruned: int = 0
+    artifact_payloads_pruned: int = 0
+
+
+class WorkflowAdminTopWorkflow(BaseModel):
+    """Workflow cost summary for operator metrics."""
+
+    workflow_id: str
+    workflow_name: str
+    run_count: int = 0
+    actual_cost_cents: int = 0
+    estimated_cost_cents: int = 0
+
+
+class WorkflowAdminFailedRun(BaseModel):
+    """Recent failed workflow run shown in admin metrics."""
+
+    run_id: str
+    workflow_id: str
+    workflow_name: str
+    trigger_type: WorkflowTriggerType
+    error: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    actual_cost_cents: int = 0
+
+
+class WorkflowAdminMetricsResponse(BaseModel):
+    """Admin-only operational workflow metrics."""
+
+    generated_at: datetime
+    window_hours: int = 24
+    scheduler_lag_seconds: int = 0
+    stale_lock_count: int = 0
+    long_running_count: int = 0
+    queued_runs: int = 0
+    running_runs: int = 0
+    paused_runs: int = 0
+    failed_runs_24h: int = 0
+    total_runs_24h: int = 0
+    failure_rate_24h: float = 0.0
+    failed_workflows: List[WorkflowAdminFailedRun] = Field(default_factory=list)
+    top_workflows_by_cost: List[WorkflowAdminTopWorkflow] = Field(default_factory=list)
 
 
 class WorkflowDefinitionListItem(BaseModel):

@@ -1,5 +1,6 @@
 """Workflow service scaffolding."""
 
+from .maintenance import WorkflowMaintenanceService
 from .operations import WorkflowOperationsService
 from .registry import StepRegistry, create_default_step_registry
 from .runtime import (
@@ -41,6 +42,7 @@ __all__ = [
     "WorkflowScheduleValidationError",
     "calculate_next_run_at",
     "WorkflowOperationsService",
+    "WorkflowMaintenanceService",
     "WorkflowService",
     "WorkflowServiceError",
     "WorkflowNotFoundError",

@@ -31,10 +31,12 @@ from app.schemas.workflow import (
     WorkflowSchedulePreviewRequest,
     WorkflowSchedulePreviewResponse,
     WorkflowSchedulerTickResponse,
+    WorkflowStaleLockRecoveryRequest,
     WorkflowTriggerType,
 )
 from app.services.audit_service import log_audit_event
 
+from .maintenance import WorkflowMaintenanceService
 from .runtime import (
     WorkflowRunConflictError,
     WorkflowRuntimeService,
@@ -76,9 +78,12 @@ class WorkflowSchedulerService:
     DEFAULT_CATCHUP_LIMIT = 5
 
     def __init__(
-        self, runtime_service: Optional[WorkflowRuntimeService] = None
+        self,
+        runtime_service: Optional[WorkflowRuntimeService] = None,
+        maintenance_service: Optional[WorkflowMaintenanceService] = None,
     ) -> None:
         self.runtime_service = runtime_service or WorkflowRuntimeService()
+        self.maintenance_service = maintenance_service or WorkflowMaintenanceService()
 
     def preview_schedule(
         self, payload: WorkflowSchedulePreviewRequest
@@ -121,7 +126,16 @@ class WorkflowSchedulerService:
     ) -> WorkflowSchedulerTickResponse:
         """Create due scheduled runs, then execute a bounded queued batch."""
         tick_now = _naive_utc(now or utc_now())
+        recovered = await self.maintenance_service.recover_stale_locks(
+            db,
+            WorkflowStaleLockRecoveryRequest(
+                limit=max(1, create_limit),
+                now=tick_now,
+                reason="workflow scheduler recovered expired lock",
+            ),
+        )
         result = await self.create_due_runs(db, now=tick_now, limit=create_limit)
+        result.stale_locks_recovered = recovered.recovered_count
         executed, failed, errors = await self.execute_queued_runs(
             db,
             worker_id=worker_id,

@@ -17,12 +17,15 @@ from app.schemas.workflow import (
     WorkflowDefinitionUpdate,
     WorkflowLifecycleAction,
     WorkflowManualRunRequest,
+    WorkflowRetentionPolicy,
     WorkflowRunAction,
     WorkflowRunStatus,
     WorkflowSchedulePreviewRequest,
+    WorkflowStaleLockRecoveryRequest,
     WorkflowTriggerFireRequest,
 )
 from app.services.workflows import (
+    WorkflowMaintenanceService,
     WorkflowNotFoundError,
     WorkflowOperationsService,
     WorkflowPermissionError,
@@ -45,6 +48,7 @@ runtime_service = WorkflowRuntimeService()
 scheduler_service = WorkflowSchedulerService(runtime_service)
 trigger_fire_service = WorkflowTriggerFireService(runtime_service)
 operations_service = WorkflowOperationsService()
+maintenance_service = WorkflowMaintenanceService()
 
 
 def _map_service_error(exc: Exception) -> HTTPException:
@@ -265,6 +269,71 @@ async def list_workflow_operations(
     """List compact workflow operations rows."""
     operations = await operations_service.list_operations(db, current_user)
     return {"success": True, "operations": operations.model_dump(mode="json")}
+
+
+@router.get("/operations/admin-metrics")
+async def get_workflow_admin_metrics(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Return admin-only workflow operator metrics."""
+    if not _has_workflow_manage_access(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="workflow manage permission required",
+        )
+    metrics = await operations_service.get_admin_metrics(db)
+    return {"success": True, "metrics": metrics.model_dump(mode="json")}
+
+
+@router.post("/operations/recover-stale-locks")
+async def recover_workflow_stale_locks(
+    payload: Optional[WorkflowStaleLockRecoveryRequest] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Recover expired running workflow locks."""
+    if not _has_workflow_manage_access(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="workflow manage permission required",
+        )
+    try:
+        result = await maintenance_service.recover_stale_locks(
+            db,
+            payload or WorkflowStaleLockRecoveryRequest(),
+            current_user,
+        )
+        await db.commit()
+        return {"success": True, "recovery": result.model_dump(mode="json")}
+    except Exception as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/operations/retention")
+async def apply_workflow_retention_policy(
+    payload: Optional[WorkflowRetentionPolicy] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Dry-run or apply workflow verbose-data retention."""
+    if not _has_workflow_manage_access(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="workflow manage permission required",
+        )
+    try:
+        result = await maintenance_service.apply_retention_policy(
+            db,
+            payload or WorkflowRetentionPolicy(),
+            current_user,
+        )
+        await db.commit()
+        return {"success": True, "retention": result.model_dump(mode="json")}
+    except Exception as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
 
 
 @router.get("/operations/recent-runs")
