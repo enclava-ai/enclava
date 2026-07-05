@@ -74,7 +74,13 @@ class WorkflowModule(BaseModule):
         action = request.get("action", "status")
 
         if action == "status":
-            return {"success": True, "stats": self.get_stats()}
+            stats = self.get_stats()
+            db_session = context.get("db_session") or context.get("db")
+            if db_session is not None:
+                stats["persisted_workflow_count"] = (
+                    await self.workflow_service.count_definitions(db_session)
+                )
+            return {"success": True, "stats": stats}
 
         if action == "catalog":
             return {

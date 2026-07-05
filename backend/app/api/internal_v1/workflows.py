@@ -1,0 +1,269 @@
+"""Internal workflow lifecycle API."""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.security import get_current_user
+from app.db.database import get_db
+from app.schemas.workflow import (
+    WorkflowDefinitionCreate,
+    WorkflowDefinitionStatus,
+    WorkflowDefinitionUpdate,
+    WorkflowLifecycleAction,
+)
+from app.services.workflows import (
+    WorkflowNotFoundError,
+    WorkflowPermissionError,
+    WorkflowService,
+    WorkflowValidationError,
+)
+
+router = APIRouter(tags=["Workflows"])
+workflow_service = WorkflowService()
+
+
+def _map_service_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, WorkflowNotFoundError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, WorkflowPermissionError):
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    if isinstance(exc, WorkflowValidationError):
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"message": str(exc), "errors": exc.details},
+        )
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="workflow operation failed",
+    )
+
+
+@router.get("/catalog")
+async def list_workflow_step_catalog(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List workflow step catalog entries."""
+    return {
+        "success": True,
+        "steps": [
+            entry.model_dump(mode="json")
+            for entry in workflow_service.list_step_catalog()
+        ],
+    }
+
+
+@router.get("/templates")
+async def list_workflow_templates(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List workflow template seeds."""
+    return {
+        "success": True,
+        "templates": [
+            template.model_dump(mode="json")
+            for template in workflow_service.list_templates()
+        ],
+    }
+
+
+@router.post("/validate")
+async def validate_workflow_definition(
+    definition: dict[str, Any],
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Validate a workflow definition document."""
+    result = await workflow_service.validate_workflow_payload(definition)
+    return {"success": result.valid, **result.model_dump(mode="json")}
+
+
+@router.get("/")
+async def list_workflows(
+    include_archived: bool = Query(default=False),
+    status_filter: Optional[WorkflowDefinitionStatus] = Query(
+        default=None, alias="status"
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List workflows visible to the authenticated user."""
+    workflows = await workflow_service.list_definitions(
+        db,
+        current_user,
+        include_archived=include_archived,
+        status=status_filter,
+    )
+    return {
+        "success": True,
+        "workflows": [workflow.model_dump(mode="json") for workflow in workflows],
+        "total": len(workflows),
+    }
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def create_workflow(
+    payload: WorkflowDefinitionCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Create a workflow draft."""
+    try:
+        workflow = await workflow_service.create_definition(db, payload, current_user)
+        await db.commit()
+        return {"success": True, "workflow": workflow.model_dump(mode="json")}
+    except (
+        WorkflowNotFoundError,
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+    except ValidationError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(),
+        ) from exc
+
+
+@router.get("/{workflow_id}")
+async def get_workflow(
+    workflow_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Get workflow detail."""
+    try:
+        workflow = await workflow_service.get_definition(db, workflow_id, current_user)
+        return {"success": True, "workflow": workflow.model_dump(mode="json")}
+    except (
+        WorkflowNotFoundError,
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        raise _map_service_error(exc) from exc
+
+
+@router.put("/{workflow_id}")
+async def update_workflow(
+    workflow_id: str,
+    payload: WorkflowDefinitionUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Update workflow draft fields."""
+    try:
+        workflow = await workflow_service.update_definition(
+            db, workflow_id, payload, current_user
+        )
+        await db.commit()
+        return {"success": True, "workflow": workflow.model_dump(mode="json")}
+    except (
+        WorkflowNotFoundError,
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+    except ValidationError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(),
+        ) from exc
+
+
+@router.post("/{workflow_id}/publish")
+async def publish_workflow(
+    workflow_id: str,
+    action: Optional[WorkflowLifecycleAction] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Publish the workflow draft as an immutable version."""
+    try:
+        workflow = await workflow_service.publish_definition(
+            db, workflow_id, current_user, action or WorkflowLifecycleAction()
+        )
+        await db.commit()
+        return {"success": True, "workflow": workflow.model_dump(mode="json")}
+    except (
+        WorkflowNotFoundError,
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/{workflow_id}/enable")
+async def enable_workflow(
+    workflow_id: str,
+    action: Optional[WorkflowLifecycleAction] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Enable a published workflow."""
+    try:
+        workflow = await workflow_service.enable_definition(
+            db, workflow_id, current_user, action or WorkflowLifecycleAction()
+        )
+        await db.commit()
+        return {"success": True, "workflow": workflow.model_dump(mode="json")}
+    except (
+        WorkflowNotFoundError,
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/{workflow_id}/disable")
+async def disable_workflow(
+    workflow_id: str,
+    action: Optional[WorkflowLifecycleAction] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Disable a workflow."""
+    try:
+        workflow = await workflow_service.disable_definition(
+            db, workflow_id, current_user, action or WorkflowLifecycleAction()
+        )
+        await db.commit()
+        return {"success": True, "workflow": workflow.model_dump(mode="json")}
+    except (
+        WorkflowNotFoundError,
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc
+
+
+@router.post("/{workflow_id}/archive")
+async def archive_workflow(
+    workflow_id: str,
+    action: Optional[WorkflowLifecycleAction] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Archive a workflow."""
+    try:
+        workflow = await workflow_service.archive_definition(
+            db, workflow_id, current_user, action or WorkflowLifecycleAction()
+        )
+        await db.commit()
+        return {"success": True, "workflow": workflow.model_dump(mode="json")}
+    except (
+        WorkflowNotFoundError,
+        WorkflowPermissionError,
+        WorkflowValidationError,
+    ) as exc:
+        await db.rollback()
+        raise _map_service_error(exc) from exc

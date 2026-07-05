@@ -19,7 +19,7 @@ The first vertical slice is Nightly RAG Summary: a scheduled workflow that finds
 - Decimal phases (2.1, 2.2): Urgent insertions if needed.
 
 - [x] **Phase 1: Product Contract and Scaffold** - Lock MVP boundaries, schemas, module adapter direction, step registry shell, and template seeds. (completed 2026-07-05)
-- [ ] **Phase 2: Persistence, API, Permissions, and Audit** - Add durable workflow data model, lifecycle service, internal APIs, permissions, and audit hooks.
+- [x] **Phase 2: Persistence, API, Permissions, and Audit** - Add durable workflow data model, lifecycle service, internal APIs, permissions, and audit hooks. (completed 2026-07-05)
 - [ ] **Phase 3: Manual Execution Engine** - Implement persisted manual runs, ordered step execution, MVP step types, run detail, artifacts, retries, cancellation, budget checks, and redaction.
 - [ ] **Phase 4: Scheduler and Operations Console** - Add timezone-aware scheduling, due-run creation, idempotency, misfire/concurrency policy, operations console, schedule board, and health states.
 - [ ] **Phase 5: Builder, Templates, and Validation** - Build the typed step builder, step catalog forms, schedule preview validation, templates, draft/publish flow, and Nightly RAG Summary template.
@@ -45,11 +45,11 @@ The first vertical slice is Nightly RAG Summary: a scheduled workflow that finds
 Plans:
 **Wave 1**
 
-- [ ] 01-01: Add workflow domain schemas, runtime policy types, state enums, and sample definitions.
+- [x] 01-01: Add workflow domain schemas, runtime policy types, state enums, and sample definitions.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02: Add service interfaces, step registry shell, template seeds, and module adapter integration points.
+- [x] 01-02: Add service interfaces, step registry shell, template seeds, and module adapter integration points.
 
 ### Phase 2: Persistence, API, Permissions, and Audit
 
@@ -67,15 +67,15 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 02-01: Add workflow persistence models and migration.
+- [x] 02-01: Add workflow persistence models and migration.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02: Implement workflow lifecycle service, validation, publish/version semantics, and permission checks.
+- [x] 02-02: Implement workflow lifecycle service, validation, publish/version semantics, and permission checks.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03: Add internal workflow API router and lifecycle audit hooks.
+- [x] 02-03: Add internal workflow API router and lifecycle audit hooks.
 
 ### Phase 3: Manual Execution Engine
 
@@ -237,7 +237,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Product Contract and Scaffold | 2/2 | Complete | 2026-07-05 |
-| 2. Persistence, API, Permissions, and Audit | 0/3 | Planned | - |
+| 2. Persistence, API, Permissions, and Audit | 3/3 | Complete | 2026-07-05 |
 | 3. Manual Execution Engine | 0/3 | Planned | - |
 | 4. Scheduler and Operations Console | 0/3 | Planned | - |
 | 5. Builder, Templates, and Validation | 0/3 | Planned | - |

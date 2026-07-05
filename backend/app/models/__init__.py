@@ -71,6 +71,17 @@ from .tool import Tool, ToolCategory, ToolExecution, ToolStatus, ToolType
 from .usage_record import UsageRecord
 from .usage_tracking import UsageTracking
 from .user import User
+from .workflow import (
+    LegacyWorkflowExecution,
+    LegacyWorkflowStepLog,
+    WorkflowArtifact,
+    WorkflowDefinition,
+    WorkflowEvent,
+    WorkflowRun,
+    WorkflowStepRun,
+    WorkflowTrigger,
+    WorkflowVersion,
+)
 
 __all__ = [
     "Base",
@@ -119,4 +130,13 @@ __all__ = [
     "ConnectorType",
     "ConnectorStatus",
     "ConnectorSyncStatus",
+    "LegacyWorkflowExecution",
+    "LegacyWorkflowStepLog",
+    "WorkflowDefinition",
+    "WorkflowVersion",
+    "WorkflowTrigger",
+    "WorkflowRun",
+    "WorkflowStepRun",
+    "WorkflowArtifact",
+    "WorkflowEvent",
 ]

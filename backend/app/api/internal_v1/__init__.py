@@ -28,6 +28,7 @@ from .debugging import router as debugging_router
 from .metrics import router as metrics_router
 from .providers import router as providers_router
 from .usage_stats import router as usage_stats_router
+from .workflows import router as workflows_router
 
 # Create internal API router
 internal_api_router = APIRouter()
@@ -143,6 +144,9 @@ internal_api_router.include_router(
 )
 
 # Include connector management routes (knowledge base connectors - admin only)
+internal_api_router.include_router(connectors_router, tags=["internal-connectors"])
+
+# Include workflow lifecycle routes
 internal_api_router.include_router(
-    connectors_router, tags=["internal-connectors"]
+    workflows_router, prefix="/workflows", tags=["internal-workflows"]
 )

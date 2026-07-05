@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -240,3 +241,91 @@ class WorkflowTemplate(BaseModel):
     description: str
     definition: WorkflowDefinitionDocument
     tags: List[str] = Field(default_factory=list)
+
+
+class WorkflowDefinitionCreate(BaseModel):
+    """Request body for creating a workflow draft."""
+
+    name: str = Field(min_length=1, max_length=255)
+    description: Optional[str] = None
+    definition: WorkflowDefinitionDocument
+    tags: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkflowDefinitionUpdate(BaseModel):
+    """Request body for updating a workflow draft."""
+
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    definition: Optional[WorkflowDefinitionDocument] = None
+    tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class WorkflowLifecycleAction(BaseModel):
+    """Optional metadata attached to workflow lifecycle actions."""
+
+    reason: Optional[str] = Field(default=None, max_length=1000)
+
+
+class WorkflowVersionSummary(BaseModel):
+    """Published workflow version summary."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    version_number: int
+    status: WorkflowVersionStatus
+    created_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+
+
+class WorkflowTriggerSummary(BaseModel):
+    """Persisted trigger summary."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    trigger_type: WorkflowTriggerType
+    enabled: bool
+    cron_expression: Optional[str] = None
+    timezone: Optional[str] = None
+    misfire_policy: Optional[str] = None
+    next_run_at: Optional[datetime] = None
+
+
+class WorkflowDefinitionListItem(BaseModel):
+    """Workflow item returned from list endpoints."""
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    status: WorkflowDefinitionStatus
+    owner_user_id: Optional[int] = None
+    current_version_id: Optional[str] = None
+    latest_version_number: int
+    is_active: bool
+    trigger_type: WorkflowTriggerType
+    tags: List[str] = Field(default_factory=list)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    last_published_at: Optional[datetime] = None
+    archived_at: Optional[datetime] = None
+
+
+class WorkflowDefinitionDetail(WorkflowDefinitionListItem):
+    """Workflow detail returned from lifecycle APIs."""
+
+    draft_definition: WorkflowDefinitionDocument
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    versions: List[WorkflowVersionSummary] = Field(default_factory=list)
+    triggers: List[WorkflowTriggerSummary] = Field(default_factory=list)
+
+
+class WorkflowValidationResponse(BaseModel):
+    """Definition validation response."""
+
+    valid: bool
+    definition: Optional[WorkflowDefinitionDocument] = None
+    errors: List[Dict[str, Any]] = Field(default_factory=list)
