@@ -68,6 +68,7 @@ export function WorkflowRunTimeline({ run }: WorkflowRunTimelineProps) {
                 key={step.id}
                 step={step}
                 isLast={index === run.steps.length - 1}
+                events={run.events}
               />
             ))
           ) : (
@@ -112,11 +113,15 @@ function Metric({
 function StepRow({
   step,
   isLast,
+  events,
 }: {
   step: WorkflowStepRunDetail
   isLast: boolean
+  events: WorkflowEventSummary[]
 }) {
   const Icon = stepIcon(step.status)
+  const skipReason =
+    step.status === "skipped" ? skippedStepReason(step, events) : null
   return (
     <div className="grid grid-cols-[2rem_1fr] gap-3 p-4">
       <div className="relative flex justify-center">
@@ -150,6 +155,11 @@ function StepRow({
             {step.error}
           </p>
         ) : null}
+        {skipReason ? (
+          <p className="rounded-md border border-warning-border bg-warning-soft p-2 text-xs text-warning-soft-foreground">
+            {skipReason}
+          </p>
+        ) : null}
         {step.artifacts.length ? (
           <div className="flex flex-wrap gap-2">
             {step.artifacts.map((artifact) => (
@@ -166,6 +176,17 @@ function StepRow({
       </div>
     </div>
   )
+}
+
+function skippedStepReason(
+  step: WorkflowStepRunDetail,
+  events: WorkflowEventSummary[]
+): string | null {
+  const event = events.find(
+    (item) =>
+      item.event_type === "step_skipped" && item.data?.step_key === step.step_key
+  )
+  return String(event?.data?.reason || event?.message || "") || null
 }
 
 function PayloadPanel({
