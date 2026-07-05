@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping, Optional
 
 from sqlalchemy import Select, case, func, select
@@ -24,10 +24,19 @@ from app.schemas.workflow import (
     WorkflowOperationsTotals,
     WorkflowRunStatus,
     WorkflowRunSummary,
+    WorkflowScheduleBoardGroup,
+    WorkflowScheduleBoardItem,
+    WorkflowScheduleBoardResponse,
+    WorkflowScheduleBoardRun,
+    WorkflowSchedulePreviewItem,
+    WorkflowSchedulePreviewRequest,
+    WorkflowTemplateSummary,
     WorkflowTriggerType,
 )
 
+from .scheduler import WorkflowSchedulerService, WorkflowScheduleValidationError
 from .service import _actor_id, _can_read_all
+from .templates import list_workflow_templates
 
 
 class WorkflowOperationsService:
@@ -87,6 +96,8 @@ class WorkflowOperationsService:
         actor: Mapping[str, Any],
         *,
         failed_only: bool = False,
+        status: Optional[WorkflowRunStatus] = None,
+        workflow_id: Optional[str] = None,
         limit: int = 20,
     ) -> list[WorkflowRunSummary]:
         """Return recent visible workflow runs for operations panels."""
@@ -96,6 +107,11 @@ class WorkflowOperationsService:
             return []
 
         names_by_id = {workflow.id: workflow.name for workflow in workflows}
+        if workflow_id is not None:
+            if workflow_id not in names_by_id:
+                return []
+            workflow_ids = [workflow_id]
+
         stmt: Select[tuple[WorkflowRun]] = (
             select(WorkflowRun)
             .options(selectinload(WorkflowRun.version))
@@ -105,6 +121,8 @@ class WorkflowOperationsService:
         )
         if failed_only:
             stmt = stmt.where(WorkflowRun.status == WorkflowRunStatus.FAILED.value)
+        if status is not None:
+            stmt = stmt.where(WorkflowRun.status == status.value)
 
         result = await db.execute(stmt)
         return [
@@ -112,6 +130,98 @@ class WorkflowOperationsService:
             for run in result.scalars().all()
             if (summary := _run_summary(run, names_by_id.get(run.workflow_id, "")))
             is not None
+        ]
+
+    async def list_schedule_board(
+        self,
+        db: AsyncSession,
+        actor: Mapping[str, Any],
+    ) -> WorkflowScheduleBoardResponse:
+        """Return visible schedule triggers with upcoming fire-time groups."""
+        workflows = await self._list_visible_workflows(db, actor)
+        workflow_ids = [workflow.id for workflow in workflows]
+        if not workflow_ids:
+            return WorkflowScheduleBoardResponse(groups=_empty_schedule_groups())
+
+        latest_runs = await self._ranked_runs(db, workflow_ids)
+        active_runs = await self._ranked_runs(
+            db, workflow_ids, statuses=self.ACTIVE_RUN_STATUSES
+        )
+        failed_runs = await self._ranked_runs(
+            db, workflow_ids, statuses={WorkflowRunStatus.FAILED.value}
+        )
+        now = utc_now()
+        schedules: list[WorkflowScheduleBoardItem] = []
+        upcoming: list[WorkflowScheduleBoardRun] = []
+
+        for workflow in workflows:
+            trigger = _current_trigger(workflow)
+            if (
+                not trigger
+                or trigger.trigger_type != WorkflowTriggerType.SCHEDULE.value
+            ):
+                continue
+
+            latest_run = latest_runs.get(workflow.id)
+            active_run = active_runs.get(workflow.id)
+            failed_run = failed_runs.get(workflow.id)
+            health = self._schedule_health_state(
+                workflow, trigger, latest_run, active_run, now
+            )
+            preview = _preview_trigger(trigger, now=now)
+            item = WorkflowScheduleBoardItem(
+                workflow_id=workflow.id,
+                workflow_name=workflow.name,
+                description=workflow.description,
+                status=WorkflowDefinitionStatus(workflow.status),
+                health=health,
+                owner_label=_owner_label(workflow),
+                tags=workflow.tags or [],
+                trigger_id=trigger.id,
+                trigger_enabled=bool(trigger.enabled),
+                cron_expression=trigger.cron_expression,
+                timezone=trigger.timezone,
+                misfire_policy=trigger.misfire_policy,
+                next_run_at=trigger.next_run_at,
+                last_fire_at=trigger.last_fire_at,
+                latest_run=_run_summary(latest_run, workflow.name),
+                active_run=_run_summary(active_run, workflow.name),
+                latest_failed_run=_run_summary(failed_run, workflow.name),
+                preview=preview,
+            )
+            schedules.append(item)
+            upcoming.extend(
+                WorkflowScheduleBoardRun(
+                    workflow_id=workflow.id,
+                    workflow_name=workflow.name,
+                    trigger_id=trigger.id,
+                    run_at=preview_item.run_at,
+                    local_time=preview_item.local_time,
+                    timezone=preview_item.timezone,
+                    health=health,
+                    workflow_status=WorkflowDefinitionStatus(workflow.status),
+                    trigger_enabled=bool(trigger.enabled),
+                )
+                for preview_item in preview
+            )
+
+        return WorkflowScheduleBoardResponse(
+            schedules=schedules,
+            groups=_group_upcoming_runs(upcoming, now),
+        )
+
+    def list_template_summaries(self) -> list[WorkflowTemplateSummary]:
+        """Return compact workflow template summaries."""
+        return [
+            WorkflowTemplateSummary(
+                id=template.id,
+                name=template.name,
+                description=template.description,
+                trigger_type=template.definition.trigger.type,
+                step_count=len(template.definition.steps),
+                tags=template.tags,
+            )
+            for template in list_workflow_templates()
         ]
 
     async def _list_visible_workflows(
@@ -280,6 +390,30 @@ class WorkflowOperationsService:
             return WorkflowHealthState.HEALTHY
         return WorkflowHealthState.NO_SCHEDULE
 
+    def _schedule_health_state(
+        self,
+        workflow: WorkflowDefinition,
+        trigger: WorkflowTrigger,
+        latest_run: Optional[WorkflowRun],
+        active_run: Optional[WorkflowRun],
+        now: datetime,
+    ) -> WorkflowHealthState:
+        if (
+            workflow.status != WorkflowDefinitionStatus.ACTIVE.value
+            or not workflow.is_active
+            or not trigger.enabled
+        ):
+            return WorkflowHealthState.DISABLED
+        if active_run is not None:
+            return WorkflowHealthState.RUNNING
+        if latest_run and latest_run.status == WorkflowRunStatus.FAILED.value:
+            return WorkflowHealthState.FAILED
+        if trigger.next_run_at and trigger.next_run_at < now - timedelta(
+            seconds=self.MISSED_GRACE_SECONDS
+        ):
+            return WorkflowHealthState.MISSED
+        return WorkflowHealthState.HEALTHY
+
     def _totals(self, rows: list[WorkflowOperationsRow]) -> WorkflowOperationsTotals:
         return WorkflowOperationsTotals(
             total=len(rows),
@@ -367,3 +501,76 @@ def _duration_ms(run: WorkflowRun) -> Optional[int]:
     if not run.started_at or not run.completed_at:
         return None
     return int((run.completed_at - run.started_at).total_seconds() * 1000)
+
+
+def _preview_trigger(
+    trigger: WorkflowTrigger,
+    *,
+    now: datetime,
+    count: int = 5,
+) -> list[WorkflowSchedulePreviewItem]:
+    if not trigger.cron_expression or not trigger.timezone:
+        return []
+    try:
+        return (
+            WorkflowSchedulerService()
+            .preview_schedule(
+                WorkflowSchedulePreviewRequest(
+                    cron=trigger.cron_expression,
+                    timezone=trigger.timezone,
+                    count=count,
+                    start_at=now,
+                )
+            )
+            .next_runs
+        )
+    except WorkflowScheduleValidationError:
+        return []
+
+
+def _group_upcoming_runs(
+    runs: list[WorkflowScheduleBoardRun],
+    now: datetime,
+) -> list[WorkflowScheduleBoardGroup]:
+    grouped = {key: [] for key, _ in _schedule_group_specs()}
+    for run in sorted(runs, key=lambda item: item.run_at):
+        grouped[_schedule_group_key(run.run_at, now)].append(run)
+
+    return [
+        WorkflowScheduleBoardGroup(key=key, label=label, runs=grouped[key])
+        for key, label in _schedule_group_specs()
+    ]
+
+
+def _empty_schedule_groups() -> list[WorkflowScheduleBoardGroup]:
+    return [
+        WorkflowScheduleBoardGroup(key=key, label=label)
+        for key, label in _schedule_group_specs()
+    ]
+
+
+def _schedule_group_specs() -> list[tuple[str, str]]:
+    return [
+        ("today", "Today"),
+        ("tomorrow", "Tomorrow"),
+        ("this_week", "This Week"),
+        ("later", "Later"),
+    ]
+
+
+def _schedule_group_key(run_at: datetime, now: datetime) -> str:
+    run_date = _aware_utc(run_at).date()
+    today = _aware_utc(now).date()
+    if run_date == today:
+        return "today"
+    if run_date == today + timedelta(days=1):
+        return "tomorrow"
+    if run_date <= today + timedelta(days=7):
+        return "this_week"
+    return "later"
+
+
+def _aware_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

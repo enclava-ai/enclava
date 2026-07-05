@@ -487,6 +487,89 @@ export interface WorkflowOperationsApiResponse {
   operations: WorkflowOperationsResponse
 }
 
+export interface WorkflowSchedulePreviewItem {
+  run_at: string
+  local_time: string
+  timezone: string
+}
+
+export interface WorkflowScheduleBoardRun {
+  workflow_id: string
+  workflow_name: string
+  trigger_id: string
+  run_at: string
+  local_time: string
+  timezone: string
+  health: WorkflowHealthState
+  workflow_status: 'draft' | 'active' | 'disabled' | 'archived'
+  trigger_enabled: boolean
+}
+
+export interface WorkflowScheduleBoardGroup {
+  key: string
+  label: string
+  runs: WorkflowScheduleBoardRun[]
+}
+
+export interface WorkflowScheduleBoardItem {
+  workflow_id: string
+  workflow_name: string
+  description?: string | null
+  status: 'draft' | 'active' | 'disabled' | 'archived'
+  health: WorkflowHealthState
+  owner_label?: string | null
+  tags: string[]
+  trigger_id: string
+  trigger_enabled: boolean
+  cron_expression?: string | null
+  timezone?: string | null
+  misfire_policy?: string | null
+  next_run_at?: string | null
+  last_fire_at?: string | null
+  latest_run?: WorkflowRunSummary | null
+  active_run?: WorkflowRunSummary | null
+  latest_failed_run?: WorkflowRunSummary | null
+  preview: WorkflowSchedulePreviewItem[]
+}
+
+export interface WorkflowScheduleBoardResponse {
+  schedules: WorkflowScheduleBoardItem[]
+  groups: WorkflowScheduleBoardGroup[]
+}
+
+export interface WorkflowScheduleBoardApiResponse {
+  success: boolean
+  schedule_board: WorkflowScheduleBoardResponse
+}
+
+export interface WorkflowRunsApiResponse {
+  success: boolean
+  runs: WorkflowRunSummary[]
+}
+
+export interface WorkflowTemplateSummary {
+  id: string
+  name: string
+  description: string
+  trigger_type: WorkflowTriggerType
+  step_count: number
+  tags: string[]
+}
+
+export interface WorkflowTemplatesApiResponse {
+  success: boolean
+  templates: WorkflowTemplateSummary[]
+}
+
+export interface WorkflowSchedulePreviewApiResponse {
+  success: boolean
+  preview: {
+    cron: string
+    timezone: string
+    next_runs: WorkflowSchedulePreviewItem[]
+  }
+}
+
 export interface WorkflowStepRunDetail {
   id: string
   step_key: string
@@ -546,10 +629,48 @@ export const workflowApi = {
   getOperations() {
     return apiClient.get<WorkflowOperationsApiResponse>('/api/workflows')
   },
+  getRecentRuns(params?: {
+    workflow_id?: string
+    status?: WorkflowRunStatus
+    limit?: number
+  }) {
+    const query = new URLSearchParams({ resource: 'runs' })
+    if (params?.workflow_id) query.set('workflow_id', params.workflow_id)
+    if (params?.status) query.set('status', params.status)
+    if (params?.limit) query.set('limit', String(params.limit))
+    return apiClient.get<WorkflowRunsApiResponse>(`/api/workflows?${query.toString()}`)
+  },
+  getScheduleBoard() {
+    return apiClient.get<WorkflowScheduleBoardApiResponse>('/api/workflows?resource=schedules')
+  },
+  getTemplates() {
+    return apiClient.get<WorkflowTemplatesApiResponse>('/api/workflows?resource=templates')
+  },
   runNow(workflowId: string, inputData: Record<string, any> = {}) {
     return apiClient.post<WorkflowRunResponse>('/api/workflows', {
       workflow_id: workflowId,
       input_data: inputData,
+    })
+  },
+  enableWorkflow(workflowId: string, reason?: string) {
+    return apiClient.post('/api/workflows', {
+      action: 'enable',
+      workflow_id: workflowId,
+      reason,
+    })
+  },
+  disableWorkflow(workflowId: string, reason?: string) {
+    return apiClient.post('/api/workflows', {
+      action: 'disable',
+      workflow_id: workflowId,
+      reason,
+    })
+  },
+  previewSchedule(workflowId: string, count = 5) {
+    return apiClient.post<WorkflowSchedulePreviewApiResponse>('/api/workflows', {
+      action: 'preview_schedule',
+      workflow_id: workflowId,
+      count,
     })
   },
 }

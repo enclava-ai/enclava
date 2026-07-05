@@ -17,6 +17,7 @@ from app.schemas.workflow import (
     WorkflowLifecycleAction,
     WorkflowManualRunRequest,
     WorkflowRunAction,
+    WorkflowRunStatus,
     WorkflowSchedulePreviewRequest,
 )
 from app.services.workflows import (
@@ -235,6 +236,86 @@ async def list_workflow_operations_failures(
         limit=limit,
     )
     return {"success": True, "runs": [run.model_dump(mode="json") for run in runs]}
+
+
+@router.get("/operations/runs")
+async def list_workflow_operations_runs(
+    limit: int = Query(default=20, ge=1, le=100),
+    workflow_id: Optional[str] = Query(default=None),
+    status_filter: Optional[WorkflowRunStatus] = Query(default=None, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List recent runs visible to the workflow operations tabs."""
+    runs = await operations_service.list_recent_runs(
+        db,
+        current_user,
+        workflow_id=workflow_id,
+        status=status_filter,
+        limit=limit,
+    )
+    return {"success": True, "runs": [run.model_dump(mode="json") for run in runs]}
+
+
+@router.get("/operations/schedules")
+async def list_workflow_schedule_board(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List schedule board data visible to the actor."""
+    board = await operations_service.list_schedule_board(db, current_user)
+    return {"success": True, "schedule_board": board.model_dump(mode="json")}
+
+
+@router.get("/operations/templates")
+async def list_workflow_operation_templates(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """List compact template summaries for workflow operations tabs."""
+    return {
+        "success": True,
+        "templates": [
+            template.model_dump(mode="json")
+            for template in operations_service.list_template_summaries()
+        ],
+    }
+
+
+@router.post("/{workflow_id}/schedule/preview")
+async def preview_existing_workflow_schedule(
+    workflow_id: str,
+    count: int = Query(default=5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Preview the current schedule trigger for an existing workflow."""
+    try:
+        workflow = await workflow_service.get_definition(db, workflow_id, current_user)
+        trigger = next(
+            (
+                item
+                for item in reversed(workflow.triggers)
+                if item.trigger_type.value == "schedule"
+            ),
+            None,
+        )
+        if trigger is None or not trigger.cron_expression or not trigger.timezone:
+            raise WorkflowScheduleValidationError("workflow has no schedule trigger")
+        preview = scheduler_service.preview_schedule(
+            WorkflowSchedulePreviewRequest(
+                cron=trigger.cron_expression,
+                timezone=trigger.timezone,
+                count=count,
+            )
+        )
+        return {"success": True, "preview": preview.model_dump(mode="json")}
+    except (
+        WorkflowNotFoundError,
+        WorkflowPermissionError,
+        WorkflowValidationError,
+        WorkflowScheduleValidationError,
+    ) as exc:
+        raise _map_service_error(exc) from exc
 
 
 @router.get("/runs/{run_id}")

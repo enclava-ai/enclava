@@ -2,7 +2,7 @@
 status: clean
 phase: 04-scheduler-and-operations-console
 depth: standard
-files_reviewed: 21
+files_reviewed: 31
 findings:
   critical: 0
   warning: 0
@@ -42,6 +42,19 @@ created: 2026-07-05
 - `frontend/src/components/workflows/WorkflowOperationsConsole.tsx`
 - `nginx/nginx.conf`
 
+### Plan 04-03 Schedule Board and Controls
+
+- `backend/app/schemas/workflow.py`
+- `backend/app/services/workflows/operations.py`
+- `backend/app/api/internal_v1/workflows.py`
+- `backend/tests/unit/services/test_workflow_schedule_board_api.py`
+- `frontend/src/lib/api-client.ts`
+- `frontend/src/app/api/workflows/route.ts`
+- `frontend/src/app/workflows/page.tsx`
+- `frontend/src/components/workflows/WorkflowScheduleBoard.tsx`
+- `frontend/src/components/workflows/WorkflowRunsTable.tsx`
+- `frontend/src/components/workflows/WorkflowTemplatesPanel.tsx`
+
 ## Result
 
 No blocking bugs, security issues, or code quality findings remain at standard depth.
@@ -56,6 +69,10 @@ No blocking bugs, security issues, or code quality findings remain at standard d
 - The console derives health from persisted workflow/run/trigger state and blocks run-now for inactive workflows.
 - The Workflows route is an operations console first; builder UX remains deferred to Phase 5.
 - The live nginx `/api/` catch-all is bypassed for `/api/workflows`, matching the existing frontend API exception pattern.
+- Schedule board rows reuse the operations visibility boundary and current persisted schedule trigger.
+- Enable/disable controls call the centralized lifecycle APIs so audit records and trigger state remain consistent.
+- Recent run filters and schedule preview APIs are exposed through the existing authenticated frontend proxy.
+- The operations UX is now split into Overview, Runs, Schedules, and Templates tabs without adding builder-authoring scope.
 
 ## Verification Considered
 
@@ -69,3 +86,8 @@ No blocking bugs, security issues, or code quality findings remain at standard d
 - `npm run check:plumbing`
 - `npm run build`
 - Live smoke: `/workflows` returns 200 through nginx; `/api/workflows` reaches the Next proxy after the nginx route exception.
+- `pytest --no-cov -q tests/unit/services/test_workflow_schedule_board_api.py`
+- `pytest --no-cov -q tests/unit/services/test_workflow_schedule_board_api.py tests/unit/services/test_workflow_operations_api.py tests/unit/services/test_workflow_scheduler_api.py tests/unit/services/test_workflow_scheduler.py tests/unit/services/test_workflow_run_api.py tests/unit/services/test_workflow_api.py`
+- `black --check app/schemas/workflow.py app/services/workflows app/api/internal_v1/workflows.py tests/unit/services/test_workflow_schedule_board_api.py`
+- `isort --check-only app/schemas/workflow.py app/services/workflows app/api/internal_v1/workflows.py tests/unit/services/test_workflow_schedule_board_api.py`
+- `git diff --check` on touched workflow files.

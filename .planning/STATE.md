@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 4 plan 04-02 complete; next plan is 04-03 schedule board and controls
-last_updated: "2026-07-05T20:39:45.727Z"
-last_activity: 2026-07-05 - Completed Phase 4 Plan 04-02 operations console
+stopped_at: Phase 4 complete; next phase is Phase 5 builder, templates, and validation
+last_updated: "2026-07-05T20:56:04.000Z"
+last_activity: 2026-07-05 - Completed Phase 4 Plan 04-03 schedule board and controls
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 22
-  completed_plans: 10
-  percent: 45
+  completed_plans: 11
+  percent: 50
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-05)
 
 **Core value:** Users can run confidential AI automations that are scheduled, auditable, observable, budget-aware, and clear to operate.
-**Current focus:** Phase 4 — Scheduler and Operations Console
+**Current focus:** Phase 5 — Builder, Templates, and Validation
 
 ## Current Position
 
-Phase: 4 (Scheduler and Operations Console) — EXECUTING
-Plan: 04-03 (3 of 3)
-Status: Executing Phase 4
-Last activity: 2026-07-05 - Completed Phase 4 Plan 04-02 operations console
+Phase: 5 (Builder, Templates, and Validation) — READY
+Plan: 05-01 (1 of 3)
+Status: Phase 4 complete; ready to plan Phase 5
+Last activity: 2026-07-05 - Completed Phase 4 Plan 04-03 schedule board and controls
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-07-05 - Completed Phase 4 Plan 04-02 operations console
 
 - Phases planned: 8
 - Plans planned: 22
-- Plans completed: 10
+- Plans completed: 11
 
 ## Accumulated Context
 
@@ -64,6 +64,8 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 3]: Manual workflow execution is synchronous/in-process for the MVP, with persisted run, step, event, artifact, retry, cancellation, budget, and redaction history.
 - [Phase 3]: Run detail UI is direct-linked only until Phase 4 introduces the Workflows operations console and navigation entry.
 - [Phase 4]: Scheduler should follow the existing lightweight asyncio task pattern used by connector sync, backed by Postgres locks and idempotency keys.
+- [Phase 4]: Workflows route is operations-first: overview, runs, schedules, and templates are separate tabs before builder authoring arrives.
+- [Phase 4]: Schedule board lifecycle controls reuse workflow enable/disable APIs so audit behavior remains centralized.
 
 ### Pending Todos
 
@@ -100,5 +102,5 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Execute Phase 4 with `$gsd-execute-phase 4`
+- Plan Phase 5 with `$gsd-plan-phase 5 --auto`
 - Or continue autonomous execution with `$gsd-autonomous --auto`

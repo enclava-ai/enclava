@@ -557,6 +557,69 @@ class WorkflowOperationsResponse(BaseModel):
     totals: WorkflowOperationsTotals = Field(default_factory=WorkflowOperationsTotals)
 
 
+class WorkflowScheduleBoardRun(BaseModel):
+    """One upcoming scheduled fire time shown on the schedule board."""
+
+    workflow_id: str
+    workflow_name: str
+    trigger_id: str
+    run_at: datetime
+    local_time: str
+    timezone: str
+    health: WorkflowHealthState
+    workflow_status: WorkflowDefinitionStatus
+    trigger_enabled: bool
+
+
+class WorkflowScheduleBoardGroup(BaseModel):
+    """Grouped upcoming scheduled runs."""
+
+    key: str
+    label: str
+    runs: List[WorkflowScheduleBoardRun] = Field(default_factory=list)
+
+
+class WorkflowScheduleBoardItem(BaseModel):
+    """One schedule row for the workflow schedule board."""
+
+    workflow_id: str
+    workflow_name: str
+    description: Optional[str] = None
+    status: WorkflowDefinitionStatus
+    health: WorkflowHealthState
+    owner_label: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    trigger_id: str
+    trigger_enabled: bool
+    cron_expression: Optional[str] = None
+    timezone: Optional[str] = None
+    misfire_policy: Optional[str] = None
+    next_run_at: Optional[datetime] = None
+    last_fire_at: Optional[datetime] = None
+    latest_run: Optional[WorkflowRunSummary] = None
+    active_run: Optional[WorkflowRunSummary] = None
+    latest_failed_run: Optional[WorkflowRunSummary] = None
+    preview: List[WorkflowSchedulePreviewItem] = Field(default_factory=list)
+
+
+class WorkflowScheduleBoardResponse(BaseModel):
+    """Schedule board payload for the Workflows page."""
+
+    schedules: List[WorkflowScheduleBoardItem] = Field(default_factory=list)
+    groups: List[WorkflowScheduleBoardGroup] = Field(default_factory=list)
+
+
+class WorkflowTemplateSummary(BaseModel):
+    """Compact workflow template summary for operations tabs."""
+
+    id: str
+    name: str
+    description: str
+    trigger_type: WorkflowTriggerType
+    step_count: int
+    tags: List[str] = Field(default_factory=list)
+
+
 class WorkflowRunDetail(WorkflowRunSummary):
     """Workflow run detail returned by runtime APIs."""
 
