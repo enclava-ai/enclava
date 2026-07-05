@@ -18,7 +18,7 @@ The first vertical slice is Nightly RAG Summary: a scheduled workflow that finds
 - Integer phases (1, 2, 3): Planned milestone work.
 - Decimal phases (2.1, 2.2): Urgent insertions if needed.
 
-- [ ] **Phase 1: Product Contract and Scaffold** - Lock MVP boundaries, schemas, module adapter direction, step registry shell, and template seeds.
+- [x] **Phase 1: Product Contract and Scaffold** - Lock MVP boundaries, schemas, module adapter direction, step registry shell, and template seeds. (completed 2026-07-05)
 - [ ] **Phase 2: Persistence, API, Permissions, and Audit** - Add durable workflow data model, lifecycle service, internal APIs, permissions, and audit hooks.
 - [ ] **Phase 3: Manual Execution Engine** - Implement persisted manual runs, ordered step execution, MVP step types, run detail, artifacts, retries, cancellation, budget checks, and redaction.
 - [ ] **Phase 4: Scheduler and Operations Console** - Add timezone-aware scheduling, due-run creation, idempotency, misfire/concurrency policy, operations console, schedule board, and health states.
@@ -236,7 +236,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Product Contract and Scaffold | 0/2 | Planned | - |
+| 1. Product Contract and Scaffold | 2/2 | Complete | 2026-07-05 |
 | 2. Persistence, API, Permissions, and Audit | 0/3 | Planned | - |
 | 3. Manual Execution Engine | 0/3 | Planned | - |
 | 4. Scheduler and Operations Console | 0/3 | Planned | - |

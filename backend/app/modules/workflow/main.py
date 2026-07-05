@@ -3,8 +3,11 @@
 import time
 from typing import Any, Dict, List, Optional
 
+from pydantic import ValidationError
+
 from app.core.logging import get_logger
 from app.services.base_module import BaseModule, Permission
+from app.services.workflows import WorkflowRuntimeDependencies, WorkflowService
 
 from ..protocols import AgentServiceProtocol
 
@@ -20,10 +23,14 @@ class WorkflowModule(BaseModule):
     def __init__(
         self,
         agent_service: Optional[AgentServiceProtocol] = None,
+        workflow_service: Optional[WorkflowService] = None,
         config: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(module_id="workflow", config=config)
         self.agent_service = agent_service
+        self.workflow_service = workflow_service or WorkflowService(
+            dependencies=WorkflowRuntimeDependencies(agent_service=agent_service)
+        )
         self.started_at: Optional[float] = None
         self.executions_started = 0
         self.executions_completed = 0
@@ -55,6 +62,8 @@ class WorkflowModule(BaseModule):
             "executions_started": self.executions_started,
             "executions_completed": self.executions_completed,
             "active_executions": self.executions_started - self.executions_completed,
+            "registered_step_types": len(self.workflow_service.list_step_catalog()),
+            "template_count": len(self.workflow_service.list_templates()),
             "uptime_seconds": uptime,
         }
 
@@ -66,6 +75,34 @@ class WorkflowModule(BaseModule):
 
         if action == "status":
             return {"success": True, "stats": self.get_stats()}
+
+        if action == "catalog":
+            return {
+                "success": True,
+                "steps": [
+                    step.model_dump()
+                    for step in self.workflow_service.list_step_catalog()
+                ],
+            }
+
+        if action == "templates":
+            return {
+                "success": True,
+                "templates": [
+                    template.model_dump(mode="json")
+                    for template in self.workflow_service.list_templates()
+                ],
+            }
+
+        if action == "validate":
+            try:
+                definition = self.workflow_service.validate_definition(
+                    request.get("definition", {})
+                )
+            except ValidationError as exc:
+                return {"success": False, "error": str(exc), "details": exc.errors()}
+
+            return {"success": True, "definition": definition.model_dump(mode="json")}
 
         if action == "execute":
             self.executions_started += 1
@@ -85,10 +122,15 @@ class WorkflowModule(BaseModule):
 
 def create_module(
     agent_service: Optional[AgentServiceProtocol] = None,
+    workflow_service: Optional[WorkflowService] = None,
     config: Optional[Dict[str, Any]] = None,
 ) -> WorkflowModule:
     """Factory function for dependency injection."""
-    return WorkflowModule(agent_service=agent_service, config=config)
+    return WorkflowModule(
+        agent_service=agent_service,
+        workflow_service=workflow_service,
+        config=config,
+    )
 
 
 workflow_module = WorkflowModule()

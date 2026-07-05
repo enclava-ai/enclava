@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Workflow Automation
 status: Active
-stopped_at: Milestone v1.1 created from workflow implementation plan; ready to discuss Phase 1
-last_updated: "2026-07-05T00:00:00.000Z"
-last_activity: 2026-07-05 - Ingested workflow implementation plan and created v1.1 milestone
+stopped_at: Phase 1 completed; ready to discuss Phase 2
+last_updated: "2026-07-05T18:56:00.000Z"
+last_activity: 2026-07-05 - Completed Phase 1 Product Contract and Scaffold
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 22
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 9
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-07-05)
 
 ## Current Position
 
-Phase: 1 - Product Contract and Scaffold
+Phase: 2 - Persistence, API, Permissions, and Audit
 Plan: Not planned yet
 Status: Active
-Last activity: 2026-07-05 - Ingested `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md` and created v1.1 milestone
+Last activity: 2026-07-05 - Completed Phase 1 Product Contract and Scaffold
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-07-05 - Ingested `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md
 
 - Phases planned: 8
 - Plans planned: 22
-- Plans completed: 0
+- Plans completed: 2
 
 ## Accumulated Context
 
@@ -57,6 +57,7 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Milestone v1.1]: Workflow production behavior uses dedicated internal APIs, not the generic module execute endpoint.
 - [Milestone v1.1]: Postgres is the workflow source of truth.
 - [Milestone v1.1]: Start with an in-process scheduler/runner backed by Postgres and escalate only if scale requires it.
+- [Phase 1]: Workflow contracts live in `app.schemas.workflow`; scaffold service and templates live in `app.services.workflows`.
 
 ### Pending Todos
 
@@ -88,10 +89,10 @@ Items intentionally deferred from the first useful workflow release:
 ## Session Continuity
 
 Last session: 2026-07-05T00:00:00.000Z
-Stopped at: Milestone v1.1 created; ready to discuss Phase 1
+Stopped at: Phase 1 completed; ready to discuss Phase 2
 Resume file: None
 
 ## Operator Next Steps
 
-- Start Phase 1 with `$gsd-discuss-phase 1`
-- Or skip discussion and plan directly with `$gsd-plan-phase 1`
+- Start Phase 2 with `$gsd-discuss-phase 2`
+- Or skip discussion and plan directly with `$gsd-plan-phase 2`
