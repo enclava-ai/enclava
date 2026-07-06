@@ -223,7 +223,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 08-02: Add backend, frontend, and E2E/UAT coverage for workflow release criteria.
+- [x] 08-02: Add backend, frontend, and E2E/UAT coverage for workflow release criteria. (completed 2026-07-06)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -243,7 +243,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Builder, Templates, and Validation | 3/3 | Complete | 2026-07-05 |
 | 6. Connector and Extract Integration | 2/2 | Complete | 2026-07-05 |
 | 7. Advanced Control Flow and Triggers | 3/3 | Complete | 2026-07-05 |
-| 8. Hardening, Observability, and Release | 1/3 | In Progress | - |
+| 8. Hardening, Observability, and Release | 2/3 | In Progress | - |
 
 ## Archives
 
