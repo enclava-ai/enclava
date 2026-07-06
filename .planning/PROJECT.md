@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Enclava is a confidential AI platform with a FastAPI backend, Next.js frontend, dynamic modules, RAG, LLM provider orchestration, plugin support, connectors, usage tracking, admin controls, and a polished enterprise frontend foundation. The next milestone turns workflows into a first-class automation capability for scheduled and manual confidential AI operations.
+Enclava is a confidential AI platform with a FastAPI backend, Next.js frontend, dynamic modules, RAG, LLM provider orchestration, plugin support, connectors, usage tracking, admin controls, a polished enterprise frontend foundation, and first-class workflow automation for scheduled and manual confidential AI operations.
 
 ## Core Value
 
@@ -12,7 +12,7 @@ Users can run confidential AI automations that are scheduled, auditable, observa
 
 **Shipped milestone:** v1.0 Frontend UX Overhaul, completed 2026-07-01.
 
-**Active milestone:** v1.1 Workflow Automation, created 2026-07-05 from `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`.
+**Current milestone:** v1.1 Workflow Automation, implemented 2026-07-06 and ready for milestone audit/completion.
 
 **Delivered in v1.0:**
 - Deprecated frontend routes and sole-use proxies were removed.
@@ -27,9 +27,11 @@ Users can run confidential AI automations that are scheduled, auditable, observa
 - Accessibility labels, live-region feedback, and frontend UX guardrail documentation are in place.
 
 **Current workflow baseline:**
-- `backend/app/modules/workflow/main.py` exists as a module stub with basic status and echo-style execute behavior.
-- Workflow module metadata and permissions exist, but there is no real workflow engine, persistence, scheduling, dedicated UI route, or production run API yet.
-- Workflow UX sketches and a full implementation plan exist under `.planning/`.
+- Workflows are durable Postgres-backed automations with definitions, immutable published versions, triggers, runs, step runs, events, artifacts, approvals, and audit records.
+- `/workflows` exposes an Operations Console, workflow list, schedule board, templates, typed builder, run detail, and admin metrics for workflow managers.
+- Dedicated authenticated workflow APIs live under `/api-internal/v1/workflows`; production behavior does not depend on the generic module execute endpoint.
+- Runtime support covers manual runs, scheduled runs, API/event trigger foundations, retries, cancellation, budget checks, redaction, branch skips, approval pause/resume, stale-lock recovery, and retention maintenance.
+- Workflow release docs live in `docs/workflows/operations.md`, `docs/workflows/uat.md`, and `docs/workflows/release.md`.
 
 **Archive references:**
 - `.planning/milestones/v1.0-ROADMAP.md`
@@ -38,9 +40,9 @@ Users can run confidential AI automations that are scheduled, auditable, observa
 
 ## Active Milestone Goals
 
-v1.1 Workflow Automation should deliver workflows as a governed automation layer around existing Enclava capabilities.
+v1.1 Workflow Automation delivered workflows as a governed automation layer around existing Enclava capabilities.
 
-Primary goals:
+Delivered goals:
 
 - Add a Workflows product route with Operations Console as the default view.
 - Add durable workflow definitions, versions, triggers, runs, step runs, artifacts, and events.
@@ -70,17 +72,7 @@ Primary goals:
 
 ### Active
 
-See `.planning/REQUIREMENTS.md` for v1.1 requirements.
-
-Primary active requirement groups:
-
-- Product model and UX.
-- Definition lifecycle and persistence.
-- Execution engine.
-- Scheduling and operations.
-- Builder and templates.
-- Connector and Extract integrations.
-- Security, governance, observability, and release readiness.
+No active milestone requirements. v1.1 is implemented and ready for milestone audit/completion.
 
 ### Out of Scope
 
@@ -143,6 +135,7 @@ Workflow context:
 | Retain durable workflow history indefinitely | Definitions, versions, runs, step runs, approvals, and audit logs are the production record. | Active - retention only prunes verbose events and artifact payloads |
 | Keep admin metrics in Operations Console | Operators need lag, stale lock, failure, duration, and cost signals without a separate dashboard. | Active - metrics load only for workflow managers |
 | Use frontend workflow surface guard for v1.1 release coverage | The repo does not yet have a component or browser test harness, so a no-dependency source wiring guard gives runnable release coverage without adding brittle late-milestone infrastructure. | Active - future component/browser tests remain deferred |
+| Use release checklist for workflow closeout | Operators need one doc that ties automated verification, rebuilds, live smoke checks, and known limits together. | Active - `docs/workflows/release.md` |
 
 ## Evolution
 
@@ -155,4 +148,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Define the next Active requirements when a new milestone starts.
 
 ---
-*Last updated: 2026-07-06 after completing Phase 8 Plan 08-02*
+*Last updated: 2026-07-06 after completing Phase 8 Plan 08-03*

@@ -9,7 +9,7 @@ The first vertical slice is Nightly RAG Summary: a scheduled workflow that finds
 ## Milestones
 
 - **v1.0 Frontend UX Overhaul** - Phases 1-7, shipped 2026-07-01. Full archive: `.planning/milestones/v1.0-ROADMAP.md`.
-- **v1.1 Workflow Automation** - Phases 1-8, active, created 2026-07-05 from `.planning/WORKFLOWS_IMPLEMENTATION_PLAN.md`.
+- **v1.1 Workflow Automation** - Phases 1-8, implemented 2026-07-06 and ready for milestone audit/completion.
 
 ## Phases
 
@@ -25,7 +25,7 @@ The first vertical slice is Nightly RAG Summary: a scheduled workflow that finds
 - [x] **Phase 5: Builder, Templates, and Validation** - Build the typed step builder, step catalog forms, schedule preview validation, templates, draft/publish flow, and Nightly RAG Summary template. (completed 2026-07-05)
 - [x] **Phase 6: Connector and Extract Integration** - Add connector sync and Extract template step types with artifact handling and module-specific run summaries. (completed 2026-07-05)
 - [x] **Phase 7: Advanced Control Flow and Triggers** - Add only proven advanced controls: branches, approvals, pause/resume, and API/event trigger foundations. (completed 2026-07-05)
-- [ ] **Phase 8: Hardening, Observability, and Release** - Add recovery, scale, retention, admin metrics, E2E/UAT coverage, docs, container rebuilds, and release smoke checks.
+- [x] **Phase 8: Hardening, Observability, and Release** - Add recovery, scale, retention, admin metrics, E2E/UAT coverage, docs, container rebuilds, and release smoke checks. (completed 2026-07-06)
 
 ## Phase Details
 
@@ -227,7 +227,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 08-03: Rebuild containers, run release smoke checks, close docs, and prepare milestone completion.
+- [x] 08-03: Rebuild containers, run release smoke checks, close docs, and prepare milestone completion. (completed 2026-07-06)
 
 ## Progress
 
@@ -243,7 +243,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Builder, Templates, and Validation | 3/3 | Complete | 2026-07-05 |
 | 6. Connector and Extract Integration | 2/2 | Complete | 2026-07-05 |
 | 7. Advanced Control Flow and Triggers | 3/3 | Complete | 2026-07-05 |
-| 8. Hardening, Observability, and Release | 2/3 | In Progress | - |
+| 8. Hardening, Observability, and Release | 3/3 | Complete | 2026-07-06 |
 
 ## Archives
 

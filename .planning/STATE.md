@@ -2,33 +2,33 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Phase 8 Plan 08-03 planned; ready to execute release closeout
-last_updated: "2026-07-06T00:11:00.000Z"
-last_activity: 2026-07-06 - Planned Phase 8 Plan 08-03 workflow release closeout
+status: ready_for_completion
+stopped_at: v1.1 Workflow Automation implementation complete; ready for milestone audit/completion
+last_updated: "2026-07-06T00:16:30.000Z"
+last_activity: 2026-07-06 - Completed Phase 8 Plan 08-03 workflow release closeout
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 22
-  completed_plans: 21
-  percent: 95
+  completed_plans: 22
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-05)
+See: .planning/PROJECT.md (updated 2026-07-06)
 
 **Core value:** Users can run confidential AI automations that are scheduled, auditable, observable, budget-aware, and clear to operate.
-**Current focus:** Phase 8 — Hardening, Observability, and Release
+**Current focus:** Milestone audit and completion
 
 ## Current Position
 
-Phase: 8 (Hardening, Observability, and Release) — READY
+Phase: 8 (Hardening, Observability, and Release) — COMPLETE
 Plan: 08-03 (3 of 3)
-Status: Ready to execute Phase 8 Plan 08-03
-Last activity: 2026-07-06 - Planned Phase 8 Plan 08-03 workflow release closeout
+Status: Ready for milestone audit/completion
+Last activity: 2026-07-06 - Completed Phase 8 Plan 08-03 workflow release closeout
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Last activity: 2026-07-06 - Planned Phase 8 Plan 08-03 workflow release closeout
 
 - Phases planned: 8
 - Plans planned: 22
-- Plans completed: 21
+- Plans completed: 22
 
 ## Accumulated Context
 
@@ -86,10 +86,11 @@ Decisions are logged in PROJECT.md Key Decisions table. New milestone decisions:
 - [Phase 8]: Workflow retention removes only verbose events and artifact payload/storage URI data; durable definitions, versions, runs, step runs, approvals, and audit logs remain.
 - [Phase 8]: Admin workflow metrics and maintenance actions are manage-only and load opportunistically in the Operations Console.
 - [Phase 8]: Frontend workflow release coverage uses a no-dependency wiring guard until a real component/browser harness is introduced.
+- [Phase 8]: Workflow release closeout uses `docs/workflows/release.md` as the operator checklist for verification, rebuild, and live smoke evidence.
 
 ### Pending Todos
 
-- Phase 8 Plan 08-03 ready for execution.
+- Run milestone audit and completion/archive workflow.
 
 ### Blockers/Concerns
 
@@ -116,11 +117,10 @@ Items intentionally deferred from the first useful workflow release:
 
 ## Session Continuity
 
-Last session: 2026-07-06T00:11:00.000Z
-Stopped at: Phase 8 Plan 08-03 planned; ready to execute release closeout
+Last session: 2026-07-06T00:16:30.000Z
+Stopped at: v1.1 Workflow Automation implementation complete; ready for milestone audit/completion
 Resume file: None
 
 ## Operator Next Steps
 
-- Execute Phase 8 Plan 08-03 release closeout.
-- Continue autonomous execution with `$gsd-autonomous --auto`.
+- Run milestone audit/completion when ready.
