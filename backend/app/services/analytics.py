@@ -714,14 +714,9 @@ class InMemoryAnalyticsService:
                 avg_tokens_per_request = 0
                 avg_cost_per_request_cents = 0
 
-            # Mock budget information (since we don't have DB access here)
-            total_budget_cents = 100000  # $1000 default
-            used_budget_cents = total_cost_cents
-
-            if total_budget_cents > 0:
-                budget_usage_percentage = (used_budget_cents / total_budget_cents) * 100
-            else:
-                budget_usage_percentage = 0
+            total_budget_cents = 0
+            used_budget_cents = 0
+            budget_usage_percentage = 0
 
             # Top endpoints from memory
             endpoint_counts = defaultdict(int)
@@ -776,7 +771,7 @@ class InMemoryAnalyticsService:
                 total_budget_cents=total_budget_cents,
                 used_budget_cents=used_budget_cents,
                 budget_usage_percentage=round(budget_usage_percentage, 2),
-                active_budgets=1,  # Mock value
+                active_budgets=0,
                 top_endpoints=top_endpoints,
                 status_codes=dict(status_counts),
                 top_models=top_models,
@@ -874,7 +869,7 @@ class InMemoryAnalyticsService:
                 error_rate=metrics.error_rate,
                 requests_per_minute=metrics.requests_per_minute,
                 budget_usage_percentage=metrics.budget_usage_percentage,
-                budgets_near_limit=0,  # Mock values since no DB access
+                budgets_near_limit=0,
                 budgets_exceeded=0,
                 timestamp=datetime.now(timezone.utc),
             )

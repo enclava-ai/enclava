@@ -111,8 +111,6 @@ async def _maybe_await(value: Any) -> Any:
 
 
 async def _log_budget_audit_event(db: AsyncSession, **kwargs: Any) -> None:
-    if db.__class__.__module__.startswith("unittest.mock"):
-        return
     await log_audit_event(db=db, **kwargs)
 
 

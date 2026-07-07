@@ -7,7 +7,6 @@ import inspect
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, Optional
-from unittest.mock import Mock
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -25,7 +24,7 @@ router = APIRouter()
 
 
 def _response_data(value):
-    """Convert service DTOs and simple mocks to JSON-safe data."""
+    """Convert service DTOs and plain objects to JSON-safe data."""
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, (datetime, date)):
@@ -36,12 +35,6 @@ def _response_data(value):
         return {key: _response_data(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set)):
         return [_response_data(item) for item in value]
-    if isinstance(value, Mock):
-        return {
-            key: _response_data(item)
-            for key, item in value.__dict__.items()
-            if not key.startswith("_") and key != "method_calls" and not callable(item)
-        }
     if hasattr(value, "model_dump"):
         return _response_data(value.model_dump())
 
@@ -274,15 +267,9 @@ async def get_module_analytics(
         for name, module in module_manager.modules.items():
             stats = {"name": name, "initialized": getattr(module, "initialized", False)}
 
-            # Get module statistics if available. Plain mocks report any
-            # attribute as present, so only call explicitly assigned mock methods.
+            # Get module statistics if available.
             get_stats = getattr(module, "get_stats", None)
-            has_explicit_mock_stats = (
-                isinstance(module, Mock) and "get_stats" in module.__dict__
-            )
-            if callable(get_stats) and (
-                not isinstance(module, Mock) or has_explicit_mock_stats
-            ):
+            if callable(get_stats):
                 try:
                     module_data = _response_data(get_stats())
                     if isinstance(module_data, dict):

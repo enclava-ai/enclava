@@ -7,7 +7,6 @@ endpoint smoke tests. They are mounted only when TESTING/LLM_TEST_MODE is set.
 import inspect
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-from unittest.mock import Mock
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr
@@ -26,10 +25,9 @@ async def _maybe_await(value: Any) -> Any:
 
 def _value(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, dict):
-        value = obj.get(name, default)
+        return obj.get(name, default)
     else:
-        value = getattr(obj, name, default)
-    return default if isinstance(value, Mock) else value
+        return getattr(obj, name, default)
 
 
 def _user_dict(user: Any) -> Dict[str, Any]:

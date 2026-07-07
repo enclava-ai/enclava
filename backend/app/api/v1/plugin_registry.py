@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.core.security import get_current_user
-from app.db.database import get_db
+from app.db.database import get_db, utc_now
+from app.models.plugin import Plugin, PluginAuditLog
 from app.models.user import User
 from app.services.plugin_context_manager import plugin_context_manager
 from app.services.plugin_registry import plugin_discovery, plugin_installer
@@ -78,10 +79,11 @@ async def discover_plugins(
 @router.get("/categories")
 async def get_plugin_categories(
     current_user: Dict[str, Any] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get available plugin categories"""
     try:
-        categories = await plugin_discovery.get_plugin_categories()
+        categories = await plugin_discovery.get_plugin_categories(db)
         return {"categories": categories}
 
     except Exception as e:
@@ -548,4 +550,32 @@ async def install_plugin_background(
 
     except Exception as e:
         logger.error(f"Background installation failed: {e}")
-        # TODO: Notify user of installation failure
+        try:
+            from sqlalchemy import select
+
+            result = await db.execute(select(Plugin).where(Plugin.name == plugin_id))
+            plugin = result.scalar_one_or_none()
+            if plugin:
+                plugin.status = "error"
+                plugin.last_error = str(e)
+                plugin.error_count = (plugin.error_count or 0) + 1
+                plugin.last_error_at = utc_now()
+                db.add(
+                    PluginAuditLog(
+                        plugin_id=plugin.id,
+                        event_type="installation",
+                        action="install_failed",
+                        user_id=int(user_id),
+                        request_data={"version": version, "source": "repository"},
+                        success=False,
+                        error_message=str(e),
+                    )
+                )
+                await db.commit()
+            else:
+                await db.rollback()
+        except Exception as persist_error:
+            await db.rollback()
+            logger.error(
+                f"Failed to persist plugin installation failure: {persist_error}"
+            )

@@ -549,12 +549,7 @@ class BudgetEnforcementService:
                 continue
 
             reset_day = int(getattr(budget, "reset_day", 1) or 1)
-            import datetime as datetime_module
-
-            datetime_is_mocked = (
-                "unittest.mock" in type(datetime_module.datetime).__module__
-            )
-            if datetime_is_mocked and now.day != reset_day:
+            if now.day != reset_day:
                 continue
 
             self._legacy_set_usage(budget, Decimal("0.00"))

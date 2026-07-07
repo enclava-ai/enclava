@@ -14,7 +14,6 @@ import logging
 import time
 from datetime import datetime
 from typing import Any, Iterator, Optional
-from unittest.mock import Mock
 
 try:
     import github as github_sdk
@@ -38,7 +37,6 @@ _DEFAULTS: dict[str, Any] = {
     "include_issues": True,
     "include_pull_requests": True,
     "include_readme": True,
-    "include_discussions": False,
     "state": "all",
 }
 
@@ -62,7 +60,6 @@ class GitHubConnector(BaseConnector):
             "include_issues":         True,
             "include_pull_requests":  True,
             "include_readme":         True,
-            "include_discussions":    False,  # not implemented
             "state":                  "all",  # "open" | "closed" | "all"
         }
     """
@@ -405,10 +402,7 @@ class GitHubConnector(BaseConnector):
                     issue_kwargs["since"] = since
                 for issue in repo.get_issues(**issue_kwargs):
                     # get_issues returns both issues AND pull requests
-                    pull_request_marker = getattr(issue, "pull_request", None)
-                    if isinstance(pull_request_marker, Mock):
-                        pull_request_marker = None
-                    if pull_request_marker is not None:
+                    if getattr(issue, "pull_request", None) is not None:
                         continue  # skip PRs here; handled separately below
                     try:
                         yield self._build_issue_doc(repo, issue)

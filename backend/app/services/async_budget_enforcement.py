@@ -12,7 +12,6 @@ Small budget overages (by the cost of one request) are acceptable.
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import Mock
 
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -339,24 +338,6 @@ async def async_check_budget_for_request(
     endpoint: str = None,
 ) -> Tuple[bool, Optional[str], List[Dict[str, Any]]]:
     """Async convenience function to check budget compliance"""
-    try:
-        from app.services.budget_enforcement import BudgetEnforcementService
-
-        legacy_check = BudgetEnforcementService.check_budget_compliance
-        if isinstance(legacy_check, Mock):
-            try:
-                return legacy_check(
-                    BudgetEnforcementService(db),
-                    api_key,
-                    model_name,
-                    estimated_tokens,
-                    endpoint,
-                )
-            except Exception as e:
-                return False, str(e), []
-    except ImportError:
-        pass
-
     service = AsyncBudgetEnforcementService(db)
     return await service.check_budget_compliance(
         api_key, model_name, estimated_tokens, endpoint

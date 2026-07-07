@@ -119,11 +119,10 @@ async def stream_response_events_with_tracking(
 
                         # Track chunks from output_text.delta events
                         if "delta" in data and isinstance(data.get("delta"), str):
-                            # Create a fake chunk for tracker
-                            fake_chunk = {
+                            tracker_chunk = {
                                 "choices": [{"delta": {"content": data["delta"]}}]
                             }
-                            tracker.process_chunk(fake_chunk)
+                            tracker.process_chunk(tracker_chunk)
 
                         # Check for completion or failure events
                         event_type = lines[0].replace("event:", "").strip()

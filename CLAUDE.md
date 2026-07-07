@@ -6,16 +6,18 @@ Enclava is a confidential AI platform providing OpenAI-compatible chatbots and A
 
 ## Warnings and rules
 - Do not try to change to timestamps with timezones 
+- Use Docker Compose for local containers, not Podman.
+- After shipping code that affects the running app, rebuild/recreate containers and smoke-check the public routes before calling the work done.
 
 ## Development Commands
 
 ### Start Development Environment
 ```bash
 # Start all services (first run will build containers)
-podman compose up --build
+sudo docker compose up --build
 
 # Run in background
-podman compose up --build -d
+sudo docker compose up --build -d
 ```
 
 Application accessible at:
@@ -24,17 +26,34 @@ Application accessible at:
 - Backend API docs: http://localhost:1080/api/v1/docs
 - Qdrant dashboard: http://localhost:56333/dashboard
 
+### Container Closeout
+```bash
+# Always run after completing app changes that should be reflected locally
+sudo docker compose up --build -d
+
+# Nginx can keep stale upstream container addresses after backend/frontend recreate
+sudo docker compose restart enclava-nginx
+
+# Verify services and public routes
+sudo docker compose ps
+curl -I --max-time 10 http://localhost:1080/
+curl -I --max-time 10 http://localhost:1080/settings/llm
+curl -I --max-time 10 http://localhost:1080/api/v1/docs
+```
+
+If Docker socket access is configured for the current user, the same commands can be run without `sudo`.
+
 ### Backend Testing
 ```bash
 # Run tests with Docker (uses docker-compose.test.yml)
 cd backend
-podman compose -f ../docker-compose.test.yml run --rm enclava-backend-test pytest
+sudo docker compose -f ../docker-compose.test.yml run --rm enclava-backend-test pytest
 
 # Run specific test file
-podman compose -f ../docker-compose.test.yml run --rm enclava-backend-test pytest tests/test_auth_security.py
+sudo docker compose -f ../docker-compose.test.yml run --rm enclava-backend-test pytest tests/test_auth_security.py
 
 # Run single test
-podman compose -f ../docker-compose.test.yml run --rm enclava-backend-test pytest tests/test_auth_security.py::test_function_name -v
+sudo docker compose -f ../docker-compose.test.yml run --rm enclava-backend-test pytest tests/test_auth_security.py::test_function_name -v
 ```
 
 ### Backend Linting/Formatting
@@ -71,7 +90,7 @@ alembic upgrade head
 
 ### Tech Stack
 - **Backend**: FastAPI (Python 3.11), SQLAlchemy async, Pydantic
-- **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS, Radix UI
+- **Frontend**: Next.js 16, React 19, TypeScript 6, Tailwind CSS, Radix UI
 - **Databases**: PostgreSQL 16, Redis 7, Qdrant (vector DB)
 - **LLM Proxy**: privatemode.ai proxy for confidential inference
 

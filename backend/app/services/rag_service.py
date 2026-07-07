@@ -133,11 +133,7 @@ class RAGService:
             .filter(RagCollection.name == collection_data.get("name"))
             .first()
         )
-        try:
-            from unittest.mock import MagicMock
-        except ImportError:
-            MagicMock = ()
-        if existing and not isinstance(existing, MagicMock):
+        if existing:
             raise ValueError(
                 f"Collection '{collection_data.get('name')}' already exists"
             )

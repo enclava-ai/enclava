@@ -62,7 +62,7 @@ class ToolHistoryResponse(BaseModel):
 
 
 class ToolCallRequest(BaseModel):
-    """Schema for tool call request (placeholder for future use)"""
+    """Schema for requesting tool-aware chat handling."""
 
     message: str = Field(..., description="Chat message")
     tools: Optional[List[str]] = Field(

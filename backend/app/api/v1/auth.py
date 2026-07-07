@@ -4,7 +4,6 @@ import inspect
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
-from unittest.mock import Mock
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -68,10 +67,9 @@ def _token_and_jti(value):
 
 def _value(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, dict):
-        value = obj.get(name, default)
+        return obj.get(name, default)
     else:
-        value = getattr(obj, name, default)
-    return default if isinstance(value, Mock) else value
+        return getattr(obj, name, default)
 
 
 def _role_name(user: Any) -> Optional[str]:
@@ -236,15 +234,6 @@ class ChangePasswordRequest(BaseModel):
 async def register(user_data: UserRegisterRequest, db: AsyncSession = Depends(get_db)):
     """Register a new user"""
 
-    if isinstance(create_user, Mock):
-        created_user = await _maybe_await(create_user(user_data))
-        if not created_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Registration failed",
-            )
-        return _user_response(created_user)
-
     # Check if user already exists
     stmt = select(User).where(User.email == user_data.email)
     result = await db.execute(stmt)
@@ -292,40 +281,6 @@ async def login(user_data: UserLoginRequest, db: AsyncSession = Depends(get_db))
     # SECURITY FIX #41, #52: Don't log PII or timing details in production
     # Only log minimal information needed for debugging
     identifier = user_data.email if user_data.email else user_data.username
-
-    if isinstance(authenticate_user, Mock):
-        try:
-            user = await _maybe_await(authenticate_user(identifier, user_data.password))
-        except Exception as exc:
-            logger.error("Legacy authentication hook failed", error=str(exc))
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal server error",
-            ) from exc
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-            )
-        if not bool(_value(user, "is_active", True)):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User account is disabled",
-            )
-
-        access_token = create_access_token(data={"sub": str(_value(user, "id", ""))})
-        refresh_token, _ = _token_and_jti(
-            create_refresh_token(
-                data={"sub": str(_value(user, "id", "")), "type": "refresh"}
-            )
-        )
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": _user_payload(user),
-        }
 
     # Redact email/username for logging - show only domain for email or first 2 chars for username
     if user_data.email and "@" in identifier:

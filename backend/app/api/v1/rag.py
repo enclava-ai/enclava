@@ -8,7 +8,6 @@ import inspect
 import io
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from unittest.mock import Mock
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -16,7 +15,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.security import get_current_user
 from app.db.database import get_db
 from app.models.rag_collection import CollectionVisibility, RagCollection
@@ -102,10 +100,6 @@ async def _maybe_await(value: Any) -> Any:
     return value
 
 
-def _is_service_mocked() -> bool:
-    return isinstance(RAGService, Mock)
-
-
 def _current_user_id(current_user: Any) -> Any:
     if isinstance(current_user, dict):
         return current_user.get("id")
@@ -131,17 +125,6 @@ async def get_collections(
 ):
     """Get all RAG collections - live data directly from Qdrant (source of truth)"""
     try:
-        if (settings.TESTING or _is_service_mocked()) and _is_service_mocked():
-            rag_service = RAGService(db)
-            collections = await _maybe_await(
-                rag_service.get_all_collections(skip=skip, limit=limit)
-            )
-            return {
-                "success": True,
-                "collections": [_as_dict(collection) for collection in collections],
-                "total": len(collections),
-            }
-
         from app.services.qdrant_stats_service import qdrant_stats_service
 
         # Get live stats from Qdrant
@@ -198,11 +181,6 @@ async def get_rag_stats(
 ):
     """Get overall RAG statistics - live data directly from Qdrant"""
     try:
-        if (settings.TESTING or _is_service_mocked()) and _is_service_mocked():
-            rag_service = RAGService(db)
-            stats_data = await _maybe_await(rag_service.get_stats())
-            return {"success": True, "stats": stats_data}
-
         from app.services.qdrant_stats_service import qdrant_stats_service
 
         # Get live stats from Qdrant
@@ -274,11 +252,8 @@ async def get_collection(
     """Get a specific collection"""
     try:
         rag_service = RAGService(db)
-        service_collection_id = (
-            collection_id if _is_service_mocked() else int(collection_id)
-        )
         collection = await _maybe_await(
-            rag_service.get_collection(service_collection_id)
+            rag_service.get_collection(int(collection_id))
         )
 
         if not collection:
@@ -304,12 +279,9 @@ async def delete_collection(
     """Delete a collection and optionally all its documents"""
     try:
         rag_service = RAGService(db)
-        if _is_service_mocked():
-            success = await _maybe_await(rag_service.delete_collection(collection_id))
-        else:
-            success = await rag_service.delete_collection(
-                int(collection_id), cascade=cascade
-            )
+        success = await rag_service.delete_collection(
+            int(collection_id), cascade=cascade
+        )
 
         if not success:
             raise HTTPException(status_code=404, detail="Collection not found")
@@ -439,16 +411,14 @@ async def upload_document(
                         status_code=400, detail="File is not valid UTF-8 text"
                     )
 
-            elif file_extension in ["pdf"] and not _is_service_mocked():
+            elif file_extension in ["pdf"]:
                 # For PDF files, just check if it starts with PDF signature
                 if not file_content.startswith(b"%PDF"):
                     raise HTTPException(
                         status_code=400, detail="Invalid PDF file format"
                     )
 
-            elif (
-                file_extension in ["docx", "xlsx", "pptx"] and not _is_service_mocked()
-            ):
+            elif file_extension in ["docx", "xlsx", "pptx"]:
                 # For Office documents, check ZIP signature
                 if not file_content.startswith(b"PK"):
                     raise HTTPException(
@@ -524,22 +494,6 @@ async def get_collection_documents(
     current_user: User = Depends(get_current_user),
 ):
     """Get documents for a collection."""
-    if _is_service_mocked():
-        try:
-            rag_service = RAGService(db)
-            documents = await _maybe_await(
-                rag_service.get_documents(
-                    collection_id=collection_id, skip=skip, limit=limit
-                )
-            )
-            return {
-                "success": True,
-                "documents": [_as_dict(doc) for doc in documents],
-                "total": len(documents),
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
     return await get_documents(
         collection_id=collection_id,
         skip=skip,
@@ -574,8 +528,7 @@ async def get_document(
     """Get a specific document"""
     try:
         rag_service = RAGService(db)
-        service_document_id = document_id if _is_service_mocked() else int(document_id)
-        document = await _maybe_await(rag_service.get_document(service_document_id))
+        document = await _maybe_await(rag_service.get_document(int(document_id)))
 
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -596,10 +549,7 @@ async def delete_document(
     """Delete a document"""
     try:
         rag_service = RAGService(db)
-        if _is_service_mocked():
-            success = await _maybe_await(rag_service.delete_document(document_id))
-        else:
-            success = await rag_service.delete_document(int(document_id))
+        success = await rag_service.delete_document(int(document_id))
 
         if not success:
             raise HTTPException(status_code=404, detail="Document not found")

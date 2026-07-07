@@ -35,6 +35,70 @@ logger = get_logger("plugin.gateway")
 security = HTTPBearer()
 
 
+def _coerce_permission_list(raw: Any) -> List[str]:
+    """Normalize permission input into a clean list of strings."""
+    if not raw:
+        return []
+
+    if isinstance(raw, str):
+        return [raw]
+
+    if isinstance(raw, dict):
+        raw = raw.get("granted", raw.get("scopes", []))
+
+    if isinstance(raw, (list, tuple, set)):
+        values = []
+        for item in raw:
+            if isinstance(item, str) and item.strip():
+                values.append(item.strip())
+        return values
+
+    return []
+
+
+def _permission_matches(required: str, granted: List[str]) -> bool:
+    """Return True when required permission matches granted permission(s)."""
+    if "*" in granted:
+        return True
+
+    for granted_permission in granted:
+        if required == granted_permission:
+            return True
+
+        if granted_permission.endswith(":*"):
+            base = granted_permission[:-2]
+            if base and required.startswith(f"{base}:"):
+                return True
+
+    return False
+
+
+def _required_plugin_permissions(plugin: Plugin) -> List[str]:
+    """Collect all permission requirements defined by the plugin record and manifest."""
+    required: List[str] = []
+
+    required.extend(_coerce_permission_list(plugin.api_scopes))
+    required.extend(_coerce_permission_list(plugin.required_permissions))
+
+    manifest_permissions = []
+    manifest_data = plugin.manifest_data if plugin.manifest_data else {}
+    if isinstance(manifest_data, dict):
+        spec = manifest_data.get("spec") or {}
+        if isinstance(spec, dict):
+            raw_permissions = spec.get("permissions")
+            if isinstance(raw_permissions, dict):
+                manifest_permissions.extend(
+                    _coerce_permission_list(raw_permissions.get("platform_apis"))
+                )
+                manifest_permissions.extend(
+                    _coerce_permission_list(raw_permissions.get("plugin_scopes"))
+                )
+    required.extend(manifest_permissions)
+
+    # Deduplicate while preserving order
+    return list(dict.fromkeys(required))
+
+
 class PluginAuthenticationService:
     """Handles plugin authentication and authorization"""
 
@@ -106,14 +170,32 @@ class PluginAuthenticationService:
             if not plugin:
                 return None, None
 
-            # Verify plugin permissions for API key
-            # TODO: Check plugin-specific permissions in API key scopes
+            # Verify API key permissions for plugin requirements
+            required_permissions = _required_plugin_permissions(plugin)
+            if required_permissions:
+                api_key_permissions = _coerce_permission_list(api_key_obj.permissions)
+                api_key_scopes = _coerce_permission_list(api_key_obj.scopes)
+                granted_permissions = list(
+                    dict.fromkeys(api_key_permissions + api_key_scopes)
+                )
+
+                for required_permission in required_permissions:
+                    if not _permission_matches(
+                        required_permission, granted_permissions
+                    ):
+                        return None, None
+
+            effective_permissions = _required_plugin_permissions(plugin)
+            if api_key_obj.user and getattr(api_key_obj.user, "is_superuser", False):
+                effective_permissions = ["*"]
+            elif not effective_permissions:
+                effective_permissions = ["api_access"]
 
             return api_key_obj.user_id, {
                 "user": api_key_obj.user,
                 "plugin": plugin,
                 "api_key": api_key_obj,
-                "permissions": ["api_access"],
+                "permissions": effective_permissions,
             }
 
         except Exception as e:

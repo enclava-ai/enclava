@@ -25,7 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.database import get_db, utc_now
-from app.models.plugin import Plugin, PluginAuditLog, PluginConfiguration
+from app.models.plugin import (
+    Plugin,
+    PluginAuditLog,
+    PluginConfiguration,
+    PluginPermission,
+)
 from app.models.user import User
 from app.schemas.plugin_manifest import PluginManifestValidator, validate_manifest_file
 from app.services.plugin_database import plugin_db_manager, plugin_migration_manager
@@ -687,13 +692,44 @@ class PluginDiscoveryService:
     ) -> List[Dict[str, Any]]:
         """Get list of installed plugins for user"""
         try:
-            # Get all installed plugins (for now, show all plugins to all users)
-            # TODO: Implement proper user-based plugin visibility/permissions
-            from sqlalchemy import select
+            user_id_int = int(user_id)
+            user_result = await db.execute(select(User).where(User.id == user_id_int))
+            user = user_result.scalar_one_or_none()
+            if not user:
+                return []
 
-            stmt = select(Plugin).where(
-                Plugin.status.in_(["installed", "enabled", "disabled"])
-            )
+            status_filter = Plugin.status.in_(["installed", "enabled", "disabled"])
+            if getattr(user, "is_superuser", False):
+                stmt = select(Plugin).where(status_filter)
+            else:
+                granted_ids = set()
+
+                config_result = await db.execute(
+                    select(PluginConfiguration.plugin_id).where(
+                        PluginConfiguration.user_id == user_id_int,
+                        PluginConfiguration.is_active == True,
+                    )
+                )
+                granted_ids.update(config_result.scalars().all())
+
+                permission_result = await db.execute(
+                    select(PluginPermission.plugin_id).where(
+                        PluginPermission.user_id == user_id_int,
+                        PluginPermission.granted == True,
+                        or_(
+                            PluginPermission.expires_at.is_(None),
+                            PluginPermission.expires_at > utc_now(),
+                        ),
+                    )
+                )
+                granted_ids.update(permission_result.scalars().all())
+
+                visibility_filters = [Plugin.installed_by_user_id == user_id_int]
+                if granted_ids:
+                    visibility_filters.append(Plugin.id.in_(granted_ids))
+
+                stmt = select(Plugin).where(status_filter, or_(*visibility_filters))
+
             result = await db.execute(stmt)
             installed_plugins = result.scalars().all()
 
@@ -805,49 +841,73 @@ class PluginDiscoveryService:
             logger.error(f"Error checking plugin updates: {e}")
             return []
 
-    async def get_plugin_categories(self) -> List[Dict[str, Any]]:
-        """Get available plugin categories"""
+    async def get_plugin_categories(
+        self, db: Optional[AsyncSession] = None
+    ) -> List[Dict[str, Any]]:
+        """Get available plugin categories from installed and repository metadata."""
         try:
-            # TODO: Implement category discovery from repository
-            default_categories = [
-                {
-                    "id": "integrations",
-                    "name": "Integrations",
-                    "description": "Third-party service integrations",
-                },
-                {
-                    "id": "ai-tools",
-                    "name": "AI Tools",
-                    "description": "AI and machine learning tools",
-                },
-                {
-                    "id": "productivity",
-                    "name": "Productivity",
-                    "description": "Productivity and workflow tools",
-                },
-                {
-                    "id": "analytics",
-                    "name": "Analytics",
-                    "description": "Data analytics and reporting",
-                },
-                {
-                    "id": "communication",
-                    "name": "Communication",
-                    "description": "Communication and collaboration tools",
-                },
-                {
-                    "id": "security",
-                    "name": "Security",
-                    "description": "Security and compliance tools",
-                },
-            ]
+            discovered_tags: set[str] = set()
 
-            return default_categories
+            if db is not None:
+                result = await db.execute(
+                    select(Plugin).where(
+                        Plugin.status.in_(["installed", "enabled", "disabled"])
+                    )
+                )
+                for plugin in result.scalars().all():
+                    manifest = plugin.manifest_data or {}
+                    metadata = (
+                        manifest.get("metadata", {})
+                        if isinstance(manifest, dict)
+                        else {}
+                    )
+                    tags = (
+                        metadata.get("tags", [])
+                        if isinstance(metadata, dict)
+                        else []
+                    )
+                    if isinstance(tags, list):
+                        discovered_tags.update(
+                            tag.strip().lower()
+                            for tag in tags
+                            if isinstance(tag, str) and tag.strip()
+                        )
+
+            repository_plugins = await self.repo_client.search_plugins("", None, 100)
+            for plugin in repository_plugins:
+                tags = plugin.get("tags", [])
+                if isinstance(tags, list):
+                    discovered_tags.update(
+                        tag.strip().lower()
+                        for tag in tags
+                        if isinstance(tag, str) and tag.strip()
+                    )
+                category = plugin.get("category")
+                if isinstance(category, str) and category.strip():
+                    discovered_tags.add(category.strip().lower())
+
+            if not discovered_tags:
+                discovered_tags = {
+                    "integrations",
+                    "ai-tools",
+                    "productivity",
+                    "analytics",
+                    "communication",
+                    "security",
+                }
+
+            return [
+                {
+                    "id": tag,
+                    "name": tag.replace("-", " ").replace("_", " ").title(),
+                    "description": f"Plugins tagged as {tag}",
+                }
+                for tag in sorted(discovered_tags)
+            ]
 
         except Exception as e:
             logger.error(f"Error getting plugin categories: {e}")
             return []
-
 
 # Global instances
 plugin_installer = PluginInstaller()

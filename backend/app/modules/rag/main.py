@@ -678,7 +678,7 @@ class RAGModule(BaseModule):
                 "dimension": embedding_service.dimension or 384,
             }
         else:
-            # Fallback to mock implementation
+            # Continue with default vector dimensions when the embedding service is unavailable.
             logger.warning("Failed to initialize embedding model, using fallback")
             self.embedding_service = None
             return {

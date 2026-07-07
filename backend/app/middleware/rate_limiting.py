@@ -288,7 +288,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if token.startswith("eyJ"):
                 # JWT token - MUST validate signature before exempting from rate limits
                 # SECURITY FIX: Previously this just decoded without verification,
-                # allowing fake JWT-like tokens to bypass rate limiting
+                # allowing forged JWT-like tokens to bypass rate limiting
                 try:
                     payload = verify_token(token)
                     user_id = payload.get("sub")

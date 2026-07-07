@@ -7,7 +7,6 @@ import json
 import logging
 import time
 from typing import Any, Dict, List, Optional, Union
-from unittest.mock import Mock
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -31,7 +30,6 @@ from app.services.async_budget_enforcement import (
     async_check_budget_for_request,
     async_record_request_usage,
 )
-from app.services.budget_enforcement import BudgetEnforcementService
 from app.services.cost_calculator import CostCalculator, estimate_request_cost
 from app.services.llm.exceptions import (
     LLMError,
@@ -59,12 +57,10 @@ router = APIRouter()
 async def get_cached_models() -> List[Dict[str, Any]]:
     """Get models from cache or fetch from LLM service if cache is stale"""
     current_time = time.time()
-    bypass_cache = isinstance(llm_service.get_models, Mock)
 
     # Check if cache is still valid
     if (
-        not bypass_cache
-        and _models_cache["data"] is not None
+        _models_cache["data"] is not None
         and current_time - _models_cache["cached_at"] < _models_cache["cache_ttl"]
     ):
         logger.debug("Returning cached models list")
@@ -101,11 +97,8 @@ async def get_cached_models() -> List[Dict[str, Any]]:
                 model_dict["tasks"] = model_info.tasks
             models.append(model_dict)
 
-        # Update cache only for real provider calls. Tests patch get_models with
-        # Mock objects and should not read or poison the process-wide cache.
-        if not bypass_cache:
-            _models_cache["data"] = models
-            _models_cache["cached_at"] = current_time
+        _models_cache["data"] = models
+        _models_cache["cached_at"] = current_time
 
         return models
     except Exception as e:
@@ -132,10 +125,6 @@ async def _maybe_await(value: Any) -> Any:
     return value
 
 
-def _is_mock_callable(value: Any) -> bool:
-    return callable(value) and isinstance(value, Mock)
-
-
 def _to_response_dict(value: Any) -> Dict[str, Any]:
     if isinstance(value, dict):
         return value
@@ -155,20 +144,6 @@ async def check_budget_for_request(
 ) -> bool:
     """Backward-compatible budget hook used by older tests."""
     if settings.TESTING or settings.LLM_TEST_MODE:
-        legacy_checker = BudgetEnforcementService.check_budget_compliance
-        if isinstance(legacy_checker, Mock):
-            try:
-                result = legacy_checker(
-                    BudgetEnforcementService(db),
-                    api_key,
-                    model,
-                    estimated_tokens,
-                    endpoint,
-                )
-                result = await _maybe_await(result)
-            except Exception:
-                return False
-            return result[0] if isinstance(result, tuple) else bool(result)
         return True
 
     is_allowed, _, _ = await async_check_budget_for_request(
@@ -468,17 +443,7 @@ async def create_chat_completion(
             if chat_request.stream:
 
                 async def legacy_event_generator():
-                    stream_factory = getattr(
-                        llm_service, "chat_completion_stream", None
-                    )
-                    stream = None
-                    if _is_mock_callable(stream_factory):
-                        stream = await _maybe_await(stream_factory(chat_request))
-                    if stream is not None:
-                        async for chunk in stream:
-                            yield f"data: {json.dumps(chunk)}\n\n"
-                    else:
-                        yield 'data: {"choices":[{"delta":{"content":"Test"}}]}\n\n'
+                    yield 'data: {"choices":[{"delta":{"content":"Test"}}]}\n\n'
                     yield "data: [DONE]\n\n"
 
                 return StreamingResponse(
@@ -488,14 +453,7 @@ async def create_chat_completion(
                 )
 
             try:
-                legacy_chat = getattr(llm_service, "chat_completion", None)
-                service_chat = getattr(llm_service, "create_chat_completion", None)
-                if _is_mock_callable(legacy_chat):
-                    response = await _maybe_await(legacy_chat(chat_request))
-                elif _is_mock_callable(service_chat):
-                    response = await _maybe_await(service_chat(chat_request))
-                else:
-                    response = _default_chat_response(chat_request)
+                response = _default_chat_response(chat_request)
                 response = _to_response_dict(response)
             except Exception as exc:
                 _raise_legacy_llm_http_error(exc)
@@ -823,29 +781,22 @@ async def create_embedding(
                 )
 
             try:
-                legacy_embeddings = getattr(llm_service, "embeddings", None)
-                service_embeddings = getattr(llm_service, "create_embedding", None)
-                if _is_mock_callable(legacy_embeddings):
-                    response = await _maybe_await(legacy_embeddings(request))
-                elif _is_mock_callable(service_embeddings):
-                    response = await _maybe_await(service_embeddings(request))
-                else:
-                    response = {
-                        "object": "list",
-                        "data": [
-                            {
-                                "object": "embedding",
-                                "embedding": [0.0] * 1536,
-                                "index": index,
-                            }
-                            for index, _ in enumerate(input_items)
-                        ],
-                        "model": request.model,
-                        "usage": {
-                            "prompt_tokens": int(estimated_tokens),
-                            "total_tokens": int(estimated_tokens),
-                        },
-                    }
+                response = {
+                    "object": "list",
+                    "data": [
+                        {
+                            "object": "embedding",
+                            "embedding": [0.0] * 1536,
+                            "index": index,
+                        }
+                        for index, _ in enumerate(input_items)
+                    ],
+                    "model": request.model,
+                    "usage": {
+                        "prompt_tokens": int(estimated_tokens),
+                        "total_tokens": int(estimated_tokens),
+                    },
+                }
                 response = _to_response_dict(response)
                 if request.model == "privatemode-embeddings":
                     for item in response.get("data", []):
