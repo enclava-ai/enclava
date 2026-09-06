@@ -78,3 +78,5 @@ security-review.md
 backend/.env.local
 backend/.env.test
 
+
+.planning/debug/
